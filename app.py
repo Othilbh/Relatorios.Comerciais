@@ -1,0 +1,197 @@
+"""OTHIL — Relatórios Comerciais — Módulo Metas Semanais
+
+App Streamlit: faz upload dos PDFs de Estoque Físico e de Lucratividade por
+Vendedor, permite configurar os produtos da semana (nome + códigos/SKU) e os
+percentuais de cada vendedor, calcula Meta/Vendido/Falta/% e gera os 3 PDFs
+de saída (relatório por vendedor, dashboard e resumo geral).
+"""
+import json
+import datetime
+import streamlit as st
+
+from parsers import parse_estoque, parse_vendas
+from calc import compute_metas, VENDEDORES_PADRAO, parse_codigos_input, map_vendedor
+from pdfgen import generate_relatorio_vendedor, generate_dashboard, generate_resumo_geral
+
+CONFIG_PATH = 'config_semanal.json'
+
+st.set_page_config(page_title='OTHIL — Metas Semanais', layout='wide')
+
+
+# ---------------------------------------------------------------------------
+# Persistência simples da configuração da semana (produtos + percentuais)
+# ---------------------------------------------------------------------------
+
+def load_config():
+    try:
+        with open(CONFIG_PATH, 'r', encoding='utf-8') as f:
+            return json.load(f)
+    except FileNotFoundError:
+        return {
+            'produtos': [
+                {'nome': 'Melão Gaia', 'codigos_texto': '3102006*'},
+                {'nome': 'Goiaba', 'codigos_texto': '300200208,300200203'},
+            ],
+            'vendedor_pcts': dict(VENDEDORES_PADRAO),
+        }
+
+
+def save_config(cfg):
+    with open(CONFIG_PATH, 'w', encoding='utf-8') as f:
+        json.dump(cfg, f, ensure_ascii=False, indent=2)
+
+
+if 'config' not in st.session_state:
+    st.session_state.config = load_config()
+
+cfg = st.session_state.config
+
+st.title('OTHIL — Relatórios Comerciais')
+st.caption('Módulo: Metas Semanais')
+
+# ---------------------------------------------------------------------------
+# 1) Upload dos PDFs de origem
+# ---------------------------------------------------------------------------
+st.header('1. Upload dos relatórios da semana')
+col1, col2 = st.columns(2)
+with col1:
+    estoque_file = st.file_uploader('Estoque Físico (PDF)', type='pdf', key='estoque')
+with col2:
+    vendas_file = st.file_uploader('Lucratividade por Vendedor / Vendas Acumuladas (PDF)',
+                                    type='pdf', key='vendas')
+
+# ---------------------------------------------------------------------------
+# 2) Configuração semanal: produtos (nome + códigos) e percentuais
+# ---------------------------------------------------------------------------
+st.header('2. Produtos da semana')
+st.caption(
+    'Os produtos e seus códigos variam toda semana. Cole aqui os códigos de '
+    'cada produto separados por vírgula ou quebra de linha. Use um "*" no '
+    'final de um código para casar por prefixo (ex.: "3102006*" casa com '
+    'qualquer código que comece com 3102006). Sem "*", o código precisa ser exato.'
+)
+
+if st.button('➕ Adicionar produto'):
+    cfg['produtos'].append({'nome': '', 'codigos_texto': ''})
+
+remover_idx = None
+for i, p in enumerate(cfg['produtos']):
+    with st.expander(f"Produto {i+1}: {p['nome'] or '(sem nome)'}", expanded=True):
+        c1, c2, c3 = st.columns([3, 5, 1])
+        with c1:
+            p['nome'] = st.text_input('Nome do produto', value=p['nome'], key=f'nome_{i}')
+        with c2:
+            p['codigos_texto'] = st.text_area('Códigos (vírgula ou linha; use * para prefixo)',
+                                               value=p['codigos_texto'], key=f'cod_{i}', height=80)
+        with c3:
+            st.write('')
+            st.write('')
+            if st.button('🗑️', key=f'del_{i}'):
+                remover_idx = i
+
+if remover_idx is not None:
+    cfg['produtos'].pop(remover_idx)
+    st.rerun()
+
+st.subheader('Percentuais de meta por vendedor (% sobre o estoque atual)')
+pct_cols = st.columns(len(cfg['vendedor_pcts']))
+for col, (vend, pct) in zip(pct_cols, list(cfg['vendedor_pcts'].items())):
+    with col:
+        cfg['vendedor_pcts'][vend] = st.number_input(vend, min_value=0, max_value=200,
+                                                       value=int(pct), key=f'pct_{vend}')
+
+cb1, cb2, cb3 = st.columns(3)
+with cb1:
+    if st.button('💾 Salvar configuração desta semana'):
+        save_config(cfg)
+        st.success('Configuração salva.')
+with cb2:
+    st.download_button('⬇️ Exportar configuração (JSON)',
+                        data=json.dumps(cfg, ensure_ascii=False, indent=2),
+                        file_name=f"config_metas_{datetime.date.today().isoformat()}.json",
+                        mime='application/json')
+with cb3:
+    up_cfg = st.file_uploader('⬆️ Importar configuração (JSON)', type='json', key='cfg_upload')
+    if up_cfg is not None:
+        st.session_state.config = json.load(up_cfg)
+        st.rerun()
+
+st.divider()
+
+# ---------------------------------------------------------------------------
+# 3) Cálculo e relatórios
+# ---------------------------------------------------------------------------
+st.header('3. Calcular metas e gerar relatórios')
+
+periodo = st.text_input('Período (ex.: 22/06/2026 a 26/06/2026)',
+                         value=cfg.get('periodo', ''))
+data_emissao = st.text_input('Data de emissão (ex.: 29/06/2026)',
+                              value=datetime.date.today().strftime('%d/%m/%Y'))
+cfg['periodo'] = periodo
+
+if st.button('▶️ Calcular metas', type='primary'):
+    if not estoque_file or not vendas_file:
+        st.error('Envie os dois PDFs (Estoque Físico e Vendas) antes de calcular.')
+    elif not any(p['nome'].strip() for p in cfg['produtos']):
+        st.error('Cadastre ao menos um produto com nome e códigos.')
+    else:
+        with st.spinner('Lendo PDFs e calculando metas...'):
+            estoque_rows = parse_estoque(estoque_file)
+            vendas_rows = parse_vendas(vendas_file)
+            produtos_config = [
+                {'nome': p['nome'], 'codigos': parse_codigos_input(p['codigos_texto'])}
+                for p in cfg['produtos'] if p['nome'].strip()
+            ]
+            resultados = compute_metas(estoque_rows, vendas_rows, produtos_config,
+                                        cfg['vendedor_pcts'])
+        st.session_state['estoque_rows'] = estoque_rows
+        st.session_state['vendas_rows'] = vendas_rows
+        st.session_state['resultados'] = resultados
+        st.success('Cálculo concluído.')
+
+if 'resultados' in st.session_state:
+    resultados = st.session_state['resultados']
+    estoque_rows = st.session_state['estoque_rows']
+
+    st.subheader('Resultado: Meta / Vendido / Falta por produto e vendedor')
+    for r in resultados:
+        st.markdown(f"**{r['produto']}** — Estoque atual: {r['estoque_total']:.0f} cx")
+        st.dataframe(
+            [{'Vendedor': l['vendedor'], '% Meta': f"{l['pct']:.0f}%",
+              'Meta (cx)': l['meta'], 'Vendido (cx)': l['vendido'],
+              'Falta (cx)': l['falta'], '% Atingido': f"{l['atingido']*100:.1f}%"}
+             for l in r['linhas']],
+            use_container_width=True, hide_index=True,
+        )
+
+    st.divider()
+    st.subheader('Gerar PDFs')
+
+    vendedores_disponiveis = list(cfg['vendedor_pcts'].keys())
+    vendedor_sel = st.selectbox('Relatório individual do vendedor', vendedores_disponiveis)
+
+    pcol1, pcol2, pcol3 = st.columns(3)
+    with pcol1:
+        pdf_bytes = generate_relatorio_vendedor(vendedor_sel, data_emissao,
+                                                  estoque_rows, resultados)
+        st.download_button(f'⬇️ Relatório — {vendedor_sel}', data=pdf_bytes,
+                            file_name=f'Relatorio_{vendedor_sel}_{datetime.date.today().strftime("%d%m%Y")}.pdf',
+                            mime='application/pdf')
+    with pcol2:
+        pdf_bytes = generate_dashboard(periodo, resultados, cfg['vendedor_pcts'])
+        st.download_button('⬇️ Dashboard', data=pdf_bytes,
+                            file_name=f'Dashboard_{datetime.date.today().strftime("%d%m%Y")}.pdf',
+                            mime='application/pdf')
+    with pcol3:
+        pdf_bytes = generate_resumo_geral(periodo, data_emissao, resultados, cfg['vendedor_pcts'])
+        st.download_button('⬇️ Resumo Geral', data=pdf_bytes,
+                            file_name=f'Resumo_Geral_{datetime.date.today().strftime("%d%m%Y")}.pdf',
+                            mime='application/pdf')
+
+    with st.expander('Gerar relatórios de TODOS os vendedores de uma vez'):
+        if st.button('Gerar todos os PDFs individuais'):
+            for v in vendedores_disponiveis:
+                pdf_bytes = generate_relatorio_vendedor(v, data_emissao, estoque_rows, resultados)
+                st.download_button(f'⬇️ {v}', data=pdf_bytes,
+                                    file_name=f'Relatorio_{v}_{datetime.date.today().strftime("%d%m%Y")}.pdf',
+                                    mime='application/pdf', key=f'all_{v}')
