@@ -146,18 +146,38 @@ if st.button('▶️ Calcular metas', type='primary'):
         st.error('Cadastre ao menos um produto com nome, estoque e códigos.')
     else:
         with st.spinner('Lendo PDFs e calculando metas...'):
-            estoque_rows = parse_estoque(estoque_file) if estoque_file else []
-            vendas_rows = parse_vendas(vendas_file)
+            estoque_rows = []
+            if estoque_file:
+                try:
+                    estoque_rows = parse_estoque(estoque_file)
+                except Exception:
+                    st.warning(
+                        'Não foi possível ler o PDF de Estoque Físico enviado '
+                        '(arquivo corrompido, protegido ou em formato inesperado). '
+                        'A Meta não depende desse PDF, então o cálculo vai continuar '
+                        'sem a lista detalhada de estoque no relatório individual.'
+                    )
+            try:
+                vendas_rows = parse_vendas(vendas_file)
+            except Exception:
+                st.error(
+                    'Não foi possível ler o PDF de Vendas/Lucratividade enviado. '
+                    'Verifique se o arquivo não está corrompido ou protegido por '
+                    'senha e tente enviar novamente.'
+                )
+                vendas_rows = None
+
+        if vendas_rows is not None:
             produtos_config = [
                 {'nome': p['nome'], 'codigos': parse_codigos_input(p['codigos_texto']),
                  'estoque': p.get('estoque', 0)}
                 for p in cfg['produtos'] if p['nome'].strip()
             ]
             resultados = compute_metas(vendas_rows, produtos_config, cfg['vendedor_pcts'])
-        st.session_state['estoque_rows'] = estoque_rows
-        st.session_state['vendas_rows'] = vendas_rows
-        st.session_state['resultados'] = resultados
-        st.success('Cálculo concluído.')
+            st.session_state['estoque_rows'] = estoque_rows
+            st.session_state['vendas_rows'] = vendas_rows
+            st.session_state['resultados'] = resultados
+            st.success('Cálculo concluído.')
 
 if 'resultados' in st.session_state:
     resultados = st.session_state['resultados']

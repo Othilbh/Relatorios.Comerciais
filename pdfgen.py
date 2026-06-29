@@ -5,6 +5,7 @@ relatórios de exemplo da Ingrid:
   - Resumo Geral (matriz Produto × Vendedor)
 """
 import io
+import pdfplumber
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import A4, landscape
 from reportlab.lib.units import cm
@@ -78,15 +79,61 @@ def _melhor_vendedor(produto_result):
 # 1) Relatório por Vendedor
 # --------------------------------------------------------------------------
 
-def generate_relatorio_vendedor(vendedor: str, data_emissao: str,
-                                 estoque_rows: list, metas_results: list) -> bytes:
+# Níveis de compactação testados em ordem: o primeiro que resultar em uma
+# única página é usado. Cada nível reduz margens, fontes e espaçamentos para
+# caber relatórios de vendedores com mais itens de estoque numa folha só.
+_RELATORIO_COMPACT_LEVELS = [
+    {'margin': 1.2*cm, 'title_font': 14, 'section_font': 11,
+     'est_font': 7, 'est_pad': 3, 'meta_font': 8, 'meta_pad': 3,
+     'card_font': 9, 'footer_font': 7.5, 'footer_leading': 9,
+     'spacer1': 0.5*cm, 'spacer2': 0.5*cm},
+    {'margin': 0.9*cm, 'title_font': 13, 'section_font': 10,
+     'est_font': 6.3, 'est_pad': 2, 'meta_font': 7.5, 'meta_pad': 2,
+     'card_font': 8.5, 'footer_font': 6.8, 'footer_leading': 8,
+     'spacer1': 0.3*cm, 'spacer2': 0.3*cm},
+    {'margin': 0.6*cm, 'title_font': 12, 'section_font': 9.5,
+     'est_font': 5.6, 'est_pad': 1.2, 'meta_font': 7, 'meta_pad': 1.5,
+     'card_font': 8, 'footer_font': 6.2, 'footer_leading': 7.2,
+     'spacer1': 0.2*cm, 'spacer2': 0.2*cm},
+    {'margin': 0.4*cm, 'title_font': 11, 'section_font': 9,
+     'est_font': 5, 'est_pad': 0.8, 'meta_font': 6.3, 'meta_pad': 1,
+     'card_font': 7.3, 'footer_font': 5.6, 'footer_leading': 6.5,
+     'spacer1': 0.1*cm, 'spacer2': 0.1*cm},
+]
+
+
+def _count_pages(pdf_bytes: bytes) -> int:
+    with pdfplumber.open(io.BytesIO(pdf_bytes)) as pdf:
+        return len(pdf.pages)
+
+
+def _footer_paragraph(font_size: float, leading: float) -> Paragraph:
+    """Bloco único de rodapé (em vez de um Paragraph por linha) para reduzir
+    o espaçamento extra entre flowables e ajudar a caber numa página."""
+    bold_line = f"<b>{FOOTER_TEXT[0]}</b>"
+    rest = "<br/>".join(FOOTER_TEXT[1:])
+    style = ParagraphStyle('foot_compact', parent=STYLES['Normal'],
+                            fontSize=font_size, leading=leading)
+    return Paragraph(bold_line + "<br/>" + rest, style)
+
+
+def _build_relatorio_vendedor(vendedor: str, data_emissao: str,
+                               estoque_rows: list, metas_results: list,
+                               level: dict) -> bytes:
     buf = io.BytesIO()
+    m = level['margin']
     doc = SimpleDocTemplate(buf, pagesize=A4,
-                             topMargin=1.2*cm, bottomMargin=1.2*cm,
-                             leftMargin=1.2*cm, rightMargin=1.2*cm)
+                             topMargin=m, bottomMargin=m,
+                             leftMargin=m, rightMargin=m)
+    title_style = ParagraphStyle('title_c', parent=STYLES['Heading1'],
+                                  fontSize=level['title_font'], spaceAfter=3)
+    section_style = ParagraphStyle('section_c', parent=STYLES['Heading2'],
+                                    fontSize=level['section_font'],
+                                    spaceBefore=6, spaceAfter=3)
+
     elems = []
     elems.append(Paragraph(f"Vendedor : {vendedor.upper()}  —  Data: {data_emissao}",
-                            TITLE_STYLE))
+                            title_style))
 
     # Tabela de estoque do vendedor (todas as linhas do relatório de
     # estoque cujo "Complemento" pertence a este vendedor).
@@ -105,7 +152,9 @@ def generate_relatorio_vendedor(vendedor: str, data_emissao: str,
         t.setStyle(TableStyle([
             ('BACKGROUND', (0, 0), (-1, 0), HEADER_BG),
             ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
-            ('FONTSIZE', (0, 0), (-1, -1), 7),
+            ('FONTSIZE', (0, 0), (-1, -1), level['est_font']),
+            ('TOPPADDING', (0, 0), (-1, -1), level['est_pad']),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), level['est_pad']),
             ('GRID', (0, 0), (-1, -1), 0.4, colors.lightgrey),
             ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, LIGHT_BG]),
             ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
@@ -115,7 +164,7 @@ def generate_relatorio_vendedor(vendedor: str, data_emissao: str,
         elems.append(Paragraph("Sem itens de estoque para este vendedor.", STYLES['Normal']))
 
     elems.append(Paragraph(f"METAS SEMANAIS — {vendedor.upper()} — {data_emissao}",
-                            SECTION_STYLE))
+                            section_style))
     mheader = ['Produto', 'Meta (cx)', 'Vendido (cx)', 'Falta (cx)', '%']
     mdata = [mheader]
     meta_t = vendido_t = falta_t = 0.0
@@ -135,14 +184,16 @@ def generate_relatorio_vendedor(vendedor: str, data_emissao: str,
     mt.setStyle(TableStyle([
         ('BACKGROUND', (0, 0), (-1, 0), HEADER_BG),
         ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
-        ('FONTSIZE', (0, 0), (-1, -1), 8),
+        ('FONTSIZE', (0, 0), (-1, -1), level['meta_font']),
+        ('TOPPADDING', (0, 0), (-1, -1), level['meta_pad']),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), level['meta_pad']),
         ('GRID', (0, 0), (-1, -1), 0.4, colors.lightgrey),
         ('FONTNAME', (0, -1), (-1, -1), 'Helvetica-Bold'),
         ('BACKGROUND', (0, -1), (-1, -1), colors.HexColor('#dfe6e9')),
         ('ROWBACKGROUNDS', (0, 1), (-1, -2), [colors.white, LIGHT_BG]),
     ]))
     elems.append(mt)
-    elems.append(Spacer(1, 0.5*cm))
+    elems.append(Spacer(1, level['spacer1']))
 
     card = Table([
         ['Meta Total', 'Vendido', 'Falta', '% Atingido'],
@@ -152,20 +203,32 @@ def generate_relatorio_vendedor(vendedor: str, data_emissao: str,
         ('BACKGROUND', (0, 0), (-1, 0), HEADER_BG),
         ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
         ('FONTNAME', (0, 1), (-1, 1), 'Helvetica-Bold'),
-        ('FONTSIZE', (0, 0), (-1, -1), 9),
+        ('FONTSIZE', (0, 0), (-1, -1), level['card_font']),
         ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
         ('GRID', (0, 0), (-1, -1), 0.4, colors.lightgrey),
     ]))
     elems.append(card)
-    elems.append(Spacer(1, 0.5*cm))
+    elems.append(Spacer(1, level['spacer2']))
 
-    for line in FOOTER_TEXT:
-        style = STYLES['Heading4'] if line.startswith('É DE') else ParagraphStyle(
-            'foot', parent=STYLES['Normal'], fontSize=7.5)
-        elems.append(Paragraph(line, style))
+    elems.append(_footer_paragraph(level['footer_font'], level['footer_leading']))
 
     doc.build(elems)
     return buf.getvalue()
+
+
+def generate_relatorio_vendedor(vendedor: str, data_emissao: str,
+                                 estoque_rows: list, metas_results: list) -> bytes:
+    """Gera o relatório individual do vendedor, encolhendo automaticamente
+    fontes/margens/espaçamentos até caber em uma única folha A4 (para
+    impressão). Se nem no nível mais compacto couber, retorna a versão mais
+    compacta mesmo assim (melhor esforço)."""
+    last_bytes = None
+    for level in _RELATORIO_COMPACT_LEVELS:
+        last_bytes = _build_relatorio_vendedor(vendedor, data_emissao, estoque_rows,
+                                                metas_results, level)
+        if _count_pages(last_bytes) <= 1:
+            return last_bytes
+    return last_bytes
 
 
 # --------------------------------------------------------------------------
