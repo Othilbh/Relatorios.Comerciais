@@ -14,6 +14,40 @@ NUM_RE = re.compile(r'^-?[\d.]+,\d+$')
 DATE_RE = re.compile(r'^\d{2}/\d{2}/\d{4}$')
 VENDOR_LINE_RE = re.compile(r'^Vendedor:\s*(\d+)\s+(.+)$')
 
+# Nomes dos vendedores que aparecem no campo Complemento do Estoque Físico.
+# Mantido em sincronia manualmente com os aliases de VENDEDORES_PADRAO em
+# calc.py (não importamos de lá para evitar import circular).
+# Ordenado do nome mais longo pro mais curto, pra casar o nome mais
+# específico primeiro quando houver ambiguidade.
+KNOWN_VENDOR_NAMES = sorted(
+    ['REGINALDO', 'AFANAIS', 'LUCIANO', 'CLAUDIA', 'JULIANA', 'FARLEY', 'DORA', 'RONI'],
+    key=len, reverse=True,
+)
+
+
+def _clean_complemento(token: str) -> str:
+    """O Complemento (vendedor responsável) às vezes sai colado com texto da
+    coluna do Produto e embaralha 1-2 letras na fronteira (o mesmo bug de
+    caracteres descrito no topo do arquivo: "PREMIUM"+"DORA" sai
+    "PREMIUDMORA", "RONI" sai "RONISTONIS" etc.). Procura um nome de
+    vendedor conhecido dentro do token — primeiro por igualdade exata de
+    substring, depois por aproximação (até 1-2 letras diferentes na ponta,
+    pra cobrir o embaralhamento) — e devolve só o nome limpo. Se nada bater,
+    devolve o token original sem alteração."""
+    raw_u = token.upper()
+    for name in KNOWN_VENDOR_NAMES:
+        if name in raw_u:
+            return name
+    for name in KNOWN_VENDOR_NAMES:
+        if len(raw_u) < len(name):
+            continue
+        window = raw_u[-len(name):]
+        mismatches = sum(1 for a, b in zip(window, name) if a != b)
+        threshold = 1 if len(name) <= 5 else 2
+        if mismatches <= threshold:
+            return name
+    return token
+
 
 def cluster_rows(words, tol=3.0):
     """Agrupa palavras em linhas usando a primeira palavra do grupo como
@@ -60,7 +94,7 @@ def parse_estoque(file) -> list[dict]:
                 if not DATE_RE.match(toks[-6]) or not NUM_RE.match(toks[-1]):
                     continue
                 codigo = toks[0]
-                complemento = toks[-7]
+                complemento = _clean_complemento(toks[-7])
                 data = toks[-6]
                 atual, anterior, vendida, custo, md = toks[-5:]
                 produto = ' '.join(toks[1:-7])
