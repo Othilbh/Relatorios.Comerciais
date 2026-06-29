@@ -1,7 +1,9 @@
 """Motor de cálculo das Metas Semanais.
 
 Regras de negócio (validadas contra os relatórios reais da Ingrid):
-  Meta(vendedor, produto)    = round_half_up(% vendedor × Estoque(produto))
+  Meta(vendedor, produto)    = round_up(% vendedor × Estoque(produto))
+                                (se não for número inteiro, arredonda sempre
+                                para cima, ex.: 20,3 -> 21)
   Vendido(vendedor, produto) = soma de Qtd Vendida no relatório de vendas
                                 (Lucratividade por Vendedor), agrupada pela
                                 SEÇÃO DE VENDEDOR em que a linha aparece
@@ -10,6 +12,11 @@ Regras de negócio (validadas contra os relatórios reais da Ingrid):
                                 relatório de Estoque.
   Falta(vendedor, produto)   = Meta − Vendido
   % Atingido                 = Vendido / Meta
+
+'Estoque(produto)' é digitado manualmente pela Ingrid no app (não é mais
+extraído automaticamente do PDF de Estoque Físico), pois o snapshot do PDF
+pode não refletir o estoque conferido na segunda-feira na hora de bater a
+meta.
 """
 import math
 from parsers import normalize_codigo
@@ -53,8 +60,10 @@ def map_vendedor(raw: str):
     return None
 
 
-def round_half_up(x: float) -> int:
-    return math.floor(x + 0.5)
+def round_up(x: float) -> int:
+    """Arredonda sempre para cima quando o resultado não é inteiro
+    (ex.: 20,3 -> 21; 20,0 permanece 20)."""
+    return math.ceil(x)
 
 
 def codigo_matches(codigo_norm: str, entry: str) -> bool:
@@ -85,9 +94,13 @@ def parse_codigos_input(text: str) -> list[str]:
     return parts
 
 
-def compute_metas(estoque_rows, vendas_rows, produtos_config, vendedor_pcts):
+def compute_metas(vendas_rows, produtos_config, vendedor_pcts):
     """
-    produtos_config: list of {'nome': str, 'codigos': list[str]}
+    produtos_config: list of {'nome': str, 'codigos': list[str], 'estoque': float}
+      'estoque' é a quantidade atual em estoque do produto (em caixas),
+      digitada manualmente pela Ingrid no app.
+    'codigos' continua sendo usado apenas para casar as vendas (Vendido)
+      no relatório de Lucratividade por Vendedor.
     vendedor_pcts: dict {nome_vendedor: percentual (0-100)}
 
     Retorna lista de dicts:
@@ -102,12 +115,7 @@ def compute_metas(estoque_rows, vendas_rows, produtos_config, vendedor_pcts):
     for produto in produtos_config:
         nome = produto['nome']
         entries = produto['codigos']
-
-        estoque_total = 0.0
-        for row in estoque_rows:
-            cn = normalize_codigo(row['codigo'])
-            if any(codigo_matches(cn, e) for e in entries):
-                estoque_total += row['saldo_atual']
+        estoque_total = float(produto.get('estoque', 0) or 0)
 
         vendido_por_vendedor = {v: 0.0 for v in vendedor_pcts}
         for row in vendas_rows:
@@ -119,7 +127,7 @@ def compute_metas(estoque_rows, vendas_rows, produtos_config, vendedor_pcts):
 
         linhas = []
         for vend, pct in vendedor_pcts.items():
-            meta = round_half_up(pct / 100 * estoque_total)
+            meta = round_up(pct / 100 * estoque_total)
             vendido = vendido_por_vendedor.get(vend, 0.0)
             falta = meta - vendido
             atingido = (vendido / meta) if meta else 0.0

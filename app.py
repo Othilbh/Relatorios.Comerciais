@@ -29,8 +29,8 @@ def load_config():
     except FileNotFoundError:
         return {
             'produtos': [
-                {'nome': 'Melão Gaia', 'codigos_texto': '3102006*'},
-                {'nome': 'Goiaba', 'codigos_texto': '300200208,300200203'},
+                {'nome': 'Melão Gaia', 'codigos_texto': '3102006*', 'estoque': 0},
+                {'nome': 'Goiaba', 'codigos_texto': '300200208,300200203', 'estoque': 0},
             ],
             'vendedor_pcts': dict(VENDEDORES_PADRAO),
         }
@@ -55,9 +55,11 @@ st.caption('Módulo: Metas Semanais')
 st.header('1. Upload dos relatórios da semana')
 col1, col2 = st.columns(2)
 with col1:
-    estoque_file = st.file_uploader('Estoque Físico (PDF)', type='pdf', key='estoque')
+    estoque_file = st.file_uploader('Estoque Físico (PDF) — opcional, usado só para detalhar '
+                                     'o estoque completo no relatório individual de cada vendedor',
+                                     type='pdf', key='estoque')
 with col2:
-    vendas_file = st.file_uploader('Lucratividade por Vendedor / Vendas Acumuladas (PDF)',
+    vendas_file = st.file_uploader('Lucratividade por Vendedor / Vendas Acumuladas (PDF) — obrigatório',
                                     type='pdf', key='vendas')
 
 # ---------------------------------------------------------------------------
@@ -65,25 +67,32 @@ with col2:
 # ---------------------------------------------------------------------------
 st.header('2. Produtos da semana')
 st.caption(
-    'Os produtos e seus códigos variam toda semana. Cole aqui os códigos de '
-    'cada produto separados por vírgula ou quebra de linha. Use um "*" no '
-    'final de um código para casar por prefixo (ex.: "3102006*" casa com '
-    'qualquer código que comece com 3102006). Sem "*", o código precisa ser exato.'
+    'Os produtos e seus códigos variam toda semana. Para cada produto, digite '
+    'a quantidade atual em estoque (a Meta é calculada a partir dela) e cole os '
+    'códigos usados para identificar as vendas desse produto no relatório de '
+    'vendas, separados por vírgula ou quebra de linha. Use um "*" no final de '
+    'um código para casar por prefixo (ex.: "3102006*" casa com qualquer código '
+    'que comece com 3102006). Sem "*", o código precisa ser exato.'
 )
 
 if st.button('➕ Adicionar produto'):
-    cfg['produtos'].append({'nome': '', 'codigos_texto': ''})
+    cfg['produtos'].append({'nome': '', 'codigos_texto': '', 'estoque': 0})
 
 remover_idx = None
 for i, p in enumerate(cfg['produtos']):
+    p.setdefault('estoque', 0)
     with st.expander(f"Produto {i+1}: {p['nome'] or '(sem nome)'}", expanded=True):
-        c1, c2, c3 = st.columns([3, 5, 1])
+        c1, c2, c3, c4 = st.columns([3, 4, 2, 1])
         with c1:
             p['nome'] = st.text_input('Nome do produto', value=p['nome'], key=f'nome_{i}')
         with c2:
-            p['codigos_texto'] = st.text_area('Códigos (vírgula ou linha; use * para prefixo)',
+            p['codigos_texto'] = st.text_area('Códigos (vírgula ou linha; use * para prefixo) '
+                                               '— usados só para identificar as vendas',
                                                value=p['codigos_texto'], key=f'cod_{i}', height=80)
         with c3:
+            p['estoque'] = st.number_input('Estoque atual (cx)', min_value=0, step=1,
+                                            value=int(p['estoque']), key=f'est_{i}')
+        with c4:
             st.write('')
             st.write('')
             if st.button('🗑️', key=f'del_{i}'):
@@ -93,7 +102,8 @@ if remover_idx is not None:
     cfg['produtos'].pop(remover_idx)
     st.rerun()
 
-st.subheader('Percentuais de meta por vendedor (% sobre o estoque atual)')
+st.subheader('Percentuais de meta por vendedor (% sobre o estoque digitado acima)')
+st.caption('Já vêm preenchidos com os percentuais fixos de cada vendedor — normalmente não precisa alterar.')
 pct_cols = st.columns(len(cfg['vendedor_pcts']))
 for col, (vend, pct) in zip(pct_cols, list(cfg['vendedor_pcts'].items())):
     with col:
@@ -130,20 +140,20 @@ data_emissao = st.text_input('Data de emissão (ex.: 29/06/2026)',
 cfg['periodo'] = periodo
 
 if st.button('▶️ Calcular metas', type='primary'):
-    if not estoque_file or not vendas_file:
-        st.error('Envie os dois PDFs (Estoque Físico e Vendas) antes de calcular.')
+    if not vendas_file:
+        st.error('Envie o PDF de Vendas (Lucratividade por Vendedor) antes de calcular.')
     elif not any(p['nome'].strip() for p in cfg['produtos']):
-        st.error('Cadastre ao menos um produto com nome e códigos.')
+        st.error('Cadastre ao menos um produto com nome, estoque e códigos.')
     else:
         with st.spinner('Lendo PDFs e calculando metas...'):
-            estoque_rows = parse_estoque(estoque_file)
+            estoque_rows = parse_estoque(estoque_file) if estoque_file else []
             vendas_rows = parse_vendas(vendas_file)
             produtos_config = [
-                {'nome': p['nome'], 'codigos': parse_codigos_input(p['codigos_texto'])}
+                {'nome': p['nome'], 'codigos': parse_codigos_input(p['codigos_texto']),
+                 'estoque': p.get('estoque', 0)}
                 for p in cfg['produtos'] if p['nome'].strip()
             ]
-            resultados = compute_metas(estoque_rows, vendas_rows, produtos_config,
-                                        cfg['vendedor_pcts'])
+            resultados = compute_metas(vendas_rows, produtos_config, cfg['vendedor_pcts'])
         st.session_state['estoque_rows'] = estoque_rows
         st.session_state['vendas_rows'] = vendas_rows
         st.session_state['resultados'] = resultados
