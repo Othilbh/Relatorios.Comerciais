@@ -64,13 +64,14 @@ if 'resultado_diario' in st.session_state:
     caixas = sum(it['qtd'] for it in itens)
     clientes = len(set(it['cliente_codigo'] for it in itens))
     vendedores = len(set((it['vendedor'] or it['vendedor_raw']) for it in itens))
-    resultado_rs = faturamento - custo
-    resultado_pct = (resultado_rs / custo * 100) if custo else 0.0
+    custo_real = custo / 1.15 if custo else 0.0
+    mc_rs  = faturamento - custo_real
+    mc_pct = mc_rs / custo_real * 100 if custo_real else 0.0
 
     c1, c2, c3, c4, c5, c6 = st.columns(6)
     c1.metric('Faturamento', f'R$ {faturamento:,.2f}')
-    c2.metric('Resultado R$', f'R$ {resultado_rs:,.2f}')
-    c3.metric('Resultado %', f'{resultado_pct:.2f}%')
+    c2.metric('MC R$', f'R$ {mc_rs:,.2f}')
+    c3.metric('MC %', f'{mc_pct:.2f}%')
     c4.metric('Caixas', f'{caixas:,.3f}')
     c5.metric('Clientes', clientes)
     c6.metric('Vendedores Ativos', vendedores)
