@@ -24,7 +24,7 @@ VERMELHO_BG, VERMELHO_FG = 'FADADD', '7A1F2B'
 HEADER_BG, HEADER_FG = '2D6A4F', 'FFFFFF'
 FONT_NAME = 'Arial'
 MONEY_FMT = '#,##0.00'
-PCT_FMT = '0.00"%"'
+PCT_FMT = '0.00'
 
 THIN = Side(style='thin', color='CCCCCC')
 BORDER = Border(left=THIN, right=THIN, top=THIN, bottom=THIN)
@@ -301,8 +301,10 @@ def _build_alertas(wb, itens):
             rows.append((it, pct))
     rows.sort(key=lambda t: t[1])
 
+    ws.row_dimensions[1].height = 32
     for i, (it, pct) in enumerate(rows):
         r = i + 2
+        pct_r = round(pct, 2)
         _text(ws, r, 1, it['vendedor'] or it['vendedor_raw'])
         _text(ws, r, 2, it['cliente_nome'])
         _text(ws, r, 3, it['produto'])
@@ -313,13 +315,16 @@ def _build_alertas(wb, itens):
         _money(ws, r, 7, it['custo_total'])
         _money(ws, r, 8, it['custo_unit'])
         _money(ws, r, 9, it['faturamento'] - it['custo_total'])
-        _pct_cell(ws, r, 10, pct, pct)
+        _pct_cell(ws, r, 10, pct_r, pct_r)
         situ = 'Crítico' if pct < 0 else 'Atenção'
+        situ_bg = VERMELHO_BG if pct < 0 else AMARELO_BG
+        situ_fg = VERMELHO_FG if pct < 0 else AMARELO_FG
         sc = ws.cell(row=r, column=11, value=situ)
-        sc.font = _font(bold=True)
+        sc.font = _font(bold=True, color=situ_fg)
+        sc.fill = PatternFill('solid', fgColor=situ_bg)
         sc.border = BORDER
 
-    widths = [14, 28, 38, 11, 15, 13, 13, 13, 13, 12, 11]
+    widths = [14, 38, 42, 10, 15, 13, 13, 13, 13, 12, 11]
     for j, w in enumerate(widths, start=1):
         ws.column_dimensions[get_column_letter(j)].width = w
     ws.freeze_panes = 'A2'
