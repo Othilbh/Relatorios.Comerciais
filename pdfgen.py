@@ -136,8 +136,10 @@ def _build_relatorio_vendedor(vendedor: str, data_emissao: str,
                             title_style))
 
     # Tabela de estoque do vendedor (todas as linhas do relatório de
-    # estoque cujo "Complemento" pertence a este vendedor).
-    linhas_estoque = [r for r in estoque_rows if map_vendedor(r['complemento']) == vendedor]
+    # estoque cujo "Complemento" pertence a este vendedor). Produtos com
+    # saldo atual zerado não entram no relatório individual.
+    linhas_estoque = [r for r in estoque_rows
+                       if map_vendedor(r['complemento']) == vendedor and r['saldo_atual'] != 0]
     header = ['Produto', 'Complemento', 'Dt.Entrada', 'Saldo', 'Qtde Vend',
               'Custo Unit', 'Md Venda']
     data = [header]

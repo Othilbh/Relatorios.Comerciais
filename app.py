@@ -12,6 +12,7 @@ import streamlit as st
 from parsers import parse_estoque, parse_vendas
 from calc import compute_metas, VENDEDORES_PADRAO, parse_codigos_input, map_vendedor
 from pdfgen import generate_relatorio_vendedor, generate_dashboard, generate_resumo_geral
+import storage
 
 CONFIG_PATH = 'config_semanal.json'
 
@@ -19,32 +20,67 @@ st.set_page_config(page_title='OTHIL — Metas Semanais', layout='wide')
 
 
 # ---------------------------------------------------------------------------
-# Persistência simples da configuração da semana (produtos + percentuais)
+# Persistência da configuração da semana (produtos + percentuais).
+#
+# O app roda no Streamlit Cloud, cujo disco é apagado a cada reinício —
+# por isso um arquivo local sozinho NÃO basta (era esse o motivo de tudo
+# salvo "ontem" desaparecer "hoje"). A configuração agora é salva também no
+# próprio repositório do GitHub via storage.py (precisa de um GITHUB_TOKEN
+# nos Secrets do Streamlit Cloud — ver instruções no topo de storage.py).
+# Sem esse token, o app cai de volta no arquivo local (só persiste se o app
+# rodar na sua própria máquina, sem reiniciar).
 # ---------------------------------------------------------------------------
 
+DEFAULT_CONFIG = {
+    'produtos': [
+        {'nome': 'Melão Gaia', 'codigos_texto': '3102006*', 'estoque': 0},
+        {'nome': 'Goiaba', 'codigos_texto': '300200208,300200203', 'estoque': 0},
+    ],
+    'vendedor_pcts': dict(VENDEDORES_PADRAO),
+}
+
+
 def load_config():
+    remote = storage.load_config_remote()
+    if remote is not None:
+        return remote
     try:
         with open(CONFIG_PATH, 'r', encoding='utf-8') as f:
             return json.load(f)
     except FileNotFoundError:
-        return {
-            'produtos': [
-                {'nome': 'Melão Gaia', 'codigos_texto': '3102006*', 'estoque': 0},
-                {'nome': 'Goiaba', 'codigos_texto': '300200208,300200203', 'estoque': 0},
-            ],
-            'vendedor_pcts': dict(VENDEDORES_PADRAO),
-        }
+        return json.loads(json.dumps(DEFAULT_CONFIG))
 
 
-def save_config(cfg):
-    with open(CONFIG_PATH, 'w', encoding='utf-8') as f:
-        json.dump(cfg, f, ensure_ascii=False, indent=2)
+def save_config(cfg, show_feedback=True):
+    ok, motivo = storage.save_config_remote(cfg)
+    if show_feedback:
+        if ok:
+            st.success('Configuração salva — vai continuar disponível a semana toda.')
+        else:
+            st.warning(f'Não foi possível salvar de forma permanente: {motivo}')
+    # Cópia local como cache de melhor esforço (útil rodando localmente; no
+    # Streamlit Cloud é apagada no próximo reinício, por isso não é a fonte
+    # principal de persistência).
+    try:
+        with open(CONFIG_PATH, 'w', encoding='utf-8') as f:
+            json.dump(cfg, f, ensure_ascii=False, indent=2)
+    except Exception:
+        pass
+    return ok
 
 
 if 'config' not in st.session_state:
     st.session_state.config = load_config()
 
 cfg = st.session_state.config
+
+if not storage.is_configured():
+    st.info(
+        '⚠️ Persistência permanente ainda não configurada: a configuração desta '
+        'semana só fica salva enquanto o app não reiniciar/dormir. Para manter os '
+        'dados disponíveis a semana toda, configure o GITHUB_TOKEN nos Secrets do '
+        'Streamlit Cloud (instruções no topo do arquivo storage.py).'
+    )
 
 st.title('OTHIL — Relatórios Comerciais')
 st.caption('Módulo: Metas Semanais')
@@ -114,7 +150,6 @@ cb1, cb2, cb3 = st.columns(3)
 with cb1:
     if st.button('💾 Salvar configuração desta semana'):
         save_config(cfg)
-        st.success('Configuração salva.')
 with cb2:
     st.download_button('⬇️ Exportar configuração (JSON)',
                         data=json.dumps(cfg, ensure_ascii=False, indent=2),
@@ -124,6 +159,7 @@ with cb3:
     up_cfg = st.file_uploader('⬆️ Importar configuração (JSON)', type='json', key='cfg_upload')
     if up_cfg is not None:
         st.session_state.config = json.load(up_cfg)
+        save_config(st.session_state.config, show_feedback=False)
         st.rerun()
 
 st.divider()
@@ -177,6 +213,9 @@ if st.button('▶️ Calcular metas', type='primary'):
             st.session_state['estoque_rows'] = estoque_rows
             st.session_state['vendas_rows'] = vendas_rows
             st.session_state['resultados'] = resultados
+            # Salva a configuração usada automaticamente, como rede de
+            # segurança extra além do botão "Salvar configuração desta semana".
+            save_config(cfg, show_feedback=False)
             st.success('Cálculo concluído.')
 
 if 'resultados' in st.session_state:
