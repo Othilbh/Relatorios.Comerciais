@@ -1,0 +1,95 @@
+{
+  "produtos": [
+    {
+      "nome": "Melão Gaia",
+      "codigos_texto": "3102006*",
+      "estoque": 2500
+    },
+    {
+      "nome": "Melao Amarelo",
+      "codigos_texto": "3102015006,3102015007",
+      "estoque": 600
+    },
+    {
+      "nome": "Mirtilo Dole",
+      "codigos_texto": "87005909",
+      "estoque": 400
+    },
+    {
+      "nome": "Portuguesa 55/60 Sabor",
+      "codigos_texto": "02050032",
+      "estoque": 120
+    },
+    {
+      "nome": "Forelle",
+      "codigos_texto": "020502701",
+      "estoque": 150
+    },
+    {
+      "nome": "Tangerina Urugold",
+      "codigos_texto": "390600112",
+      "estoque": 32
+    },
+    {
+      "nome": "Crinson Cumbuca cx Preta",
+      "codigos_texto": "230100302",
+      "estoque": 220
+    },
+    {
+      "nome": "Vitoria GrandValle/Manaira",
+      "codigos_texto": "830100903,830100952",
+      "estoque": 226
+    },
+    {
+      "nome": "Laranja Fresh/ Rofayda",
+      "codigos_texto": "390700154,390700149",
+      "estoque": 49
+    },
+    {
+      "nome": "Menis T80",
+      "codigos_texto": "010101580",
+      "estoque": 16
+    },
+    {
+      "nome": "Menis T90",
+      "codigos_texto": "010101590",
+      "estoque": 37
+    },
+    {
+      "nome": "Menis T100",
+      "codigos_texto": "0101015100",
+      "estoque": 143
+    },
+    {
+      "nome": "Menis T110",
+      "codigos_texto": "0101015110",
+      "estoque": 74
+    },
+    {
+      "nome": "Menis T120",
+      "codigos_texto": "0101015120",
+      "estoque": 261
+    },
+    {
+      "nome": "Menis T135",
+      "codigos_texto": "0101015135",
+      "estoque": 18
+    },
+    {
+      "nome": "",
+      "codigos_texto": "101016080,101016090",
+      "estoque": 113
+    }
+  ],
+  "vendedor_pcts": {
+    "Farley": 17,
+    "Dora": 17,
+    "Afanais": 25,
+    "Roni": 25,
+    "Reginaldo": 22,
+    "Luciano": 7,
+    "Juliana": 7,
+    "Claudia": 7
+  },
+  "periodo": ""
+}
