@@ -363,29 +363,29 @@ def _preencher_aba(ws, clientes_dict: dict, prod_cols: list,
         c = ws.cell(row_n, 1, cli)
         c.font, c.alignment = font_cli, al_lft
 
-        c = ws.cell(row_n, 2, round(tcx, 3))
-        c.number_format = '#,##0.000'
+        c = ws.cell(row_n, 2, round(tcx))
+        c.number_format = '#,##0'
         c.fill, c.font, c.alignment = fill_vc, font_data, al_rgt
 
         c = ws.cell(row_n, 3, round(fat, 2))
         c.number_format = '#,##0.00'
         c.font, c.alignment = font_data, al_rgt
 
-        c = ws.cell(row_n, 4, round(m_rel / 100, 6))
-        c.number_format = '0.000%'
+        c = ws.cell(row_n, 4, round(m_rel / 100, 4))
+        c.number_format = '0.00%'
         c.font = font_neg if m_rel < 0 else font_data
         c.alignment = al_rgt
 
-        c = ws.cell(row_n, 5, round(m_real / 100, 6))
-        c.number_format = '0.000%'
+        c = ws.cell(row_n, 5, round(m_real / 100, 4))
+        c.number_format = '0.00%'
         c.font = font_neg if m_real < 0 else font_data
         c.alignment = al_rgt
 
         for j, col in enumerate(prod_cols, _N_HDR + 1):
             qty = d.get(col, 0.0)
             if qty > 0:
-                c = ws.cell(row_n, j, round(qty, 3))
-                c.number_format = '#,##0.000'
+                c = ws.cell(row_n, j, round(qty))
+                c.number_format = '#,##0'
                 c.fill, c.font, c.alignment = fill_vc, font_data, al_rgt
             else:
                 c = ws.cell(row_n, j, '-')
@@ -406,27 +406,27 @@ def _preencher_aba(ws, clientes_dict: dict, prod_cols: list,
     c = ws.cell(tot_row, 1, 'TOTAL GERAL')
     c.fill, c.font, c.alignment = fill_vh, font_tot, al_lft
 
-    c = ws.cell(tot_row, 2, round(tcx_t, 3))
-    c.number_format = '#,##0.000'
+    c = ws.cell(tot_row, 2, round(tcx_t))
+    c.number_format = '#,##0'
     c.fill, c.font, c.alignment = fill_vh, font_tot, al_rgt
 
     c = ws.cell(tot_row, 3, round(fat_t, 2))
     c.number_format = '#,##0.00'
     c.fill, c.font, c.alignment = fill_vh, font_tot, al_rgt
 
-    c = ws.cell(tot_row, 4, round(mr_t / 100, 6))
-    c.number_format = '0.000%'
+    c = ws.cell(tot_row, 4, round(mr_t / 100, 4))
+    c.number_format = '0.00%'
     c.fill, c.font, c.alignment = fill_vh, font_tot, al_rgt
 
-    c = ws.cell(tot_row, 5, round(mreal_t / 100, 6))
-    c.number_format = '0.000%'
+    c = ws.cell(tot_row, 5, round(mreal_t / 100, 4))
+    c.number_format = '0.00%'
     c.fill, c.font, c.alignment = fill_vh, font_tot, al_rgt
 
     for j, col in enumerate(prod_cols, _N_HDR + 1):
         qty = sum(d.get(col, 0.0) for _, d in rows_sorted)
-        c = ws.cell(tot_row, j, round(qty, 3) if qty > 0 else '')
+        c = ws.cell(tot_row, j, round(qty) if qty > 0 else '')
         if qty > 0:
-            c.number_format = '#,##0.000'
+            c.number_format = '#,##0'
         c.fill, c.font, c.alignment = fill_vh, font_tot, al_rgt
 
     # Larguras
