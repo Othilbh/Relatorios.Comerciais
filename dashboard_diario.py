@@ -211,10 +211,44 @@ _HTML_TEMPLATE = r"""<!DOCTYPE html>
   .impacto-note { margin-top: 12px; padding: 10px 14px; background: #FEF9C3;
     border-radius: 8px; font-size: 12px; color: #5a4a00; border-left: 4px solid #D4AC0D; }
   footer { text-align: center; font-size: 11px; color: #999; padding: 14px; }
+  .btn-print { position: fixed; bottom: 24px; right: 24px; z-index: 999;
+    background: var(--header-bg); color: #fff; border: none; border-radius: 50px;
+    padding: 10px 20px; font-size: 13px; font-weight: bold; cursor: pointer;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.25); }
+  .btn-print:hover { opacity: 0.88; }
   @media (max-width: 1100px) {
     .kpis { grid-template-columns: repeat(3,1fr); }
     .grid2 { grid-template-columns: 1fr; }
     .impacto-cards { grid-template-columns: repeat(2,1fr); }
+  }
+  @media print {
+    @page { size: A4 landscape; margin: 12mm 10mm; }
+    body { background: #fff; font-size: 10px; }
+    header { padding: 8px 12px; }
+    header h1 { font-size: 14px; }
+    header p  { font-size: 9px; }
+    main { padding: 8px 0; max-width: 100%; }
+    .btn-print { display: none; }
+    section { box-shadow: none; border: 1px solid #ddd; padding: 10px 12px;
+      margin-bottom: 12px; break-inside: avoid; }
+    section h2 { font-size: 11px; margin-bottom: 8px; }
+    .kpis { gap: 6px; margin-bottom: 12px; }
+    .kpi { padding: 8px 6px; box-shadow: none; border: 1px solid #ddd; }
+    .kpi .value { font-size: 13px; }
+    .kpi .label { font-size: 8px; }
+    .grid2 { grid-template-columns: 1.4fr 1fr; gap: 10px; }
+    .chart-wrap { height: 180px; }
+    .chart-wrap.small { height: 150px; }
+    .table-scroll { max-height: none !important; overflow: visible !important;
+      border: none; }
+    table { font-size: 9px; }
+    th, td { padding: 3px 5px; }
+    .impacto-cards { gap: 6px; }
+    .impacto-card { padding: 8px; }
+    .impacto-card .value { font-size: 13px; }
+    .impacto-note { font-size: 10px; padding: 8px 10px; }
+    footer { font-size: 9px; padding: 8px; }
+    * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
   }
 </style>
 </head>
@@ -299,6 +333,7 @@ _HTML_TEMPLATE = r"""<!DOCTYPE html>
   </section>
 
 </main>
+<button class="btn-print" onclick="window.print()">🖨️ Imprimir / Salvar PDF</button>
 <footer>Gerado automaticamente — PDF "Lucratividade por Vendedor-Cliente no Previsão" (Mercatus).
 MC R$ = Faturamento − Custo &nbsp;|&nbsp; Resultado Real % = MC% + 15pp.</footer>
 
