@@ -230,24 +230,25 @@ _HTML_TEMPLATE = r"""<!DOCTYPE html>
     main { padding: 8px 0; max-width: 100%; }
     .btn-print { display: none; }
     section { box-shadow: none; border: 1px solid #ddd; padding: 10px 12px;
-      margin-bottom: 12px; break-inside: avoid; }
-    section h2 { font-size: 11px; margin-bottom: 8px; }
-    .kpis { gap: 6px; margin-bottom: 12px; }
-    .kpi { padding: 8px 6px; box-shadow: none; border: 1px solid #ddd; }
+      margin-bottom: 10px; break-inside: avoid; }
+    section h2 { font-size: 11px; margin-bottom: 6px; }
+    .kpis { gap: 5px; margin-bottom: 10px; }
+    .kpi { padding: 7px 5px; box-shadow: none; border: 1px solid #ddd; }
     .kpi .value { font-size: 13px; }
     .kpi .label { font-size: 8px; }
-    .grid2 { grid-template-columns: 1.4fr 1fr; gap: 10px; }
-    .chart-wrap { height: 180px; }
-    .chart-wrap.small { height: 150px; }
+    /* Oculta gráficos — dados já estão nas tabelas */
+    .chart-wrap, canvas { display: none !important; }
+    /* Empilha as duas colunas lado a lado sem os gráficos */
+    .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
     .table-scroll { max-height: none !important; overflow: visible !important;
-      border: none; }
-    table { font-size: 9px; }
-    th, td { padding: 3px 5px; }
+      border: 1px solid #ddd; margin-top: 0 !important; }
+    table { font-size: 9px; width: 100%; }
+    th, td { padding: 3px 6px; }
     .impacto-cards { gap: 6px; }
     .impacto-card { padding: 8px; }
     .impacto-card .value { font-size: 13px; }
     .impacto-note { font-size: 10px; padding: 8px 10px; }
-    footer { font-size: 9px; padding: 8px; }
+    footer { font-size: 9px; padding: 6px; }
     * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
   }
 </style>
