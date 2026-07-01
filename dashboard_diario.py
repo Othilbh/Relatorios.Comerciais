@@ -1,19 +1,10 @@
 """Gera o dashboard HTML gerencial 'dashboard_gerencial_othil_DDMMAAAA.html'.
 
-Dois indicadores de margem:
-  MC R$  = Faturamento − Custo_PDF  (custo bruto, sem ajuste)
-  MC %   = MC_R$ / Custo_PDF × 100
+Dois indicadores:
+  MC R$  = Faturamento − Custo_PDF  (valor monetário do prejuízo/lucro)
+  Resultado Real % = MC% + 15pp  (= Resultado%_PDF + 15pp de despesa adm)
 
-  Resultado Real % = MC% + 15pp
-    (= Resultado%_PDF + 15pp de despesa administrativa embutida)
-
-Seções do dashboard:
-  - KPIs do dia (Faturamento, MC R$, MC %, Resultado Real %, Caixas, Clientes, Vendedores)
-  - Ranking de vendedores (gráfico + tabela com MC % e Resultado Real %)
-  - Faturamento + ambas as margens por categoria de produto
-  - Top 10 clientes (faturamento + ambas as margens)
-  - Alertas Resultado Real % < -15%
-  - Impacto das vendas abaixo de -15% (Resultado Real %) na margem do dia
+  Filtro de Alertas: MC % < −15%  (inclui todos os itens com margem ruim)
 """
 import json
 import os
@@ -30,18 +21,16 @@ HEADER_BG,   HEADER_FG   = '#2D6A4F', '#FFFFFF'
 
 
 def _calc(faturamento, custo_pdf):
-    """Retorna (mc_rs, mc_pct, resultado_real_pct)."""
+    """(mc_rs, mc_pct, resultado_real_pct)"""
     mc_rs  = faturamento - custo_pdf
     mc_pct = mc_rs / custo_pdf * 100 if custo_pdf else 0.0
-    resultado_real_pct = mc_pct + 15
-    return round(mc_rs, 2), round(mc_pct, 2), round(resultado_real_pct, 2)
+    return round(mc_rs, 2), round(mc_pct, 2), round(mc_pct + 15, 2)
 
 
-def _status(pct):
-    """Status baseado em Resultado Real % (ou MC %)."""
-    if pct >= 15: return 'OK',      VERDE_BG,    VERDE_FG
-    if pct >= 0:  return 'Atenção', AMARELO_BG,  AMARELO_FG
-    return                'Crítico', VERMELHO_BG, VERMELHO_FG
+def _status(resultado_real_pct):
+    if resultado_real_pct >= 15: return 'OK',      VERDE_BG,    VERDE_FG
+    if resultado_real_pct >= 0:  return 'Atenção', AMARELO_BG,  AMARELO_FG
+    return                        'Crítico', VERMELHO_BG, VERMELHO_FG
 
 
 def _montar_dados(parsed):
@@ -66,18 +55,18 @@ def _montar_dados(parsed):
         fat    = sum(it['faturamento'] for it in d['itens'])
         custo  = sum(it['custo_total'] for it in d['itens'])
         caixas = sum(it['qtd']         for it in d['itens'])
-        mc_rs, mc_pct, res_real = _calc(fat, custo)
+        mc_rs, _, res_real = _calc(fat, custo)
         status, bg, fg = _status(res_real)
         ranking.append({
             'vendedor': vname, 'clientes': len(d['clientes']),
             'caixas': round(caixas, 3), 'faturamento': round(fat, 2),
-            'mc_rs': mc_rs, 'mc_pct': mc_pct, 'resultado_real_pct': res_real,
+            'mc_rs': mc_rs, 'resultado_real_pct': res_real,
             'status': status, 'bg': bg, 'fg': fg,
         })
     ranking.sort(key=lambda r: -r['faturamento'])
     vendedores_ativos = len(ranking)
 
-    # ---- faturamento + MC % + Resultado Real % por categoria -----------
+    # ---- categorias ----------------------------------------------------
     por_categoria = {}
     for it in itens:
         cat = map_categoria(it['produto'])
@@ -86,10 +75,10 @@ def _montar_dados(parsed):
         d['custo'] += it['custo_total']
     categorias_lista = []
     for cat, d in sorted(por_categoria.items(), key=lambda x: -x[1]['fat']):
-        _, mc_pct_cat, res_real_cat = _calc(d['fat'], d['custo'])
+        mc_rs_cat, _, res_real_cat = _calc(d['fat'], d['custo'])
         categorias_lista.append({
             'categoria': cat, 'faturamento': round(d['fat'], 2),
-            'mc_pct': mc_pct_cat, 'resultado_real_pct': res_real_cat,
+            'mc_rs': mc_rs_cat, 'resultado_real_pct': res_real_cat,
         })
 
     # ---- top 10 clientes -----------------------------------------------
@@ -101,32 +90,32 @@ def _montar_dados(parsed):
         d['custo'] += it['custo_total']
     top_clientes = []
     for cod, d in sorted(por_cliente.items(), key=lambda x: -x[1]['fat'])[:10]:
-        _, mc_pct_cli, res_real_cli = _calc(d['fat'], d['custo'])
+        mc_rs_cli, _, res_real_cli = _calc(d['fat'], d['custo'])
         top_clientes.append({
             'cliente': d['nome'], 'codigo': cod,
             'faturamento': round(d['fat'], 2),
-            'mc_pct': mc_pct_cli, 'resultado_real_pct': res_real_cli,
+            'mc_rs': mc_rs_cli, 'resultado_real_pct': res_real_cli,
         })
 
-    # ---- alertas: Resultado Real % < -15% ------------------------------
+    # ---- alertas: MC % < -15% ------------------------------------------
     alertas = []
-    alertas_fat    = 0.0
-    alertas_mc_rs  = 0.0
-    alertas_custo  = 0.0
+    alertas_fat   = 0.0
+    alertas_mc_rs = 0.0
+    alertas_custo = 0.0
     for it in itens:
         mc_rs_it, mc_pct_it, res_real_it = _calc(it['faturamento'], it['custo_total'])
-        if res_real_it < -15:
+        if mc_pct_it < -15:
             qtd = it['qtd']
             venda_unit = it['faturamento'] / qtd if qtd else 0.0
             status, bg, fg = _status(res_real_it)
             alertas.append({
-                'vendedor':  it['vendedor'] or it['vendedor_raw'],
-                'cliente':   it['cliente_nome'],
-                'produto':   it['produto'],
-                'qtd':       round(qtd, 3),
-                'custo_unit': round(it['custo_unit'], 2),
-                'venda_unit': round(venda_unit, 2),
-                'mc_pct':         round(mc_pct_it,  2),
+                'vendedor':       it['vendedor'] or it['vendedor_raw'],
+                'cliente':        it['cliente_nome'],
+                'produto':        it['produto'],
+                'qtd':            round(qtd, 3),
+                'custo_unit':     round(it['custo_unit'], 2),
+                'venda_unit':     round(venda_unit, 2),
+                'mc_rs':          round(mc_rs_it, 2),
                 'resultado_real': round(res_real_it, 2),
                 'status': status, 'bg': bg, 'fg': fg,
             })
@@ -135,23 +124,22 @@ def _montar_dados(parsed):
             alertas_custo += it['custo_total']
     alertas.sort(key=lambda a: a['resultado_real'])
 
-    # ---- impacto das vendas com Resultado Real % < -15% ---------------
+    # ---- impacto -------------------------------------------------------
     pct_fat_alertas = alertas_fat / fat_total * 100 if fat_total else 0.0
-    custo_sem_alertas = custo_total - alertas_custo
-    mc_rs_sem_alertas = mc_rs_total - alertas_mc_rs
-    mc_pct_sem_alertas = mc_rs_sem_alertas / custo_sem_alertas * 100 if custo_sem_alertas else 0.0
-    res_real_sem_alertas = mc_pct_sem_alertas + 15
-    impacto_pp = res_real_sem_alertas - res_real_total
+    custo_sem = custo_total - alertas_custo
+    mc_rs_sem = mc_rs_total - alertas_mc_rs
+    mc_pct_sem = mc_rs_sem / custo_sem * 100 if custo_sem else 0.0
+    res_real_sem = mc_pct_sem + 15
+    impacto_pp = res_real_sem - res_real_total
 
     impacto = {
-        'fat_total':             round(fat_total, 2),
-        'fat_alertas':           round(alertas_fat, 2),
-        'pct_fat_alertas':       round(pct_fat_alertas, 2),
-        'mc_rs_alertas':         round(alertas_mc_rs, 2),
-        'res_real_total':        res_real_total,
-        'res_real_sem_alertas':  round(res_real_sem_alertas, 2),
-        'impacto_pp':            round(impacto_pp, 2),
-        'n_alertas':             len(alertas),
+        'fat_alertas':          round(alertas_fat, 2),
+        'pct_fat_alertas':      round(pct_fat_alertas, 2),
+        'mc_rs_alertas':        round(alertas_mc_rs, 2),
+        'res_real_total':       res_real_total,
+        'res_real_sem_alertas': round(res_real_sem, 2),
+        'impacto_pp':           round(impacto_pp, 2),
+        'n_alertas':            len(alertas),
     }
 
     return {
@@ -160,7 +148,6 @@ def _montar_dados(parsed):
         'kpis': {
             'faturamento':        round(fat_total, 2),
             'mc_rs':              mc_rs_total,
-            'mc_pct':             mc_pct_total,
             'resultado_real_pct': res_real_total,
             'caixas':             round(caixas_total, 3),
             'clientes':           clientes_distintos,
@@ -189,52 +176,54 @@ _HTML_TEMPLATE = r"""<!DOCTYPE html>
   }
   * { box-sizing: border-box; }
   body { font-family: Arial, Helvetica, sans-serif; margin: 0; padding: 0;
-    background: #F4F6F5; color: #1A1A1A; }
-  header { background: var(--header-bg); color: var(--header-fg); padding: 20px 28px; }
-  header h1 { margin: 0; font-size: 22px; }
-  header p  { margin: 4px 0 0; font-size: 13px; opacity: 0.9; }
-  main { padding: 24px 28px 48px; max-width: 1400px; margin: 0 auto; }
-  .kpis { display: grid; grid-template-columns: repeat(7, 1fr); gap: 12px; margin-bottom: 28px; }
-  .kpi  { background: #fff; border-radius: 8px; padding: 14px 12px; text-align: center;
+    background: #F4F6F5; color: #1A1A1A; font-size: 13px; }
+  header { background: var(--header-bg); color: var(--header-fg); padding: 16px 24px; }
+  header h1 { margin: 0; font-size: 20px; }
+  header p  { margin: 4px 0 0; font-size: 12px; opacity: 0.9; }
+  main { padding: 20px 24px 40px; max-width: 1400px; margin: 0 auto; }
+  .kpis { display: grid; grid-template-columns: repeat(6, 1fr); gap: 10px; margin-bottom: 24px; }
+  .kpi  { background: #fff; border-radius: 8px; padding: 12px 10px; text-align: center;
     box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
-  .kpi .label { font-size: 11px; color: #666; text-transform: uppercase; letter-spacing: .03em; }
-  .kpi .value { font-size: 19px; font-weight: bold; color: var(--header-bg); margin-top: 4px; }
-  section { background: #fff; border-radius: 8px; padding: 18px 20px; margin-bottom: 24px;
+  .kpi .label { font-size: 10px; color: #666; text-transform: uppercase; letter-spacing: .03em; }
+  .kpi .value { font-size: 18px; font-weight: bold; color: var(--header-bg); margin-top: 4px; }
+  section { background: #fff; border-radius: 8px; padding: 16px 18px; margin-bottom: 20px;
     box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
-  section h2 { margin: 0 0 14px; font-size: 16px; color: var(--header-bg); }
-  .grid2 { display: grid; grid-template-columns: 1.4fr 1fr; gap: 20px; }
-  .chart-wrap { position: relative; height: 320px; }
-  .chart-wrap.small { height: 280px; }
-  table { width: 100%; border-collapse: collapse; font-size: 13px; }
-  th, td { padding: 7px 10px; border-bottom: 1px solid #E5E5E5; text-align: left; white-space: nowrap; }
-  th { background: var(--header-bg); color: var(--header-fg); font-weight: bold; position: sticky; top: 0; }
+  section h2 { margin: 0 0 12px; font-size: 15px; color: var(--header-bg); }
+  .grid2 { display: grid; grid-template-columns: 1.4fr 1fr; gap: 16px; }
+  .chart-wrap { position: relative; height: 300px; }
+  .chart-wrap.small { height: 240px; }
+  table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  th, td { padding: 5px 8px; border-bottom: 1px solid #E5E5E5; text-align: left; }
+  th { background: var(--header-bg); color: var(--header-fg); font-weight: bold;
+       position: sticky; top: 0; white-space: nowrap; }
+  td { white-space: nowrap; }
+  td.wrap { white-space: normal; max-width: 180px; }
   td.num, th.num { text-align: right; }
   tr:hover td { background: #FAFAFA; }
-  .badge { display: inline-block; padding: 2px 9px; border-radius: 10px; font-weight: bold; font-size: 12px; }
-  .table-scroll { max-height: 480px; overflow-y: auto; border: 1px solid #EEE; border-radius: 6px; }
-  .impacto-cards { display: grid; grid-template-columns: repeat(4,1fr); gap: 12px; }
-  .impacto-card { border-radius: 8px; padding: 14px; text-align: center; }
-  .impacto-card .label { font-size: 11px; color: #555; text-transform: uppercase; }
-  .impacto-card .value { font-size: 20px; font-weight: bold; margin-top: 6px; }
-  .impacto-note { margin-top: 14px; padding: 12px 16px; background: #FEF9C3; border-radius: 8px;
-    font-size: 13px; color: #5a4a00; border-left: 4px solid #D4AC0D; }
-  footer { text-align: center; font-size: 11px; color: #999; padding: 16px; }
+  .badge { display: inline-block; padding: 2px 7px; border-radius: 10px;
+           font-weight: bold; font-size: 11px; white-space: nowrap; }
+  .table-scroll { max-height: 420px; overflow-y: auto; border: 1px solid #EEE;
+    border-radius: 6px; overflow-x: auto; }
+  .impacto-cards { display: grid; grid-template-columns: repeat(4,1fr); gap: 10px; }
+  .impacto-card { border-radius: 8px; padding: 12px; text-align: center; }
+  .impacto-card .label { font-size: 10px; color: #555; text-transform: uppercase; }
+  .impacto-card .value { font-size: 18px; font-weight: bold; margin-top: 6px; }
+  .impacto-note { margin-top: 12px; padding: 10px 14px; background: #FEF9C3;
+    border-radius: 8px; font-size: 12px; color: #5a4a00; border-left: 4px solid #D4AC0D; }
+  footer { text-align: center; font-size: 11px; color: #999; padding: 14px; }
   @media (max-width: 1100px) {
-    .kpis { grid-template-columns: repeat(4,1fr); }
+    .kpis { grid-template-columns: repeat(3,1fr); }
     .grid2 { grid-template-columns: 1fr; }
     .impacto-cards { grid-template-columns: repeat(2,1fr); }
-  }
-  @media (max-width: 700px) {
-    .kpis { grid-template-columns: repeat(2,1fr); }
   }
 </style>
 </head>
 <body>
 <header>
   <h1>Relatório Diário de Vendas OTHIL — Dashboard Gerencial</h1>
-  <p>Dia: __DATA_EMISSAO__ &nbsp;&nbsp;|&nbsp;&nbsp; Período: __PERIODO__
-     &nbsp;&nbsp;|&nbsp;&nbsp;
-     <small>MC % = (Fat − Custo) / Custo × 100 &nbsp;|&nbsp; Resultado Real % = MC% + 15pp</small></p>
+  <p>Dia: __DATA_EMISSAO__ &nbsp;|&nbsp; Período: __PERIODO__
+     &nbsp;|&nbsp;
+     <small>MC R$ = Fat − Custo &nbsp;|&nbsp; Resultado Real % = (MC R$ / Custo × 100) + 15pp</small></p>
 </header>
 <main>
 
@@ -249,7 +238,7 @@ _HTML_TEMPLATE = r"""<!DOCTYPE html>
           <thead><tr>
             <th>Vendedor</th><th class="num">Clientes</th><th class="num">Caixas</th>
             <th class="num">Faturamento R$</th><th class="num">MC R$</th>
-            <th class="num">MC %</th><th class="num">Resultado Real %</th><th>Status</th>
+            <th class="num">Resultado Real %</th><th>Status</th>
           </tr></thead>
           <tbody></tbody>
         </table>
@@ -262,11 +251,11 @@ _HTML_TEMPLATE = r"""<!DOCTYPE html>
       <div>
         <h2>Faturamento por categoria de produto</h2>
         <div class="chart-wrap small"><canvas id="chartCategorias"></canvas></div>
-        <div class="table-scroll" style="margin-top:12px;max-height:200px;">
+        <div class="table-scroll" style="margin-top:10px;max-height:180px;">
           <table id="tabelaCategorias">
             <thead><tr>
               <th>Categoria</th><th class="num">Faturamento R$</th>
-              <th class="num">MC %</th><th class="num">Resultado Real %</th>
+              <th class="num">MC R$</th><th class="num">Resultado Real %</th>
             </tr></thead>
             <tbody></tbody>
           </table>
@@ -275,11 +264,11 @@ _HTML_TEMPLATE = r"""<!DOCTYPE html>
       <div>
         <h2>Top 10 clientes do dia</h2>
         <div class="chart-wrap small"><canvas id="chartClientes"></canvas></div>
-        <div class="table-scroll" style="margin-top:12px;max-height:200px;">
+        <div class="table-scroll" style="margin-top:10px;max-height:180px;">
           <table id="tabelaClientes">
             <thead><tr>
               <th>Cliente</th><th class="num">Faturamento R$</th>
-              <th class="num">MC %</th><th class="num">Resultado Real %</th>
+              <th class="num">MC R$</th><th class="num">Resultado Real %</th>
             </tr></thead>
             <tbody></tbody>
           </table>
@@ -289,14 +278,14 @@ _HTML_TEMPLATE = r"""<!DOCTYPE html>
   </section>
 
   <section>
-    <h2>Alertas — Resultado Real % abaixo de −15% (<span id="qtdAlertas"></span> itens, pior para o melhor)</h2>
+    <h2>Alertas — MC % abaixo de −15% (<span id="qtdAlertas"></span> itens, pior para o melhor)</h2>
     <div class="table-scroll">
       <table id="tabelaAlertas">
         <thead><tr>
           <th>Vendedor</th><th>Cliente</th><th>Produto</th>
           <th class="num">Qtd</th>
-          <th class="num">Custo Unit. R$</th><th class="num">Venda Unit. R$</th>
-          <th class="num">MC %</th><th class="num">Resultado Real %</th><th>Situação</th>
+          <th class="num">Custo Unit.</th><th class="num">Venda Unit.</th>
+          <th class="num">MC R$</th><th class="num">Resultado Real %</th><th>Situação</th>
         </tr></thead>
         <tbody></tbody>
       </table>
@@ -304,23 +293,23 @@ _HTML_TEMPLATE = r"""<!DOCTYPE html>
   </section>
 
   <section id="secaoImpacto">
-    <h2>Impacto das vendas com Resultado Real % &lt;−15% na margem do dia</h2>
+    <h2>Impacto das vendas com MC % &lt;−15% na margem do dia</h2>
     <div class="impacto-cards" id="impactoCards"></div>
     <div class="impacto-note" id="impactoNota"></div>
   </section>
 
 </main>
-<footer>Gerado automaticamente a partir do PDF "Lucratividade por Vendedor-Cliente no Previsão" (Mercatus).
-MC % = (Fat − Custo_PDF) / Custo_PDF × 100 &nbsp;|&nbsp; Resultado Real % = MC% + 15pp.</footer>
+<footer>Gerado automaticamente — PDF "Lucratividade por Vendedor-Cliente no Previsão" (Mercatus).
+MC R$ = Faturamento − Custo &nbsp;|&nbsp; Resultado Real % = MC% + 15pp.</footer>
 
 <script>
 const DADOS = __DADOS_JSON__;
-const fmtMoney = v => 'R$ ' + v.toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2});
-const fmtPct   = v => v.toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2}) + '%';
-const fmtQty   = v => v.toLocaleString('pt-BR', {minimumFractionDigits:3, maximumFractionDigits:3});
-const fmtPctSimple = v => v.toLocaleString('pt-BR', {minimumFractionDigits:1, maximumFractionDigits:1}) + '%';
+const fmtMoney  = v => 'R$ ' + v.toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2});
+const fmtPct    = v => v.toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2}) + '%';
+const fmtQty    = v => v.toLocaleString('pt-BR', {minimumFractionDigits:3, maximumFractionDigits:3});
+const fmtSimple = v => v.toLocaleString('pt-BR', {minimumFractionDigits:1, maximumFractionDigits:1}) + '%';
 
-function pctColor(pct) {
+function resColor(pct) {
   if (pct >= 15) return {bg:'__VERDE_BG__',    fg:'__VERDE_FG__'};
   if (pct >= 0)  return {bg:'__AMARELO_BG__',  fg:'__AMARELO_FG__'};
   return              {bg:'__VERMELHO_BG__', fg:'__VERMELHO_FG__'};
@@ -329,13 +318,12 @@ function pctColor(pct) {
 function montarKpis() {
   const k = DADOS.kpis;
   const cards = [
-    ['Faturamento',        fmtMoney(k.faturamento)],
-    ['MC R$',              fmtMoney(k.mc_rs)],
-    ['MC %',               fmtPct(k.mc_pct)],
-    ['Resultado Real %',   fmtPct(k.resultado_real_pct)],
-    ['Caixas',             fmtQty(k.caixas)],
-    ['Clientes',           k.clientes],
-    ['Vendedores Ativos',  k.vendedores_ativos],
+    ['Faturamento',       fmtMoney(k.faturamento)],
+    ['MC R$',             fmtMoney(k.mc_rs)],
+    ['Resultado Real %',  fmtPct(k.resultado_real_pct)],
+    ['Caixas',            fmtQty(k.caixas)],
+    ['Clientes',          k.clientes],
+    ['Vendedores Ativos', k.vendedores_ativos],
   ];
   document.getElementById('kpis').innerHTML = cards.map(([label, value]) =>
     `<div class="kpi"><div class="label">${label}</div><div class="value">${value}</div></div>`
@@ -345,15 +333,14 @@ function montarKpis() {
 function montarRanking() {
   const tbody = document.querySelector('#tabelaRanking tbody');
   tbody.innerHTML = DADOS.ranking.map(r => {
-    const cMC  = pctColor(r.mc_pct);
-    const cRes = pctColor(r.resultado_real_pct);
+    const cRes = resColor(r.resultado_real_pct);
+    const mcNeg = r.mc_rs < 0;
     return `<tr>
       <td><strong>${r.vendedor}</strong></td>
       <td class="num">${r.clientes}</td>
       <td class="num">${fmtQty(r.caixas)}</td>
       <td class="num">${fmtMoney(r.faturamento)}</td>
-      <td class="num">${fmtMoney(r.mc_rs)}</td>
-      <td class="num" style="background:${cMC.bg};color:${cMC.fg};font-weight:bold;">${fmtPct(r.mc_pct)}</td>
+      <td class="num" style="color:${mcNeg?'__VERMELHO_FG__':'inherit'};font-weight:${mcNeg?'bold':'normal'};">${fmtMoney(r.mc_rs)}</td>
       <td class="num" style="background:${cRes.bg};color:${cRes.fg};font-weight:bold;">${fmtPct(r.resultado_real_pct)}</td>
       <td><span class="badge" style="background:${r.bg};color:${r.fg};">${r.status}</span></td>
     </tr>`;
@@ -371,7 +358,7 @@ function montarRanking() {
         plugins: { legend:{display:false} },
         scales: { y: { beginAtZero:true, ticks:{ callback: v=>'R$ '+v.toLocaleString('pt-BR') } } } },
     });
-  } catch(e) { console.error('Erro no gráfico vendedores:', e); }
+  } catch(e) { console.error('Erro gráfico vendedores:', e); }
 }
 
 function montarCategorias() {
@@ -388,19 +375,19 @@ function montarCategorias() {
           backgroundColor: DADOS.categorias.map((_,i) => palette[i%palette.length]) }],
       },
       options: { responsive:true, maintainAspectRatio:false,
-        plugins: { legend:{position:'right', labels:{boxWidth:12,font:{size:11}}},
+        plugins: { legend:{position:'right', labels:{boxWidth:10,font:{size:10}}},
           tooltip:{ callbacks:{ label: ctx=>`${ctx.label}: ${fmtMoney(ctx.parsed)}` } } } },
     });
-  } catch(e) { console.error('Erro no gráfico categorias:', e); }
+  } catch(e) { console.error('Erro gráfico categorias:', e); }
 
   const tbody = document.querySelector('#tabelaCategorias tbody');
   tbody.innerHTML = DADOS.categorias.map(c => {
-    const cMC  = pctColor(c.mc_pct);
-    const cRes = pctColor(c.resultado_real_pct);
+    const cRes = resColor(c.resultado_real_pct);
+    const mcNeg = c.mc_rs < 0;
     return `<tr>
       <td>${c.categoria}</td>
       <td class="num">${fmtMoney(c.faturamento)}</td>
-      <td class="num" style="background:${cMC.bg};color:${cMC.fg};font-weight:bold;">${fmtPct(c.mc_pct)}</td>
+      <td class="num" style="color:${mcNeg?'__VERMELHO_FG__':'inherit'};font-weight:${mcNeg?'bold':'normal'};">${fmtMoney(c.mc_rs)}</td>
       <td class="num" style="background:${cRes.bg};color:${cRes.fg};font-weight:bold;">${fmtPct(c.resultado_real_pct)}</td>
     </tr>`;
   }).join('');
@@ -419,20 +406,20 @@ function montarClientes() {
         plugins: { legend:{display:false},
           tooltip: { callbacks: { afterLabel: ctx => {
             const c = DADOS.top_clientes[ctx.dataIndex];
-            return `MC %: ${fmtPct(c.mc_pct)} | Resultado Real: ${fmtPct(c.resultado_real_pct)}`;
+            return `MC: ${fmtMoney(c.mc_rs)} | Res. Real: ${fmtPct(c.resultado_real_pct)}`;
           }}}},
-        scales: { x:{ beginAtZero:true, ticks:{ callback: v=>'R$ '+v.toLocaleString('pt-BR') } } } },
+        scales: { x:{ beginAtZero:true, ticks:{ callback: v=>'R$'+v.toLocaleString('pt-BR') } } } },
     });
-  } catch(e) { console.error('Erro no gráfico clientes:', e); }
+  } catch(e) { console.error('Erro gráfico clientes:', e); }
 
   const tbody = document.querySelector('#tabelaClientes tbody');
   tbody.innerHTML = DADOS.top_clientes.map(c => {
-    const cMC  = pctColor(c.mc_pct);
-    const cRes = pctColor(c.resultado_real_pct);
+    const cRes = resColor(c.resultado_real_pct);
+    const mcNeg = c.mc_rs < 0;
     return `<tr>
-      <td>${c.cliente}</td>
+      <td class="wrap">${c.cliente}</td>
       <td class="num">${fmtMoney(c.faturamento)}</td>
-      <td class="num" style="background:${cMC.bg};color:${cMC.fg};font-weight:bold;">${fmtPct(c.mc_pct)}</td>
+      <td class="num" style="color:${mcNeg?'__VERMELHO_FG__':'inherit'};font-weight:${mcNeg?'bold':'normal'};">${fmtMoney(c.mc_rs)}</td>
       <td class="num" style="background:${cRes.bg};color:${cRes.fg};font-weight:bold;">${fmtPct(c.resultado_real_pct)}</td>
     </tr>`;
   }).join('');
@@ -442,14 +429,15 @@ function montarAlertas() {
   document.getElementById('qtdAlertas').textContent = DADOS.alertas.length;
   const tbody = document.querySelector('#tabelaAlertas tbody');
   tbody.innerHTML = DADOS.alertas.map(a => {
-    const cMC  = pctColor(a.mc_pct);
-    const cRes = pctColor(a.resultado_real);
+    const cRes = resColor(a.resultado_real);
     return `<tr>
-      <td>${a.vendedor}</td><td>${a.cliente}</td><td>${a.produto}</td>
+      <td>${a.vendedor}</td>
+      <td class="wrap">${a.cliente}</td>
+      <td class="wrap">${a.produto}</td>
       <td class="num">${fmtQty(a.qtd)}</td>
       <td class="num">${fmtMoney(a.custo_unit)}</td>
       <td class="num">${fmtMoney(a.venda_unit)}</td>
-      <td class="num" style="background:${cMC.bg};color:${cMC.fg};font-weight:bold;">${fmtPct(a.mc_pct)}</td>
+      <td class="num" style="color:__VERMELHO_FG__;font-weight:bold;">${fmtMoney(a.mc_rs)}</td>
       <td class="num" style="background:${cRes.bg};color:${cRes.fg};font-weight:bold;">${fmtPct(a.resultado_real)}</td>
       <td><span class="badge" style="background:${a.bg};color:${a.fg};">${a.status}</span></td>
     </tr>`;
@@ -462,38 +450,37 @@ function montarImpacto() {
     document.getElementById('secaoImpacto').style.display = 'none';
     return;
   }
-  const mcRsNeg = imp.mc_rs_alertas < 0;
+  const mcNeg = imp.mc_rs_alertas < 0;
   const cards = [
-    { label:'Fat. Resultado Real <−15%', value: fmtMoney(imp.fat_alertas),
-      bg: '__VERMELHO_BG__', fg: '__VERMELHO_FG__' },
-    { label:'% do Fat. Total', value: fmtPctSimple(imp.pct_fat_alertas),
-      bg: '__AMARELO_BG__', fg: '__AMARELO_FG__' },
-    { label:'MC R$ acumulada', value: fmtMoney(imp.mc_rs_alertas),
-      bg: mcRsNeg ? '__VERMELHO_BG__' : '__VERDE_BG__',
-      fg: mcRsNeg ? '__VERMELHO_FG__' : '__VERDE_FG__' },
-    { label:'Impacto no Res. Real', value: (imp.impacto_pp > 0 ? '+' : '') + fmtPctSimple(imp.impacto_pp) + ' pp',
-      bg: '__AMARELO_BG__', fg: '__AMARELO_FG__' },
+    { label:'Fat. alertas (MC <−15%)',   value: fmtMoney(imp.fat_alertas),
+      bg:'__VERMELHO_BG__', fg:'__VERMELHO_FG__' },
+    { label:'% do Fat. Total',            value: fmtSimple(imp.pct_fat_alertas),
+      bg:'__AMARELO_BG__',  fg:'__AMARELO_FG__' },
+    { label:'MC R$ acumulada',            value: fmtMoney(imp.mc_rs_alertas),
+      bg: mcNeg?'__VERMELHO_BG__':'__VERDE_BG__',
+      fg: mcNeg?'__VERMELHO_FG__':'__VERDE_FG__' },
+    { label:'Impacto no Res. Real',       value: (imp.impacto_pp>0?'+':'') + fmtSimple(imp.impacto_pp) + ' pp',
+      bg:'__AMARELO_BG__',  fg:'__AMARELO_FG__' },
   ];
   document.getElementById('impactoCards').innerHTML = cards.map(c =>
     `<div class="impacto-card" style="background:${c.bg};color:${c.fg};">
-      <div class="label">${c.label}</div>
-      <div class="value">${c.value}</div>
+      <div class="label">${c.label}</div><div class="value">${c.value}</div>
     </div>`
   ).join('');
 
-  const direcao = imp.impacto_pp > 0 ? 'subiria' : 'cairia';
+  const dir = imp.impacto_pp > 0 ? 'subiria' : 'cairia';
   document.getElementById('impactoNota').innerHTML =
-    `<strong>Análise:</strong> As ${imp.n_alertas} vendas com Resultado Real % abaixo de −15%
-    representam <strong>${fmtPctSimple(imp.pct_fat_alertas)}</strong> do faturamento do dia
-    (${fmtMoney(imp.fat_alertas)}) e acumulam MC de <strong>${fmtMoney(imp.mc_rs_alertas)}</strong>.
-    Sem essas vendas, o Resultado Real do dia ${direcao} de
+    `<strong>Análise:</strong> As ${imp.n_alertas} vendas com MC % abaixo de −15% representam
+    <strong>${fmtSimple(imp.pct_fat_alertas)}</strong> do faturamento (${fmtMoney(imp.fat_alertas)})
+    e acumulam MC de <strong>${fmtMoney(imp.mc_rs_alertas)}</strong>.
+    Sem essas vendas, o Resultado Real ${dir} de
     <strong>${fmtPct(imp.res_real_total)}</strong> para
     <strong>${fmtPct(imp.res_real_sem_alertas)}</strong>
-    (impacto de <strong>${imp.impacto_pp > 0 ? '+' : ''}${fmtPctSimple(imp.impacto_pp)} pp</strong>).`;
+    (impacto de <strong>${imp.impacto_pp>0?'+':''}${fmtSimple(imp.impacto_pp)} pp</strong>).`;
 }
 
 [montarKpis, montarRanking, montarCategorias, montarClientes, montarAlertas, montarImpacto].forEach(fn => {
-  try { fn(); } catch(e) { console.error('Erro ao montar seção:', e); }
+  try { fn(); } catch(e) { console.error('Erro:', e); }
 });
 </script>
 </body>

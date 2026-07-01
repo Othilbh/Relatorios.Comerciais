@@ -214,10 +214,9 @@ def _build_resumo(wb, n_dados, vendor_order):
     kpis = [
         ('Faturamento',       f'=SUM({dr("G")})',                                                  MONEY_FMT),
         ('MC R$',             f'=SUM({dr("J")})',                                                  MONEY_FMT),
-        ('MC %',              f'=IFERROR(SUM({dr("J")})/SUM({dr("I")})*100,0)',                    PCT_FMT),
         ('Resultado Real %',  f'=IFERROR(SUM({dr("J")})/SUM({dr("I")})*100+15,0)',                PCT_FMT),
         ('Caixas',            f'=SUM({dr("F")})',                                                  '#,##0.000'),
-        ('Clientes',          f'=SUM({dr("N")})',                                                  '0'),
+        ('Clientes',          f'=SUM({dr("N")})',                                                   '0'),
         ('Vendedores Ativos', f'={len(vendor_order)}',                                             '0'),
     ]
     ws.cell(row=1, column=1, value='Relatório Diário de Vendas OTHIL').font = _font(bold=True, size=18, color=HEADER_BG)
@@ -241,8 +240,8 @@ def _build_resumo(wb, n_dados, vendor_order):
     # Ranking de vendedores
     rank_row0 = 8
     headers = ['Vendedor', 'Clientes', 'Caixas', 'Faturamento R$', 'Fat. Unit. R$',
-               'Custo Unit. R$', 'MC R$', 'MC %', 'Resultado Real %',
-               'Ticket Médio', 'Itens Res.<-15%', 'Status']
+               'Custo Unit. R$', 'MC R$', 'Resultado Real %',
+               'Ticket Médio', 'Itens MC<-15%', 'Status']
     for j, h in enumerate(headers, start=1):
         _header_cell(ws, rank_row0, j, h)
 
@@ -252,7 +251,6 @@ def _build_resumo(wb, n_dados, vendor_order):
     i_ = dr('I')   # CustoTotal_PDF
     j_ = dr('J')   # MC_RS
     k  = dr('K')   # MC_pct
-    l_ = dr('L')   # Resultado_Real_pct
     m_ = dr('M')   # Flag1stCliVend
 
     for i, item in enumerate(vendor_order):
@@ -267,17 +265,16 @@ def _build_resumo(wb, n_dados, vendor_order):
         _money(ws, r, 5, f'=IFERROR(D{r}/C{r},0)')
         _money(ws, r, 6, f'=IFERROR(SUMIFS({i_},{crit})/C{r},0)')
         _money(ws, r, 7, f'=SUMIFS({j_},{crit})')                              # MC R$
-        _pct_cell(ws, r, 8, f'=IFERROR(H{r}/SUMIFS({i_},{crit})*100,0)', mc_pct_hint)   # MC %
-        _pct_cell(ws, r, 9, f'=IFERROR(H{r}/SUMIFS({i_},{crit})*100+15,0)', res_real_hint)  # Resultado Real %
-        _money(ws, r, 10, f'=IFERROR(D{r}/B{r},0)')                           # Ticket Médio
-        c11 = ws.cell(row=r, column=11, value=f'=COUNTIFS({b},"{vname}",{l_},"<-15")')
-        c11.border = BORDER; c11.font = _font()
-        sc = ws.cell(row=r, column=12,
-                     value=f'=IF(I{r}>=15,"OK",IF(I{r}>=0,"Atenção","Crítico"))')
+        _pct_cell(ws, r, 8, f'=IFERROR(H{r}/SUMIFS({i_},{crit})*100+15,0)', res_real_hint)  # Resultado Real %
+        _money(ws, r, 9, f'=IFERROR(D{r}/B{r},0)')                            # Ticket Médio
+        c10 = ws.cell(row=r, column=10, value=f'=COUNTIFS({b},"{vname}",{k},"<-15")')
+        c10.border = BORDER; c10.font = _font()
+        sc = ws.cell(row=r, column=11,
+                     value=f'=IF(H{r}>=15,"OK",IF(H{r}>=0,"Atenção","Crítico"))')
         sc.font = _font(bold=True); sc.alignment = Alignment(horizontal='center'); sc.border = BORDER
 
     last_row = rank_row0 + len(vendor_order)
-    for j in range(1, 13):
+    for j in range(1, 12):
         ws.column_dimensions[get_column_letter(j)].width = 16
     ws.column_dimensions['A'].width = 14
 
@@ -304,7 +301,7 @@ def _build_alertas(wb, itens):
     ws.sheet_view.showGridLines = False
 
     headers = ['Vendedor', 'Cliente', 'Produto', 'Qtd',
-               'Custo Unit. R$', 'Venda Unit. R$', 'MC %', 'Resultado Real %']
+               'Custo Unit. R$', 'Venda Unit. R$', 'MC R$', 'Resultado Real %']
     ws.row_dimensions[1].height = 32
     for j, h in enumerate(headers, start=1):
         _header_cell(ws, 1, j, h)
@@ -312,13 +309,13 @@ def _build_alertas(wb, itens):
     rows = []
     for it in itens:
         mc_rs, mc_pct, res_real = _calc(it['faturamento'], it['custo_total'])
-        if res_real < -15:
-            rows.append((it, mc_pct, res_real))
-    rows.sort(key=lambda t: t[2])   # pior Resultado Real % primeiro
+        if mc_pct < -15:           # filtro: MC % < -15%
+            rows.append((it, mc_rs, res_real))
+    rows.sort(key=lambda t: t[2])  # pior Resultado Real % primeiro
 
-    for i, (it, mc_pct, res_real) in enumerate(rows):
+    for i, (it, mc_rs, res_real) in enumerate(rows):
         r = i + 2
-        qtd       = it['qtd']
+        qtd        = it['qtd']
         venda_unit = it['faturamento'] / qtd if qtd else 0.0
         _text (ws, r, 1, it['vendedor'] or it['vendedor_raw'])
         _text (ws, r, 2, it['cliente_nome'])
@@ -326,10 +323,10 @@ def _build_alertas(wb, itens):
         _qty  (ws, r, 4, qtd)
         _money(ws, r, 5, it['custo_unit'])
         _money(ws, r, 6, round(venda_unit, 2))
-        _pct_cell(ws, r, 7, round(mc_pct,  2), mc_pct)
+        _money(ws, r, 7, round(mc_rs, 2))
         _pct_cell(ws, r, 8, round(res_real, 2), res_real)
 
-    widths = [14, 38, 42, 10, 14, 14, 11, 16]
+    widths = [14, 38, 42, 10, 14, 14, 14, 16]
     for j, w in enumerate(widths, start=1):
         ws.column_dimensions[get_column_letter(j)].width = w
     ws.freeze_panes = 'A2'
@@ -349,9 +346,9 @@ def _build_vendedor_sheet(wb, vname, vendor_itens):
 
     # --- BLOCO ESQUERDO: detalhado por produto ---
     # A=Cliente | B=Produto | C=Qtd | D=Fat R$ | E=Fat Unit R$ |
-    # F=Custo Unit R$ | G=MC R$ | H=MC % | I=Resultado Real %
+    # F=Custo Unit R$ | G=MC R$ | H=Resultado Real %
     LEFT_HEADERS = ['Cliente', 'Produto', 'Qtd', 'Fat. R$', 'Fat. Unit. R$',
-                    'Custo Unit. R$', 'MC R$', 'MC %', 'Resultado Real %']
+                    'Custo Unit. R$', 'MC R$', 'Resultado Real %']
     title_row  = 3
     header_row = 4
     ws.cell(row=title_row, column=1, value='DETALHADO POR PRODUTO').font = _font(bold=True, size=12, color=HEADER_BG)
@@ -370,8 +367,7 @@ def _build_vendedor_sheet(wb, vname, vendor_itens):
         _money   (ws, r, 5, round(fat_unit, 2))
         _money   (ws, r, 6, it['custo_unit'])
         _money   (ws, r, 7, round(mc_rs,  2))
-        _pct_cell(ws, r, 8, round(mc_pct,  2), mc_pct)
-        _pct_cell(ws, r, 9, round(res_real, 2), res_real)
+        _pct_cell(ws, r, 8, round(res_real, 2), res_real)
 
     # Linha TOTAL
     left_total_row = first_data_row + len(vendor_itens)
@@ -389,14 +385,13 @@ def _build_vendedor_sheet(wb, vname, vendor_itens):
     _money   (ws, left_total_row, 5, round(avg_fat_unit, 2))
     _money   (ws, left_total_row, 6, round(avg_custo_unit, 2))
     _money   (ws, left_total_row, 7, round(total_mc_rs,  2))
-    _pct_cell(ws, left_total_row, 8, round(total_mc_pct,  2), total_mc_pct)
-    _pct_cell(ws, left_total_row, 9, round(total_res_real, 2), total_res_real)
+    _pct_cell(ws, left_total_row, 8, round(total_res_real, 2), total_res_real)
     ws.cell(row=left_total_row, column=1).font = _font(bold=True)
 
     # --- BLOCO DIREITO: gerencial por cliente ---
-    RIGHT_COL0 = 11   # coluna K (deslocou 1 por causa da nova coluna na esquerda)
+    RIGHT_COL0 = 10   # coluna J
     RIGHT_HEADERS = ['Cliente', 'Qtd', 'Fat. R$', 'Fat. Unit. R$',
-                     'Custo Unit. R$', 'MC R$', 'MC %', 'Resultado Real %', '% do Vendedor']
+                     'Custo Unit. R$', 'MC R$', 'Resultado Real %', '% do Vendedor']
     ws.cell(row=title_row, column=RIGHT_COL0, value='GERENCIAL POR CLIENTE').font = _font(bold=True, size=12, color=HEADER_BG)
     for j, h in enumerate(RIGHT_HEADERS, start=RIGHT_COL0):
         _header_cell(ws, header_row, j, h)
@@ -427,9 +422,8 @@ def _build_vendedor_sheet(wb, vname, vendor_itens):
         _money   (ws, r, RIGHT_COL0 + 3, round(fat_unit_c,   2))
         _money   (ws, r, RIGHT_COL0 + 4, round(custo_unit_c, 2))
         _money   (ws, r, RIGHT_COL0 + 5, round(mc_rs_c,  2))
-        _pct_cell(ws, r, RIGHT_COL0 + 6, round(mc_pct_c,   2), mc_pct_c)
-        _pct_cell(ws, r, RIGHT_COL0 + 7, round(res_real_c,  2), res_real_c)
-        pv = ws.cell(row=r, column=RIGHT_COL0 + 8, value=round(pv_pct, 2))
+        _pct_cell(ws, r, RIGHT_COL0 + 6, round(res_real_c,  2), res_real_c)
+        pv = ws.cell(row=r, column=RIGHT_COL0 + 7, value=round(pv_pct, 2))
         pv.number_format = PCT_FMT; pv.border = BORDER; pv.font = _font()
 
     right_total_row = first_data_row + len(clientes_ordem)
@@ -440,18 +434,17 @@ def _build_vendedor_sheet(wb, vname, vendor_itens):
     _money   (ws, right_total_row, RIGHT_COL0 + 3, round(avg_fat_unit,   2))
     _money   (ws, right_total_row, RIGHT_COL0 + 4, round(avg_custo_unit, 2))
     _money   (ws, right_total_row, RIGHT_COL0 + 5, round(total_mc_rs,  2))
-    _pct_cell(ws, right_total_row, RIGHT_COL0 + 6, round(total_mc_pct,  2), total_mc_pct)
-    _pct_cell(ws, right_total_row, RIGHT_COL0 + 7, round(total_res_real, 2), total_res_real)
-    pv100 = ws.cell(row=right_total_row, column=RIGHT_COL0 + 8, value=100.0)
+    _pct_cell(ws, right_total_row, RIGHT_COL0 + 6, round(total_res_real, 2), total_res_real)
+    pv100 = ws.cell(row=right_total_row, column=RIGHT_COL0 + 7, value=100.0)
     pv100.number_format = PCT_FMT; pv100.border = BORDER; pv100.font = _font(bold=True)
 
     # Larguras
     ws.column_dimensions['A'].width = 30
     ws.column_dimensions['B'].width = 32
-    for col in range(3, 10):
+    for col in range(3, 9):
         ws.column_dimensions[get_column_letter(col)].width = 13
     ws.column_dimensions[get_column_letter(RIGHT_COL0)].width = 28
-    for col in range(RIGHT_COL0 + 1, RIGHT_COL0 + 9):
+    for col in range(RIGHT_COL0 + 1, RIGHT_COL0 + 8):
         ws.column_dimensions[get_column_letter(col)].width = 14
 
     ws.freeze_panes = ws.cell(row=header_row + 1, column=2).coordinate
