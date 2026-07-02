@@ -3,13 +3,16 @@
 Workflow:
   (1) Inicio do mes (uma vez):
       Secao 'Configurar Historico':
-      - Sobe PDF Vendedor-Cliente de jul./ANO-1 e jun./ANO
+      - OPCAO A: Sobe o xlsx do mes anterior (mesmo formato gerado aqui)
+        -> le clientes, historico e metas automaticamente
+      - OPCAO B: Sobe dois PDFs Lucratividade por Vendedor-Cliente
+        (ant_ano e ant_mes)
       - Clica 'Salvar Historico' -> baixa historico_JUL2026.json
 
   (2) Toda sexta-feira:
       Secao 'Gerar Relatorio Semanal':
       - Sobe historico_JUL2026.json (salvo acima)
-      - Sobe PDF Vendedor-Cliente atual (clientes do periodo)
+      - Sobe PDFs Vendedor-Cliente atual (1 por vendedor, ate 8 arquivos)
       - Sobe PDF Lucratividade por Vendedor (totais reais)
       - Clica 'Gerar Excel' -> baixa o .xlsx
 """
@@ -17,7 +20,9 @@ from datetime import datetime
 
 import streamlit as st
 
-from xlsx_vendedor_cliente import salvar_historico, carregar_historico, gerar_xlsx
+from xlsx_vendedor_cliente import (
+    salvar_historico, carregar_historico, gerar_xlsx, ler_xlsx_historico,
+)
 from parsers_vendedor import parse_totais_vendedor
 
 st.set_page_config(page_title='Vendedor-Cliente OTHIL', layout='wide')
@@ -55,42 +60,82 @@ st.divider()
 with st.expander(f'(1) Configurar Historico - faca uma vez no inicio de {MESES[mes-1]}',
                  expanded=False):
     st.info(
-        'Envie os PDFs Lucratividade por Vendedor-Cliente dos dois periodos '
-        'anteriores. O app vai parsear e gerar um arquivo JSON que substitui '
-        f'os PDFs nas gerações semanais. Guarde o arquivo {fname_json}.'
+        f'Envie o Excel do mes anterior **ou** os dois PDFs historicos. '
+        f'O app vai gerar o arquivo {fname_json} para ser usado nas gerações semanais.'
     )
-    h1, h2 = st.columns(2)
-    with h1:
-        pdf_hist_ant_ano = st.file_uploader(
-            f'PDF Mesmo Mes / Ano Anterior ({lbl_ant_a})',
-            type='pdf', key='hist_ant_ano')
-    with h2:
-        pdf_hist_ant_mes = st.file_uploader(
-            f'PDF Mes Anterior ({lbl_ant_m})',
-            type='pdf', key='hist_ant_mes')
 
-    if pdf_hist_ant_ano is None or pdf_hist_ant_mes is None:
-        st.warning('Envie os dois PDFs historicos para gerar o arquivo de configuracao.')
+    modo = st.radio(
+        'Como voce quer enviar o historico?',
+        options=['xlsx (Excel do mes anterior)', 'PDFs (Lucratividade por Vendedor-Cliente)'],
+        horizontal=True,
+        key='modo_historico',
+    )
+
+    json_bytes = None
+    pronto = False
+
+    if modo.startswith('xlsx'):
+        xlsx_hist = st.file_uploader(
+            f'Excel do mes anterior (mesmo formato gerado aqui)',
+            type=['xlsx', 'xls'],
+            key='hist_xlsx',
+        )
+        if xlsx_hist is None:
+            st.warning('Envie o arquivo Excel do mes anterior para continuar.')
+        else:
+            pronto = True
+            if st.button('Salvar Historico (via xlsx)', type='secondary'):
+                with st.spinner('Lendo Excel historico...'):
+                    try:
+                        json_bytes = ler_xlsx_historico(
+                            xlsx_bytes=xlsx_hist.read(),
+                            ref_date=ref_date,
+                        )
+                        st.success(f'Historico gerado: {fname_json}')
+                        st.download_button(
+                            label=f'Baixar {fname_json}',
+                            data=json_bytes,
+                            file_name=fname_json,
+                            mime='application/json',
+                        )
+                    except Exception as exc:
+                        st.error(f'Erro ao processar xlsx: {exc}')
+                        import traceback
+                        st.code(traceback.format_exc())
     else:
-        if st.button('Salvar Historico', type='secondary'):
-            with st.spinner('Parseando PDFs historicos...'):
-                try:
-                    json_bytes = salvar_historico(
-                        pdf_ant_ano=pdf_hist_ant_ano,
-                        pdf_ant_mes=pdf_hist_ant_mes,
-                        ref_date=ref_date,
-                    )
-                    st.success(f'Historico gerado: {fname_json}')
-                    st.download_button(
-                        label=f'Baixar {fname_json}',
-                        data=json_bytes,
-                        file_name=fname_json,
-                        mime='application/json',
-                    )
-                except Exception as exc:
-                    st.error(f'Erro ao processar PDFs historicos: {exc}')
-                    import traceback
-                    st.code(traceback.format_exc())
+        h1, h2 = st.columns(2)
+        with h1:
+            pdf_hist_ant_ano = st.file_uploader(
+                f'PDF Mesmo Mes / Ano Anterior ({lbl_ant_a})',
+                type='pdf', key='hist_ant_ano')
+        with h2:
+            pdf_hist_ant_mes = st.file_uploader(
+                f'PDF Mes Anterior ({lbl_ant_m})',
+                type='pdf', key='hist_ant_mes')
+
+        if pdf_hist_ant_ano is None or pdf_hist_ant_mes is None:
+            st.warning('Envie os dois PDFs historicos para gerar o arquivo de configuracao.')
+        else:
+            pronto = True
+            if st.button('Salvar Historico (via PDFs)', type='secondary'):
+                with st.spinner('Parseando PDFs historicos...'):
+                    try:
+                        json_bytes = salvar_historico(
+                            pdf_ant_ano=pdf_hist_ant_ano,
+                            pdf_ant_mes=pdf_hist_ant_mes,
+                            ref_date=ref_date,
+                        )
+                        st.success(f'Historico gerado: {fname_json}')
+                        st.download_button(
+                            label=f'Baixar {fname_json}',
+                            data=json_bytes,
+                            file_name=fname_json,
+                            mime='application/json',
+                        )
+                    except Exception as exc:
+                        st.error(f'Erro ao processar PDFs historicos: {exc}')
+                        import traceback
+                        st.code(traceback.format_exc())
 
 st.divider()
 
@@ -100,7 +145,7 @@ st.divider()
 st.subheader(f'(2) Gerar Relatorio Semanal - {lbl_atual}')
 st.caption(
     'Envie o JSON de historico (gerado acima uma vez por mes) e os '
-    'dois PDFs da semana. O Excel gerado tem uma aba por vendedor + GERAL.'
+    'arquivos da semana. O Excel gerado tem uma aba por vendedor + GERAL.'
 )
 
 col_j, col_a, col_b = st.columns(3)
@@ -117,10 +162,6 @@ with col_b:
     pdf_totais = st.file_uploader(
         'PDF Lucratividade por Vendedor (totais reais)',
         type='pdf', key='pdf_totais')
-
-meta_file = st.file_uploader(
-    'Planilha de metas anterior (opcional - importa coluna META)',
-    type=['xlsx', 'xls'], key='meta_xlsx')
 
 faltando = []
 if hist_file is None:
@@ -139,13 +180,11 @@ else:
                 historico   = carregar_historico(hist_file.read())
                 totais_res  = parse_totais_vendedor(pdf_totais)
                 totais_dict = totais_res['vendedores']
-                meta_bytes  = meta_file.read() if meta_file else None
 
                 xlsx_bytes = gerar_xlsx(
                     historico=historico,
                     pdf_clientes_atual=pdf_clientes,
                     totais_atual=totais_dict,
-                    meta_xlsx_bytes=meta_bytes,
                     ref_date=ref_date,
                 )
 
