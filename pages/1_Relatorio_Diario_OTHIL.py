@@ -15,8 +15,12 @@ import streamlit as st
 from parsers_diario import parse_relatorio_diario, ValidationError
 from xlsx_diario import gerar_xlsx
 from dashboard_diario import gerar_dashboard
+try:
+    from gsheets_upload import upload_xlsx_as_sheet
+    _GSHEETS_OK = True
+except Exception:
+    _GSHEETS_OK = False
 
-st.set_page_config(page_title='OTHIL — Relatório Diário', layout='wide')
 
 st.title('OTHIL — Relatórios Comerciais')
 st.caption('Módulo: Relatório Diário de Vendas (Lucratividade por Vendedor-Cliente)')
@@ -59,13 +63,14 @@ if 'resultado_diario' in st.session_state:
     caixas = sum(it['qtd'] for it in itens)
     clientes = len(set(it['cliente_codigo'] for it in itens))
     vendedores = len(set((it['vendedor'] or it['vendedor_raw']) for it in itens))
-    resultado_rs = faturamento - custo
-    resultado_pct = (resultado_rs / custo * 100) if custo else 0.0
+    custo_real = custo / 1.15 if custo else 0.0
+    mc_rs  = faturamento - custo_real
+    mc_pct = mc_rs / custo_real * 100 if custo_real else 0.0
 
     c1, c2, c3, c4, c5, c6 = st.columns(6)
     c1.metric('Faturamento', f'R$ {faturamento:,.2f}')
-    c2.metric('Resultado R$', f'R$ {resultado_rs:,.2f}')
-    c3.metric('Resultado %', f'{resultado_pct:.2f}%')
+    c2.metric('MC R$', f'R$ {mc_rs:,.2f}')
+    c3.metric('MC %', f'{mc_pct:.2f}%')
     c4.metric('Caixas', f'{caixas:,.3f}')
     c5.metric('Clientes', clientes)
     c6.metric('Vendedores Ativos', vendedores)
@@ -86,7 +91,7 @@ if 'resultado_diario' in st.session_state:
     col_xlsx, col_html = st.columns(2)
 
     with col_xlsx:
-        if st.button('📊 Gerar Excel', type='primary', key='btn_xlsx'):
+        if st.button('📊 Gerar Planilha', type='primary', key='btn_xlsx'):
             with st.spinner('Gerando planilha...'):
                 with tempfile.NamedTemporaryFile(suffix='.xlsx', delete=False) as tmp:
                     gerar_xlsx(resultado, tmp.name)
@@ -95,12 +100,27 @@ if 'resultado_diario' in st.session_state:
             st.session_state['xlsx_bytes'] = xlsx_bytes
             st.session_state['xlsx_nome'] = f'Relatorio_Diario_{data_fmt_xlsx}_OTHIL.xlsx'
         if 'xlsx_bytes' in st.session_state:
+            nome = st.session_state['xlsx_nome']
             st.download_button(
-                '⬇️ Baixar ' + st.session_state['xlsx_nome'],
+                '⬇️ Baixar Excel — ' + nome,
                 data=st.session_state['xlsx_bytes'],
-                file_name=st.session_state['xlsx_nome'],
+                file_name=nome,
                 mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
             )
+            if _GSHEETS_OK and 'gcp_service_account' in st.secrets:
+                if st.button('🔗 Abrir no Google Sheets', key='btn_gsheets'):
+                    with st.spinner('Enviando para o Google Sheets...'):
+                        try:
+                            link = upload_xlsx_as_sheet(
+                                st.session_state['xlsx_bytes'],
+                                nome.replace('.xlsx', ''),
+                            )
+                            st.session_state['gsheets_link'] = link
+                        except Exception as e:
+                            st.error(f'Erro ao enviar para o Google Sheets: {e}')
+            if 'gsheets_link' in st.session_state:
+                st.success('Planilha criada no Google Sheets!')
+                st.markdown(f'[📄 Abrir planilha]({st.session_state["gsheets_link"]})')
 
     with col_html:
         if st.button('📈 Gerar Dashboard HTML', type='primary', key='btn_html'):

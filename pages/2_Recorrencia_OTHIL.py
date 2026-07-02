@@ -19,7 +19,6 @@ try:
 except Exception:
     _GSHEETS_OK = False
 
-st.set_page_config(page_title='OTHIL — Recorrencia de Vendas', layout='wide')
 
 st.title('OTHIL — Recorrencia de Vendas')
 st.caption(

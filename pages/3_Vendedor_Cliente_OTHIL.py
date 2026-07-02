@@ -25,7 +25,6 @@ from xlsx_vendedor_cliente import (
 )
 from parsers_vendedor import parse_totais_vendedor
 
-st.set_page_config(page_title='Vendedor-Cliente OTHIL', layout='wide')
 st.title('Relatorio Vendedor-Cliente')
 
 MESES = ['Janeiro','Fevereiro','Marco','Abril','Maio','Junho',
