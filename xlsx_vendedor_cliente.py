@@ -2,7 +2,7 @@
 
 Arquitetura:
   historico (JSON, uma vez por mes):
-    ant_ano / ant_mes por vendedor: clientes dict + TOTAL dict
+    ant_ano / ant_mes por vendedor: clientes dict + TOTAL dict + meta dict
 
   atual (toda sexta):
     clientes_atual  = parse_e_agregar(pdf_vendedor_cliente)
@@ -13,6 +13,7 @@ Regras:
   MC%   = MC_RS / Custo * 100
   Resultado Real = MC% + 15pp   <- coluna MARGEM %
   Luca EXCLUIDO.
+  Clientes repetidos (mais de uma loja) sao somados pelo nome base.
 """
 from __future__ import annotations
 
@@ -42,6 +43,8 @@ VENDOR_TAB = {
 VENDOR_TITLE = {**VENDOR_TAB, 'Roni': 'RONI'}
 VENDOR_ORDER = ['Afanais', 'Dora', 'Farley', 'Luciano',
                 'Reginaldo', 'Roni', 'Claudia', 'Juliana']
+# Mapeamento inverso: aba Excel -> chave vendedor
+TAB_TO_VENDOR = {v: k for k, v in VENDOR_TAB.items()}
 
 def _fill(h): return PatternFill('solid', fgColor=h)
 def _font(bold=False, color='000000', size=9):
@@ -114,11 +117,40 @@ def _dash(ws, r, col, fill, p_key=None):
         _st(c, fill=f, font=FONT_DATA, align=AL_C)
 
 
+# ─── Consolidacao de clientes ────────────────────────────────────────────────
+
+def _client_base(name: str) -> str:
+    """Extrai nome base antes de ' - ' ou ' (' para consolidacao de lojas."""
+    name = name.strip()
+    for sep in [' - ', ' (']:
+        if sep in name:
+            return name[:name.index(sep)].strip()
+    return name
+
+
+def _lookup_client(data_dict: dict, cli_name: str):
+    """Busca dados do cliente: match exato primeiro, depois match por nome base."""
+    if not data_dict:
+        return None
+    # 1) match exato
+    if cli_name in data_dict:
+        return data_dict[cli_name]
+    # 2) match por nome base
+    base = _client_base(cli_name)
+    for k, v in data_dict.items():
+        if _client_base(k) == base:
+            return v
+    return None
+
+
+# ─── Parsers / agregadores ───────────────────────────────────────────────────
+
 def parse_e_agregar(file_objs):
     """Parse um ou mais PDFs Vendedor-Cliente e agrega tudo.
 
+    Clientes com mesmo nome base (antes de ' - ' ou ' (') sao somados.
     Aceita um unico file-like object OU uma lista deles (multi-upload).
-    Retorna {vendedor: {cliente: {vol,fat,custo,mc_rs,mc_pct,resultado_real}}}
+    Retorna {vendedor: {cliente_base: {vol,fat,custo,mc_rs,mc_pct,resultado_real}}}
     """
     if file_objs is None:
         return {}
@@ -138,7 +170,8 @@ def parse_e_agregar(file_objs):
         for it in itens:
             if it.get('vendedor') in _EXCLUIDOS:
                 continue
-            v, c = it['vendedor'], it['cliente_nome']
+            v = it['vendedor']
+            c = _client_base(it['cliente_nome'])   # consolida por nome base
             raw[v][c]['vol']   += it.get('qtd', 0)
             raw[v][c]['fat']   += it.get('faturamento', 0)
             raw[v][c]['custo'] += it.get('custo_total', 0)
@@ -186,6 +219,8 @@ def agregar_totais_historicos(file_obj):
     return out
 
 
+# ─── Historico via PDF ───────────────────────────────────────────────────────
+
 def salvar_historico(pdf_ant_ano, pdf_ant_mes, ref_date):
     """Parsa os 2 PDFs historicos e retorna bytes do JSON."""
     labels = _periodo_labels(ref_date)
@@ -214,6 +249,140 @@ def salvar_historico(pdf_ant_ano, pdf_ant_mes, ref_date):
             'label':     labels['ant_mes'],
             'vendedores': _build(clientes_ant_mes, totais_ant_mes),
         },
+        'meta': {},  # vazio quando vem de PDF; populado pelo xlsx
+    }
+    return json.dumps(historico, ensure_ascii=False, indent=2).encode('utf-8')
+
+
+# ─── Historico via xlsx ───────────────────────────────────────────────────────
+
+def _xlsx_margem_para_resultado_real(val) -> float:
+    """Converte valor de MARGEM % do xlsx para resultado_real (percentagem).
+
+    O xlsx pode armazenar como ratio (<1 em modulo, ex: 0.15 = 15%)
+    ou diretamente como % (ex: -2.49 = -2.49%).
+    """
+    if val is None:
+        return 0.0
+    try:
+        f = float(val)
+    except (TypeError, ValueError):
+        return 0.0
+    return round(f * 100 if abs(f) < 1.0 else f, 4)
+
+
+def ler_xlsx_historico(xlsx_bytes, ref_date=None) -> bytes:
+    """Le historico a partir de um xlsx anterior (mesmo formato gerado por gerar_xlsx).
+
+    Estrutura esperada do xlsx:
+      Linha 1: titulo
+      Linha 2: CLIENTE | label_ant_ano | ... | label_ant_mes | ... | META | ... | ATUAL | ...
+      Linha 3: sub-cabecalhos VOLUME / FATURAMENTO / MARGEM %
+      Linhas 4+: dados dos clientes (ultima linha util = TOTAL)
+
+    Colunas (0-indexed):
+      0: CLIENTE
+      1,2,3: ant_ano  (VOLUME, FATURAMENTO, MARGEM%)
+      4,5,6: ant_mes  (VOLUME, FATURAMENTO, MARGEM%)
+      7,8,9: META     (VOLUME, FATURAMENTO, MARGEM%)
+      10,11,12: ATUAL (ignorado aqui)
+
+    Retorna os mesmos bytes JSON que salvar_historico().
+    """
+    if ref_date is None:
+        ref_date = datetime.today()
+    labels_def = _periodo_labels(ref_date)
+
+    wb = openpyxl.load_workbook(io.BytesIO(xlsx_bytes), data_only=True)
+
+    result_ant_ano   = {}   # {vend: {'clientes': {...}, 'TOTAL': {...}}}
+    result_ant_mes   = {}
+    result_meta      = {}   # {tab_name: {cli_upper: {vol, fat, margem}}}
+    label_ant_ano    = labels_def['ant_ano']
+    label_ant_mes    = labels_def['ant_mes']
+    labels_lidos     = False
+
+    for ws in wb.worksheets:
+        tab = ws.title.strip().upper()
+        if tab == 'GERAL':
+            continue
+        vend = TAB_TO_VENDOR.get(tab)
+        if vend is None:
+            continue
+
+        # Le labels dos periodos da linha 2 (uma unica vez)
+        if not labels_lidos:
+            row2 = [ws.cell(2, c).value for c in range(1, 14)]
+            if row2[1]:
+                label_ant_ano = str(row2[1]).strip()
+            if row2[4]:
+                label_ant_mes = str(row2[4]).strip()
+            labels_lidos = True
+
+        clientes_aa = {}
+        clientes_am = {}
+        total_aa    = None
+        total_am    = None
+        meta_vend   = {}
+
+        for row in ws.iter_rows(min_row=4, values_only=True):
+            if not row or row[0] is None:
+                continue
+            cli = str(row[0]).strip()
+            if not cli:
+                continue
+
+            def _safe(v):
+                try: return float(v) if v is not None else 0.0
+                except (TypeError, ValueError): return 0.0
+
+            vol_aa = _safe(row[1])
+            fat_aa = _safe(row[2])
+            res_aa = _xlsx_margem_para_resultado_real(row[3])
+            vol_am = _safe(row[4])
+            fat_am = _safe(row[5])
+            res_am = _xlsx_margem_para_resultado_real(row[6])
+
+            m_vol = _safe(row[7]) if len(row) > 7 else 0.0
+            m_fat = _safe(row[8]) if len(row) > 8 else 0.0
+            m_mrg = float(row[9]) if (len(row) > 9 and row[9] is not None) else 0.15
+
+            if cli.upper() == 'TOTAL':
+                total_aa = {'vol': round(vol_aa), 'fat': round(fat_aa, 2),
+                            'custo': 0.0, 'mc_rs': 0.0, 'mc_pct': 0.0,
+                            'resultado_real': round(res_aa, 4)}
+                total_am = {'vol': round(vol_am), 'fat': round(fat_am, 2),
+                            'custo': 0.0, 'mc_rs': 0.0, 'mc_pct': 0.0,
+                            'resultado_real': round(res_am, 4)}
+            else:
+                clientes_aa[cli] = {'vol': round(vol_aa), 'fat': round(fat_aa, 2),
+                                    'custo': 0.0, 'mc_rs': 0.0, 'mc_pct': 0.0,
+                                    'resultado_real': round(res_aa, 4)}
+                clientes_am[cli] = {'vol': round(vol_am), 'fat': round(fat_am, 2),
+                                    'custo': 0.0, 'mc_rs': 0.0, 'mc_pct': 0.0,
+                                    'resultado_real': round(res_am, 4)}
+                meta_vend[cli.upper()] = {
+                    'vol':    round(m_vol) if m_vol else None,
+                    'fat':    round(m_fat, 2) if m_fat else None,
+                    'margem': m_mrg,
+                }
+
+        result_ant_ano[vend] = {'clientes': clientes_aa, 'TOTAL': total_aa}
+        result_ant_mes[vend] = {'clientes': clientes_am, 'TOTAL': total_am}
+        result_meta[tab]     = meta_vend
+
+    historico = {
+        'ref_label': labels_def['_ref'],
+        'gerado_em': datetime.now().isoformat(timespec='seconds'),
+        'ant_ano': {
+            'label':     label_ant_ano,
+            'vendedores': result_ant_ano,
+        },
+        'ant_mes': {
+            'label':     label_ant_mes,
+            'vendedores': result_ant_mes,
+        },
+        'meta': result_meta,
     }
     return json.dumps(historico, ensure_ascii=False, indent=2).encode('utf-8')
 
@@ -221,6 +390,8 @@ def salvar_historico(pdf_ant_ano, pdf_ant_mes, ref_date):
 def carregar_historico(json_bytes):
     return json.loads(json_bytes.decode('utf-8'))
 
+
+# ─── Construtores de planilha ─────────────────────────────────────────────────
 
 def _build_headers(ws, ref_label, labels, n_cols, p_col_map, title_name):
     last = get_column_letter(n_cols)
@@ -298,13 +469,26 @@ def _build_vendedor_sheet(ws, title_name, clientes_por_periodo, totais_por_perio
 
     _build_headers(ws, ref_label, labels, 13, _P_COL, title_name)
 
-    all_cli = set()
-    for pdata in clientes_por_periodo.values():
-        all_cli.update(pdata.keys())
+    # Lista predefinida: clientes do historico (ant_ano + ant_mes)
+    predefined = {}
+    for p in ('ant_ano', 'ant_mes'):
+        for cli in clientes_por_periodo.get(p, {}):
+            predefined[cli] = True   # preserva ordem de insercao
+
+    # Adiciona clientes novos do atual que nao correspondem a nenhum predefinido
+    for cli in clientes_por_periodo.get('atual', {}):
+        base = _client_base(cli)
+        ja_tem = any(_client_base(p) == base for p in predefined)
+        if not ja_tem:
+            predefined[cli] = True
+
+    # Adiciona clientes de meta nao presentes ainda
     for ck in meta_vend:
-        if not any(c.upper() == ck for c in all_cli):
-            all_cli.add(ck)
-    all_cli_sorted = sorted(all_cli)
+        ja_tem = any(c.upper() == ck for c in predefined)
+        if not ja_tem:
+            predefined[ck] = True
+
+    all_cli_sorted = sorted(predefined.keys())
 
     for i, cli in enumerate(all_cli_sorted):
         r = 4 + i
@@ -329,7 +513,8 @@ def _build_vendedor_sheet(ws, title_name, clientes_por_periodo, totais_por_perio
                 else:
                     _dash(ws, r, c0, fill_r, 'meta')
             else:
-                d = clientes_por_periodo.get(p_key, {}).get(cli)
+                # Busca dados: match exato ou por nome base
+                d = _lookup_client(clientes_por_periodo.get(p_key, {}), cli)
                 _write_data(ws, r, c0, d, p_key)
 
     tot_row = 4 + len(all_cli_sorted)
@@ -406,7 +591,7 @@ def gerar_xlsx(historico, pdf_clientes_atual, totais_atual,
     historico          : dict de carregar_historico()
     pdf_clientes_atual : file-like (PDF Vendedor-Cliente atual)
     totais_atual       : dict de parse_totais_vendedor()['vendedores']
-    meta_xlsx_bytes    : bytes do xlsx anterior (opcional, para META)
+    meta_xlsx_bytes    : bytes do xlsx anterior (opcional, para META se nao vier no historico)
     ref_date           : datetime de referencia (default: hoje)
     """
     if ref_date is None:
@@ -422,8 +607,9 @@ def gerar_xlsx(historico, pdf_clientes_atual, totais_atual,
 
     clientes_atual = parse_e_agregar(pdf_clientes_atual)
 
-    meta_global = {}
-    if meta_xlsx_bytes:
+    # META: prioridade ao historico (quando veio de xlsx), depois meta_xlsx_bytes
+    meta_global = historico.get('meta', {})
+    if not meta_global and meta_xlsx_bytes:
         try:
             wb_m = openpyxl.load_workbook(io.BytesIO(meta_xlsx_bytes), data_only=True)
             for ws_m in wb_m.worksheets:

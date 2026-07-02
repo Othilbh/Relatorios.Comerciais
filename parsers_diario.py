@@ -20,8 +20,6 @@ import os
 MONEY2 = r'-?\d{1,3}(?:\.\d{3})*,\d{2}'
 QTY3 = r'-?\d{1,3}(?:\.\d{3})*,\d{3}'
 
-# Comprimento decimal esperado, na ordem, para cada valor da "cauda"
-# numérica de uma linha (produto ou totais). Ver docstring acima.
 _SEQ = [3, 2, 2, 3, 2, 2, 3, 2, 2, 2, 2, 2, 2, 2, 3, 2]
 
 VENDOR_RE = re.compile(r'^Vendedor:\s*\d+\s*-\s*(.+)$')
@@ -33,8 +31,6 @@ CX_RE = re.compile(r'\bCX\s+(?=[\d\-,.])')
 EMISSAO_RE = re.compile(r'Emissão:\s*(\d{2}/\d{2}/\d{4})')
 PERIODO_RE = re.compile(r'Período\s*:\s*(\d{2}/\d{2}/\d{4}[^N]*?\d{2}/\d{2}/\d{4})')
 
-# Nome no PDF (normalizado) -> nome de exibição. Mantido em sincronia com
-# o pedido da Ingrid; "ADILSON-DORA" cobre o cabeçalho "ADILSON - DORA".
 VENDOR_ALIASES = {
     'ADILSON-DORA': 'Dora',
     'AFANAIS': 'Afanais',
@@ -47,9 +43,6 @@ VENDOR_ALIASES = {
     'RONISTONIS': 'Roni',
 }
 
-# Usado só para limpar o nome do produto (remover o "Complemento" que às
-# vezes aparece colado ao final da descrição nessas linhas). Não tem
-# relação com a atribuição de vendedor, que vem do cabeçalho "Vendedor:".
 _KNOWN_COMPLEMENTOS = sorted([
     'ADILSON', 'AFANAIS', 'CLAUDIA', 'FARLEY', 'JULIANA AUGUSTA', 'JULIANA',
     'LUCA VENDEDOR', 'LUCA', 'LUCIANO', 'REGINALDO', 'RONISTONIS', 'RONI', 'DORA',
@@ -57,11 +50,9 @@ _KNOWN_COMPLEMENTOS = sorted([
 
 
 class ValidationError(Exception):
-    """Levantado quando a soma dos itens extraídos não bate com os
-    Totais do Vendedor/Cliente oficiais do PDF (tolerância R$ 1)."""
     def __init__(self, divergencias):
         self.divergencias = divergencias
-        super().__init__(f'{len(divergencias)} divergência(s) na validação')
+        super().__init__(f'{len(divergencias)} divergencia(s) na validacao')
 
 
 def _norm_vendor_key(raw: str) -> str:
@@ -80,8 +71,6 @@ def _to_float(s: str) -> float:
 
 
 def _tokenize_tail(tail: str):
-    """Lê a 'cauda' numérica de uma linha seguindo a sequência de
-    comprimentos decimais esperada por posição (não por espaço)."""
     pos, n, vals = 0, len(tail), []
     for dec in _SEQ:
         while pos < n and tail[pos].isspace():
@@ -114,28 +103,25 @@ def _clean_produto(raw: str) -> str:
     return _strip_leading_code(_strip_trailing_complemento(raw)) or raw.strip()
 
 
-# Trechos de cabeçalho/rodapé de página e de parâmetros do relatório que se
-# repetem a cada página e a cada "Cliente:" (reimpressão de cortesia). Nunca
-# fazem parte de um produto — servem só para "descartar" o buffer de linhas
-# pendentes (ver _is_junk_line) sem deixar esse texto contaminar a descrição
-# do próximo produto.
 _JUNK_MARKERS = [
-    'Empresa/Filial', 'Emissão:', 'Lucratividade por Vendedor', 'Usuário:',
-    'recursos\\relatorios', '.rtm', 'Parâmetros:', 'Vendedor(es):',
+    'Empresa/Filial', 'Emissao:', 'Lucratividade por Vendedor', 'Usuario:',
+    'recursos\\relatorios', '.rtm', 'Parametros:', 'Vendedor(es):',
     'Pessoa(s):', 'Produto(s):', 'Base para Percentual', 'Quebra e Avaria',
-    'Considera frete', 'Classificação :', 'Saídas por Vendas',
+    'Considera frete', 'Classificacao :', 'Saidas por Vendas',
+    'Emissao', 'Emiss',
 ]
 
 
 def _is_junk_line(line: str) -> bool:
-    if line.lstrip().startswith('Código Descrição'):
+    if line.lstrip().startswith('Codigo Descricao'):
         return True
+    stripped = line.strip()
+    if not stripped:
+        return False
     return any(marker in line for marker in _JUNK_MARKERS)
 
 
 def extract_text(file) -> str:
-    """Extrai o texto do PDF com `pdftotext -layout`. `file` pode ser um
-    caminho ou um objeto tipo arquivo (ex.: upload do Streamlit)."""
     tmp_path = None
     try:
         if hasattr(file, 'read'):
@@ -157,23 +143,6 @@ def extract_text(file) -> str:
 
 
 def parse_relatorio_diario(file, tolerancia=1.0):
-    """Faz o parsing completo do relatório e valida as somas extraídas
-    contra os Totais do Vendedor/Cliente oficiais do PDF.
-
-    Retorna um dict:
-      {
-        'data_emissao': str, 'periodo': str,
-        'itens': [ {vendedor, vendedor_raw, cliente_codigo, cliente_nome,
-                    produto, qtd, faturamento, custo_unit, custo_total,
-                    resultado} , ... ],
-        'total_geral': {...} ou None,
-        'divergencias': [...]  # vazio se tudo bateu dentro da tolerância
-      }
-
-    Levanta ValidationError se houver divergência fora da tolerância
-    (o chamador pode capturar para mostrar o relatório de divergências
-    e decidir se segue mesmo assim).
-    """
     text = extract_text(file)
     lines = text.split('\n')
 
@@ -186,14 +155,6 @@ def parse_relatorio_diario(file, tolerancia=1.0):
     total_geral = None
     data_emissao = None
     periodo = None
-
-    # Buffer de linhas ainda não consumidas por um produto. Uma entrada de
-    # produto pode vir em 1, 2 ou 3 linhas físicas no pdftotext -layout
-    # (código sozinho; descrição sozinha; complemento+CX+números), então o
-    # texto vai sendo acumulado aqui até a linha que tem "CX <números>", que
-    # é o sinal de "fim do produto". É limpo (sem usar) sempre que uma linha
-    # de cabeçalho/totais/página é reconhecida, para nunca contaminar a
-    # descrição do próximo produto com lixo de página.
     pending_lines = []
 
     for line in lines:
@@ -242,7 +203,7 @@ def parse_relatorio_diario(file, tolerancia=1.0):
             vals = _tokenize_tail(m.group(1))
             if len(vals) >= 14:
                 total_geral = {'qtd': vals[6], 'faturamento': vals[8],
-                                'custo_total': vals[10], 'resultado': vals[13]}
+                               'custo_total': vals[10], 'resultado': vals[13]}
             pending_lines = []
             continue
 
@@ -259,8 +220,6 @@ def parse_relatorio_diario(file, tolerancia=1.0):
             full_desc = ' '.join(pending_lines + ([before] if before else []))
             pending_lines = []
             if not full_desc:
-                # linha de continuação "órfã" (raro: complemento colado no
-                # meio de uma descrição) — sem texto de produto recuperável.
                 full_desc = '(produto)'
             tail = line[cxm.end():]
             vals = _tokenize_tail(tail)
@@ -284,9 +243,6 @@ def parse_relatorio_diario(file, tolerancia=1.0):
         if stripped:
             pending_lines.append(stripped)
 
-    # ------------------------------------------------------------------
-    # Validação obrigatória: soma dos itens extraídos x Totais oficiais.
-    # ------------------------------------------------------------------
     divergencias = []
     agg_cliente = {}
     agg_vendedor = {}
