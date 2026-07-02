@@ -8,9 +8,28 @@ arquivos de saída do dia:
 """
 import datetime
 import io
+import json
+import os
 import tempfile
 
 import streamlit as st
+
+_GERENCIA_DIR = os.path.join(os.path.dirname(__file__), '..', 'gerencia_data')
+
+
+def _salvar_dashboard_gerencia(html_text: str, periodo: str, emissao: str):
+    try:
+        os.makedirs(_GERENCIA_DIR, exist_ok=True)
+        with open(os.path.join(_GERENCIA_DIR, 'dashboard_latest.html'), 'w', encoding='utf-8') as f:
+            f.write(html_text)
+        with open(os.path.join(_GERENCIA_DIR, 'dashboard_latest_meta.json'), 'w', encoding='utf-8') as f:
+            json.dump({
+                'periodo': periodo,
+                'emissao': emissao,
+                'gerado_em': datetime.datetime.now().isoformat(),
+            }, f, ensure_ascii=False)
+    except Exception:
+        pass
 
 from parsers_diario import parse_relatorio_diario, ValidationError
 from xlsx_diario import gerar_xlsx
@@ -131,6 +150,11 @@ if 'resultado_diario' in st.session_state:
                 html_text = open(tmp.name, 'r', encoding='utf-8').read()
             st.session_state['html_text'] = html_text
             st.session_state['html_nome'] = f'dashboard_gerencial_othil_{data_fmt_html}.html'
+            _salvar_dashboard_gerencia(
+                html_text,
+                resultado.get('periodo') or '-',
+                resultado.get('data_emissao') or '-',
+            )
         if 'html_text' in st.session_state:
             st.download_button(
                 '⬇️ Baixar ' + st.session_state['html_nome'],
