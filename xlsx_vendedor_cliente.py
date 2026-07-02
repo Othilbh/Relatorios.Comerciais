@@ -114,24 +114,34 @@ def _dash(ws, r, col, fill, p_key=None):
         _st(c, fill=f, font=FONT_DATA, align=AL_C)
 
 
-def parse_e_agregar(file_obj):
-    """Parse PDF Vendedor-Cliente -> {vendedor: {cliente: {vol,fat,custo,...}}}"""
-    if file_obj is None:
+def parse_e_agregar(file_objs):
+    """Parse um ou mais PDFs Vendedor-Cliente e agrega tudo.
+
+    Aceita um unico file-like object OU uma lista deles (multi-upload).
+    Retorna {vendedor: {cliente: {vol,fat,custo,mc_rs,mc_pct,resultado_real}}}
+    """
+    if file_objs is None:
         return {}
-    try:
-        result = parse_relatorio_diario(file_obj)
-        itens  = result['itens']
-    except Exception:
-        return {}
+    if not isinstance(file_objs, (list, tuple)):
+        file_objs = [file_objs]
 
     raw = defaultdict(lambda: defaultdict(lambda: {'vol': 0.0, 'fat': 0.0, 'custo': 0.0}))
-    for it in itens:
-        if it.get('vendedor') in _EXCLUIDOS:
+
+    for file_obj in file_objs:
+        if file_obj is None:
             continue
-        v, c = it['vendedor'], it['cliente_nome']
-        raw[v][c]['vol']   += it.get('qtd', 0)
-        raw[v][c]['fat']   += it.get('faturamento', 0)
-        raw[v][c]['custo'] += it.get('custo_total', 0)
+        try:
+            result = parse_relatorio_diario(file_obj)
+            itens  = result['itens']
+        except Exception:
+            continue
+        for it in itens:
+            if it.get('vendedor') in _EXCLUIDOS:
+                continue
+            v, c = it['vendedor'], it['cliente_nome']
+            raw[v][c]['vol']   += it.get('qtd', 0)
+            raw[v][c]['fat']   += it.get('faturamento', 0)
+            raw[v][c]['custo'] += it.get('custo_total', 0)
 
     out = {}
     for v, clientes in raw.items():
