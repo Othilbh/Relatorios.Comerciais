@@ -20,10 +20,19 @@ _GERENCIA_DIR = os.path.join(os.path.dirname(__file__), '..', 'gerencia_data')
 def _salvar_dashboard_gerencia(html_text: str, periodo: str, emissao: str):
     try:
         os.makedirs(_GERENCIA_DIR, exist_ok=True)
-        with open(os.path.join(_GERENCIA_DIR, 'dashboard_latest.html'), 'w', encoding='utf-8') as f:
+        # Usa a data de emissão do PDF como nome do arquivo (formato YYYY-MM-DD)
+        try:
+            d, m, a = emissao.split('/')
+            slug = f'{a}-{m}-{d}'
+        except Exception:
+            slug = datetime.datetime.now().strftime('%Y-%m-%d')
+        html_path = os.path.join(_GERENCIA_DIR, f'dashboard_{slug}.html')
+        meta_path = os.path.join(_GERENCIA_DIR, f'dashboard_{slug}.json')
+        with open(html_path, 'w', encoding='utf-8') as f:
             f.write(html_text)
-        with open(os.path.join(_GERENCIA_DIR, 'dashboard_latest_meta.json'), 'w', encoding='utf-8') as f:
+        with open(meta_path, 'w', encoding='utf-8') as f:
             json.dump({
+                'slug': slug,
                 'periodo': periodo,
                 'emissao': emissao,
                 'gerado_em': datetime.datetime.now().isoformat(),
