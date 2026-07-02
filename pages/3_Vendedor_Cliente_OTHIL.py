@@ -110,8 +110,9 @@ with col_j:
         type='json', key='hist_json')
 with col_a:
     pdf_clientes = st.file_uploader(
-        'PDF Vendedor-Cliente (clientes do periodo atual)',
-        type='pdf', key='pdf_clientes')
+        'PDFs Vendedor-Cliente (1 por vendedor, ate 8 arquivos)',
+        type='pdf', key='pdf_clientes',
+        accept_multiple_files=True)
 with col_b:
     pdf_totais = st.file_uploader(
         'PDF Lucratividade por Vendedor (totais reais)',
@@ -124,8 +125,8 @@ meta_file = st.file_uploader(
 faltando = []
 if hist_file is None:
     faltando.append('Historico JSON')
-if pdf_clientes is None:
-    faltando.append('PDF Vendedor-Cliente')
+if not pdf_clientes:
+    faltando.append('PDFs Vendedor-Cliente')
 if pdf_totais is None:
     faltando.append('PDF Lucratividade por Vendedor')
 
