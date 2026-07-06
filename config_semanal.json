@@ -3,47 +3,47 @@
     {
       "nome": "Melão Gaia",
       "codigos_texto": "3102006*",
-      "estoque": 4500
+      "estoque": 2597
     },
     {
       "nome": "Melao Amarelo",
       "codigos_texto": "3102015007",
-      "estoque": 38
+      "estoque": 49
     },
     {
       "nome": "Mirtilo Dole",
       "codigos_texto": "87005909",
-      "estoque": 250
+      "estoque": 313
     },
     {
       "nome": "Portuguesa 55/60 Sabor",
       "codigos_texto": "02050032",
-      "estoque": 112
+      "estoque": 482
     },
     {
       "nome": "Forelle",
       "codigos_texto": "020502701",
-      "estoque": 120
+      "estoque": 361
     },
     {
       "nome": "Melao Cepi",
       "codigos_texto": "3102005*",
-      "estoque": 1200
+      "estoque": 1757
     },
     {
       "nome": "Laranja Royfada/fresh",
       "codigos_texto": "390700*",
-      "estoque": 24
+      "estoque": 23
     },
     {
       "nome": "Pink Lady 1/2",
       "codigos_texto": "50201332\n",
-      "estoque": 150
+      "estoque": 506
     },
     {
       "nome": "Pink Lady",
       "codigos_texto": "502013*",
-      "estoque": 280
+      "estoque": 772
     },
     {
       "nome": "Williams Menis",
@@ -58,12 +58,12 @@
     {
       "nome": "Melancia Magali 10kg",
       "codigos_texto": "50020031405",
-      "estoque": 500
+      "estoque": 762
     },
     {
-      "nome": "Melancia Magali",
+      "nome": "Melancia Magali 14kg",
       "codigos_texto": "50020031005\n",
-      "estoque": 700
+      "estoque": 1302
     },
     {
       "nome": "Thompson Puro Nectar 8kg",
@@ -81,5 +81,5 @@
     "Juliana": 7,
     "Claudia": 7
   },
-  "periodo": "29/06/2026 a 03/07/2026"
+  "periodo": "06/07 a 10/07/2026"
 }
