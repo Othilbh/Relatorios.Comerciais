@@ -3,82 +3,72 @@
     {
       "nome": "Melão Gaia",
       "codigos_texto": "3102006*",
-      "estoque": 2500
+      "estoque": 4500
     },
     {
       "nome": "Melao Amarelo",
-      "codigos_texto": "3102015006,3102015007",
-      "estoque": 600
+      "codigos_texto": "3102015007",
+      "estoque": 38
     },
     {
       "nome": "Mirtilo Dole",
       "codigos_texto": "87005909",
-      "estoque": 400
+      "estoque": 250
     },
     {
       "nome": "Portuguesa 55/60 Sabor",
       "codigos_texto": "02050032",
-      "estoque": 120
+      "estoque": 112
     },
     {
       "nome": "Forelle",
       "codigos_texto": "020502701",
+      "estoque": 120
+    },
+    {
+      "nome": "Melao Cepi",
+      "codigos_texto": "3102005*",
+      "estoque": 1200
+    },
+    {
+      "nome": "Laranja Royfada/fresh",
+      "codigos_texto": "390700*",
+      "estoque": 24
+    },
+    {
+      "nome": "Pink Lady 1/2",
+      "codigos_texto": "50201332\n",
       "estoque": 150
     },
     {
-      "nome": "Tangerina Urugold",
-      "codigos_texto": "390600112",
-      "estoque": 32
+      "nome": "Pink Lady",
+      "codigos_texto": "502013*",
+      "estoque": 280
     },
     {
-      "nome": "Crinson Cumbuca cx Preta",
-      "codigos_texto": "230100302",
-      "estoque": 220
+      "nome": "Williams Menis",
+      "codigos_texto": "101015*",
+      "estoque": 339
     },
     {
-      "nome": "Vitoria GrandValle/Manaira",
-      "codigos_texto": "830100903,830100952",
-      "estoque": 226
+      "nome": "Williams Gama",
+      "codigos_texto": "101016*",
+      "estoque": 167
     },
     {
-      "nome": "Laranja Fresh/ Rofayda",
-      "codigos_texto": "390700154,390700149",
-      "estoque": 49
+      "nome": "Melancia Magali 10kg",
+      "codigos_texto": "50020031405",
+      "estoque": 500
     },
     {
-      "nome": "Menis T80",
-      "codigos_texto": "010101580",
-      "estoque": 16
+      "nome": "Melancia Magali",
+      "codigos_texto": "50020031005\n",
+      "estoque": 700
     },
     {
-      "nome": "Menis T90",
-      "codigos_texto": "010101590",
-      "estoque": 37
-    },
-    {
-      "nome": "Menis T100",
-      "codigos_texto": "0101015100",
-      "estoque": 143
-    },
-    {
-      "nome": "Menis T110",
-      "codigos_texto": "0101015110",
-      "estoque": 74
-    },
-    {
-      "nome": "Menis T120",
-      "codigos_texto": "0101015120",
-      "estoque": 261
-    },
-    {
-      "nome": "Menis T135",
-      "codigos_texto": "0101015135",
-      "estoque": 18
-    },
-    {
-      "nome": "Gama 80/90",
-      "codigos_texto": "101016080,101016090",
-      "estoque": 113
+      "nome": "Thompson Puro Nectar 8kg",
+      "codigos_texto": "830200703\n",
+      "estoque": 118
     }
   ],
   "vendedor_pcts": {
