@@ -58,6 +58,46 @@ def _agregar_clientes(itens):
     return rows
 
 
+# ----------------------------------------------------------------------
+# Gradientes de cor sem depender do matplotlib (evita o ImportError do
+# Styler.background_gradient em ambientes onde o matplotlib nao esta
+# instalado, como o Streamlit Cloud sem essa dependencia declarada).
+# ----------------------------------------------------------------------
+def _mix(c1, c2, frac):
+    return tuple(int(c1[i] + (c2[i] - c1[i]) * frac) for i in range(3))
+
+
+def _green_gradient(col):
+    vmin, vmax = col.min(), col.max()
+    branco = (255, 255, 255)
+    verde = (45, 106, 79)  # combina com o verde OTHIL (#2D6A4F)
+    styles = []
+    for v in col:
+        frac = 0.0 if vmax == vmin else (v - vmin) / (vmax - vmin)
+        frac = max(0.0, min(1.0, frac))
+        r, g, b = _mix(branco, verde, frac)
+        styles.append(f'background-color: rgb({r},{g},{b})')
+    return styles
+
+
+def _diverging_gradient(col, vmin=-30, vmax=30):
+    vermelho = (215, 25, 28)
+    amarelo = (255, 255, 191)
+    verde = (26, 150, 65)
+    mid = (vmin + vmax) / 2
+    styles = []
+    for v in col:
+        v_clamped = max(vmin, min(vmax, v))
+        if v_clamped <= mid:
+            frac = 1.0 if mid == vmin else (v_clamped - vmin) / (mid - vmin)
+            r, g, b = _mix(vermelho, amarelo, frac)
+        else:
+            frac = 1.0 if vmax == mid else (v_clamped - mid) / (vmax - mid)
+            r, g, b = _mix(amarelo, verde, frac)
+        styles.append(f'background-color: rgb({r},{g},{b})')
+    return styles
+
+
 st.title('OTHIL — Recorrencia de Vendas')
 st.caption(
     'Gera a matriz cliente x produto em caixas (CX) a partir do PDF '
@@ -158,16 +198,16 @@ if 'resultado_rec' in st.session_state:
         # Tabela completa
         st.subheader(f'Todos os clientes ({len(df)})')
 
-        # Formatação visual
+        # Formatação visual (sem depender do matplotlib)
         styled = df.style.format({
             'Faturamento R$': 'R$ {:,.2f}',
             'Caixas': '{:,.3f}',
             'MC R$': 'R$ {:,.2f}',
             'MC %': '{:.2f}%',
-        }).background_gradient(
-            subset=['Faturamento R$'], cmap='Greens'
-        ).background_gradient(
-            subset=['MC %'], cmap='RdYlGn', vmin=-30, vmax=30
+        }).apply(
+            _green_gradient, subset=['Faturamento R$']
+        ).apply(
+            _diverging_gradient, subset=['MC %']
         )
 
         st.dataframe(styled, use_container_width=True, hide_index=True)
