@@ -8,57 +8,57 @@
     {
       "nome": "Maçã Red 113/125 Dole",
       "codigos_texto": "05010191*",
-      "estoque": 336
+      "estoque": 586
     },
     {
       "nome": "Pera Forelle",
       "codigos_texto": "020502701\n",
-      "estoque": 130
+      "estoque": 311
     },
     {
       "nome": "Pera Portuguesa 55/60",
       "codigos_texto": "02050032\n",
-      "estoque": 130
+      "estoque": 433
     },
     {
       "nome": "Maçã Gala + Fuji Azaleia",
       "codigos_texto": "701052* 702145*",
-      "estoque": 137
+      "estoque": 2148
     },
     {
       "nome": "Kiwi Zespri Green",
       "codigos_texto": "38010231\n",
-      "estoque": 110
+      "estoque": 83
     },
     {
       "nome": "Melão Cepi",
       "codigos_texto": "310200*",
-      "estoque": 1200
+      "estoque": 747
     },
     {
       "nome": "Melão Rei",
       "codigos_texto": "3102009*",
-      "estoque": 1680
+      "estoque": 817
     },
     {
       "nome": "Melão Gaia",
       "codigos_texto": "3102006*",
-      "estoque": 3400
+      "estoque": 1932
     },
     {
       "nome": "Melancia Magali 14 kg",
       "codigos_texto": "50020031005\n",
-      "estoque": 1300
+      "estoque": 1947
     },
     {
       "nome": "Maçã Pink Lady 1/2",
       "codigos_texto": "050201332\n",
-      "estoque": 150
+      "estoque": 485
     },
     {
       "nome": "Maçã Pink Lady",
       "codigos_texto": "0502013*",
-      "estoque": 280
+      "estoque": 551
     },
     {
       "nome": "Pera Williams Menis",
@@ -73,7 +73,7 @@
     {
       "nome": "Mirtilo Dole",
       "codigos_texto": "87005909\n",
-      "estoque": 250
+      "estoque": 142
     }
   ],
   "vendedor_pcts": {
