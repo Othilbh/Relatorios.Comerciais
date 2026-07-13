@@ -1,74 +1,79 @@
 {
   "produtos": [
     {
-      "nome": "Melão Gaia",
-      "codigos_texto": "3102006*",
-      "estoque": 2597
+      "nome": "Uva Thompson Granel 8 kg",
+      "codigos_texto": "830200703\n",
+      "estoque": 104
     },
     {
-      "nome": "Melao Amarelo",
-      "codigos_texto": "3102015007",
-      "estoque": 49
+      "nome": "Maçã Red 113/125 Dole",
+      "codigos_texto": "",
+      "estoque": 336
+    },
+    {
+      "nome": "Pera Forelle",
+      "codigos_texto": "",
+      "estoque": 130
+    },
+    {
+      "nome": "Pera Portuguesa 55/60",
+      "codigos_texto": "",
+      "estoque": 130
+    },
+    {
+      "nome": "Maçã Gala + Fuji Azaleia",
+      "codigos_texto": "",
+      "estoque": 137
+    },
+    {
+      "nome": "Kiwi Zespri Green",
+      "codigos_texto": "",
+      "estoque": 110
+    },
+    {
+      "nome": "Melão Cepi",
+      "codigos_texto": "",
+      "estoque": 1200
+    },
+    {
+      "nome": "Melão Rei",
+      "codigos_texto": "",
+      "estoque": 1680
+    },
+    {
+      "nome": "Melão Gaia",
+      "codigos_texto": "",
+      "estoque": 3400
+    },
+    {
+      "nome": "Melancia Magali 14 kg",
+      "codigos_texto": "",
+      "estoque": 1300
+    },
+    {
+      "nome": "Maçã Pink Lady 1/2",
+      "codigos_texto": "",
+      "estoque": 150
+    },
+    {
+      "nome": "Maçã Pink Lady",
+      "codigos_texto": "",
+      "estoque": 280
+    },
+    {
+      "nome": "Pera Williams Menis",
+      "codigos_texto": "",
+      "estoque": 168
+    },
+    {
+      "nome": "Pera Williams Gama",
+      "codigos_texto": "",
+      "estoque": 56
     },
     {
       "nome": "Mirtilo Dole",
-      "codigos_texto": "87005909",
-      "estoque": 313
-    },
-    {
-      "nome": "Portuguesa 55/60 Sabor",
-      "codigos_texto": "02050032",
-      "estoque": 482
-    },
-    {
-      "nome": "Forelle",
-      "codigos_texto": "020502701",
-      "estoque": 361
-    },
-    {
-      "nome": "Melao Cepi",
-      "codigos_texto": "3102005*",
-      "estoque": 1757
-    },
-    {
-      "nome": "Laranja Royfada/fresh",
-      "codigos_texto": "390700*",
-      "estoque": 23
-    },
-    {
-      "nome": "Pink Lady 1/2",
-      "codigos_texto": "50201332\n",
-      "estoque": 506
-    },
-    {
-      "nome": "Pink Lady",
-      "codigos_texto": "502013*",
-      "estoque": 772
-    },
-    {
-      "nome": "Williams Menis",
-      "codigos_texto": "101015*",
-      "estoque": 339
-    },
-    {
-      "nome": "Williams Gama",
-      "codigos_texto": "101016*",
-      "estoque": 167
-    },
-    {
-      "nome": "Melancia Magali 10kg",
-      "codigos_texto": "50020031405",
-      "estoque": 762
-    },
-    {
-      "nome": "Melancia Magali 14kg",
-      "codigos_texto": "50020031005\n",
-      "estoque": 1302
-    },
-    {
-      "nome": "Thompson Puro Nectar 8kg",
-      "codigos_texto": "830200703\n",
-      "estoque": 118
+      "codigos_texto": "",
+      "estoque": 250
     }
   ],
   "vendedor_pcts": {
