@@ -3,62 +3,62 @@
     {
       "nome": "Uva Thompson Granel 8 kg",
       "codigos_texto": "830200703\n\n",
-      "estoque": 104
+      "estoque": 107
     },
     {
       "nome": "Maçã Red 113/125 Dole",
       "codigos_texto": "05010191*",
-      "estoque": 586
+      "estoque": 336
     },
     {
       "nome": "Pera Forelle",
       "codigos_texto": "020502701\n",
-      "estoque": 311
+      "estoque": 130
     },
     {
       "nome": "Pera Portuguesa 55/60",
       "codigos_texto": "02050032\n",
-      "estoque": 433
+      "estoque": 130
     },
     {
       "nome": "Gala + Fuji Azaleia",
       "codigos_texto": "7010521* 7010601* 7011031* 701103220 701158150 7011961*\n7012271* 701245180\n7021451*",
-      "estoque": 2148
+      "estoque": 137
     },
     {
       "nome": "Kiwi Zespri Green",
       "codigos_texto": "38010231\n",
-      "estoque": 83
+      "estoque": 110
     },
     {
       "nome": "Melão Cepi",
       "codigos_texto": "310200*",
-      "estoque": 747
+      "estoque": 1200
     },
     {
       "nome": "Melão Rei",
       "codigos_texto": "3102009*",
-      "estoque": 817
+      "estoque": 1680
     },
     {
       "nome": "Melão Gaia",
       "codigos_texto": "3102006*",
-      "estoque": 1932
+      "estoque": 3400
     },
     {
       "nome": "Melancia Magali 14 kg",
       "codigos_texto": "50020031005\n",
-      "estoque": 1947
+      "estoque": 1300
     },
     {
       "nome": "Maçã Pink Lady 1/2",
       "codigos_texto": "050201332\n",
-      "estoque": 485
+      "estoque": 150
     },
     {
       "nome": "Maçã Pink Lady",
       "codigos_texto": "0502013*",
-      "estoque": 551
+      "estoque": 280
     },
     {
       "nome": "Pera Williams Menis",
@@ -73,7 +73,7 @@
     {
       "nome": "Mirtilo Dole",
       "codigos_texto": "87005909\n",
-      "estoque": 142
+      "estoque": 250
     }
   ],
   "vendedor_pcts": {
