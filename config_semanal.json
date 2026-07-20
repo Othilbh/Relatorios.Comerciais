@@ -1,79 +1,74 @@
 {
   "produtos": [
     {
-      "nome": "THOMPSON SUEMI PURO NECTA",
-      "codigos_texto": "830200703",
-      "estoque": 107
+      "nome": "PORTUGUESA 55/60 SABOR ",
+      "codigos_texto": "02050032\n\n",
+      "estoque": 400
     },
     {
-      "nome": "Maçã Red 113/125 Dole",
-      "codigos_texto": "05010191*",
-      "estoque": 336
+      "nome": "PORTUGUESA 60/65 SABOR",
+      "codigos_texto": "02050031\n",
+      "estoque": 400
     },
     {
-      "nome": "Pera Forelle",
-      "codigos_texto": "020502701\n",
-      "estoque": 130
+      "nome": "GALA SANT  CAROL",
+      "codigos_texto": "7011961*",
+      "estoque": 483
     },
     {
-      "nome": "Pera Portuguesa 55/60",
-      "codigos_texto": "02050032\n",
-      "estoque": 130
+      "nome": "FUJI EXPRESSA",
+      "codigos_texto": "7020891*",
+      "estoque": 863
     },
     {
-      "nome": "Gala + Fuji Azaleia",
-      "codigos_texto": "7010521* 7010601* 7011031* 701103220 701158150 7011961*\n7012271* 701245180\n7021451*",
-      "estoque": 137
+      "nome": "GALA BRANCA POMERANA",
+      "codigos_texto": "7012271*",
+      "estoque": 164
     },
     {
-      "nome": "Kiwi Zespri Green",
-      "codigos_texto": "38010231\n",
+      "nome": "MIRTILO DOLE",
+      "codigos_texto": "87005909\n",
       "estoque": 110
     },
     {
-      "nome": "Melão Cepi",
-      "codigos_texto": "310200*",
-      "estoque": 1200
+      "nome": "8KG THOMPSON SUEMI PURO NECTA",
+      "codigos_texto": "830200703\n",
+      "estoque": 99
     },
     {
-      "nome": "Melão Rei",
-      "codigos_texto": "3102009*",
-      "estoque": 1680
+      "nome": "ARGENTINA  113/125 DOLE",
+      "codigos_texto": "05010191*",
+      "estoque": 400
     },
     {
-      "nome": "Melão Gaia",
-      "codigos_texto": "3102006*",
-      "estoque": 3400
+      "nome": "FUJI 135/165 AZALEIA",
+      "codigos_texto": "7021451*",
+      "estoque": 79
     },
     {
-      "nome": "Melancia Magali 14 kg",
+      "nome": "GALA 150 AZALEIA",
+      "codigos_texto": "701158150\n",
+      "estoque": 56
+    },
+    {
+      "nome": "MELANCIA MAGALI T5 14KG",
       "codigos_texto": "50020031005\n",
-      "estoque": 1300
+      "estoque": 1500
     },
     {
-      "nome": "Maçã Pink Lady 1/2",
+      "nome": "PINK LADY 1/2",
       "codigos_texto": "050201332\n",
       "estoque": 150
     },
     {
-      "nome": "Maçã Pink Lady",
+      "nome": "MELAO REI",
+      "codigos_texto": "310200900*",
+      "estoque": 1008
+    },
+    {
+      "nome": "PINK LADY",
       "codigos_texto": "0502013*",
       "estoque": 280
-    },
-    {
-      "nome": "Pera Williams Menis",
-      "codigos_texto": "0101015*",
-      "estoque": 168
-    },
-    {
-      "nome": "Pera Williams Gama",
-      "codigos_texto": "1010161*",
-      "estoque": 56
-    },
-    {
-      "nome": "Mirtilo Dole",
-      "codigos_texto": "87005909\n",
-      "estoque": 250
     }
   ],
   "vendedor_pcts": {
