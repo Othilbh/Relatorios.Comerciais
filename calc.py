@@ -32,13 +32,13 @@ VENDEDORES_PADRAO = {
     'Reginaldo': 22,
     'Luciano': 7,
     'Juliana': 7,
-    'Claudia': 7,
+    'Luca - Vendedor': 7,
 }
 
 # Aliases para reconciliar os nomes "crus" que aparecem nos PDFs de
 # estoque/vendas com os 8 nomes de exibição usados nas Metas Semanais.
-# Nomes que não casam com nenhum alias (ex.: "LUCA - VENDEDOR",
-# "JEAN CARLOS", "NAYARA") são ignorados (não fazem parte das 8 metas).
+# Nomes que não casam com nenhum alias (ex.: "JEAN CARLOS", "NAYARA")
+# são ignorados (não fazem parte das 8 metas).
 VENDOR_ALIASES = {
     'Reginaldo': ['REGINALDO'],
     'Roni': ['RONI'],
@@ -46,7 +46,7 @@ VENDOR_ALIASES = {
     'Dora': ['DORA'],
     'Farley': ['FARLEY'],
     'Luciano': ['LUCIANO'],
-    'Claudia': ['CLAUDIA'],
+    'Luca - Vendedor': ['LUCA - VENDEDOR'],
     'Juliana': ['JULIANA'],
 }
 
