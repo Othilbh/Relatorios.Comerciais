@@ -12,7 +12,6 @@ Regras:
   MC_RS = Fat - Custo_PDF
   MC%   = MC_RS / Custo * 100
   Resultado Real = MC% + 15pp   <- coluna MARGEM %
-  CLAUDIA EXCLUIDO.
   Clientes repetidos (mais de uma loja) sao somados pelo nome base.
 """
 from __future__ import annotations

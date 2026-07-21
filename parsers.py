@@ -20,7 +20,7 @@ VENDOR_LINE_RE = re.compile(r'^Vendedor:\s*(\d+)\s+(.+)$')
 # Ordenado do nome mais longo pro mais curto, pra casar o nome mais
 # específico primeiro quando houver ambiguidade.
 KNOWN_VENDOR_NAMES = sorted(
-    ['REGINALDO', 'AFANAIS', 'LUCIANO', 'CLAUDIA', 'JULIANA', 'FARLEY', 'DORA', 'RONI'],
+    ['REGINALDO', 'AFANAIS', 'LUCIANO', 'LUCA', 'JULIANA', 'FARLEY', 'DORA', 'RONI'],
     key=len, reverse=True,
 )
 
