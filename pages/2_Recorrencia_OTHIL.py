@@ -140,7 +140,7 @@ if 'resultado_rec' in st.session_state:
     # Resumo
     periodo = resultado.get('periodo') or '-'
     emissao = resultado.get('data_emissao') or '-'
-    itens_validos = [it for it in itens if it.get('vendedor') != 'Luca']
+    itens_validos = [it for it in itens if it.get('vendedor') != 'Luca - Vendedor']
     fat_total = sum(it['faturamento'] for it in itens_validos)
     cx_total  = sum(it['qtd']         for it in itens_validos)
     custo_total = sum(it['custo_total'] for it in itens_validos)
@@ -153,7 +153,7 @@ if 'resultado_rec' in st.session_state:
     ))
 
     st.header('2. Resumo do periodo')
-    st.caption(f'Periodo: {periodo}  |  Emissao: {emissao}  |  {len(itens_validos)} itens (excluindo Luca)')
+    st.caption(f'Periodo: {periodo}  |  Emissao: {emissao}  |  {len(itens_validos)} itens (excluindo Luca - Vendedor)')
     c1, c2, c3, c4, c5, c6 = st.columns(6)
     c1.metric('Faturamento', f'R$ {fat_total:,.2f}')
     c2.metric('MC R$', f'R$ {mc_rs_total:,.2f}')

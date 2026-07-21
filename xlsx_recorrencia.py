@@ -4,8 +4,8 @@ Fonte: PDF 'Lucratividade por Vendedor-Cliente no Previsao' (Mercatus).
 Reutiliza parsers_diario.parse_relatorio_diario para extracao dos dados.
 
 Estrutura do Excel:
-  - Aba CONSOLIDADO (todos os vendedores exceto Luca)
-  - Uma aba por vendedor ativo (exceto Luca)
+  - Aba CONSOLIDADO (todos os vendedores exceto Luca - Vendedor)
+  - Uma aba por vendedor ativo (exceto Luca - Vendedor)
   Cada aba: matriz cliente x produto-unificado em caixas (CX)
   Colunas fixas: CLIENTE | TOTAL CX | FATURAMENTO (R$) | MARGEM REL. | MARGEM REAL +15%
   Colunas de produto ordenadas por volume total (CX) desc
@@ -26,7 +26,7 @@ C_LARANJA = 'FFE5CC'
 C_LAR_FG  = 'C75B00'
 C_NEG     = 'C0392B'
 
-EXCLUIR = {'Luca'}
+EXCLUIR = {'Luca - Vendedor'}
 
 # =============================================================================
 # Consolidacao de clientes
