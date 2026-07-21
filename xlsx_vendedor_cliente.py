@@ -32,7 +32,7 @@ _EXCLUIDOS = {'giovana'}
 
 VENDOR_TAB = {
     'Afanais':   'AFANAIS',
-    'Luca':   'LUCA',
+    'Luca - Vendedor':   'LUCA - VENDEDOR',
     'Dora':      'DORA',
     'Farley':    'FARLEY',
     'Juliana':   'JULIANA',
@@ -42,7 +42,7 @@ VENDOR_TAB = {
 }
 VENDOR_TITLE = {**VENDOR_TAB, 'Roni': 'RONI'}
 VENDOR_ORDER = ['Afanais', 'Dora', 'Farley', 'Luciano',
-                'Reginaldo', 'Roni', 'Luca', 'Juliana']
+                'Reginaldo', 'Roni', 'Luca - Vendedor', 'Juliana']
 # Mapeamento inverso: aba Excel -> chave vendedor
 TAB_TO_VENDOR = {v: k for k, v in VENDOR_TAB.items()}
 
