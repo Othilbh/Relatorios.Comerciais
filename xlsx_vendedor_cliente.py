@@ -12,7 +12,7 @@ Regras:
   MC_RS = Fat - Custo_PDF
   MC%   = MC_RS / Custo * 100
   Resultado Real = MC% + 15pp   <- coluna MARGEM %
-  Luca EXCLUIDO.
+  CLAUDIA EXCLUIDO.
   Clientes repetidos (mais de uma loja) sao somados pelo nome base.
 """
 from __future__ import annotations
@@ -28,11 +28,11 @@ from openpyxl.utils import get_column_letter
 
 from parsers_diario import parse_relatorio_diario
 
-_EXCLUIDOS = {'Luca'}
+_EXCLUIDOS = {'giovana'}
 
 VENDOR_TAB = {
     'Afanais':   'AFANAIS',
-    'Claudia':   'CLAUDIA',
+    'Luca':   'LUCA',
     'Dora':      'DORA',
     'Farley':    'FARLEY',
     'Juliana':   'JULIANA',
@@ -42,7 +42,7 @@ VENDOR_TAB = {
 }
 VENDOR_TITLE = {**VENDOR_TAB, 'Roni': 'RONI'}
 VENDOR_ORDER = ['Afanais', 'Dora', 'Farley', 'Luciano',
-                'Reginaldo', 'Roni', 'Claudia', 'Juliana']
+                'Reginaldo', 'Roni', 'Luca', 'Juliana']
 # Mapeamento inverso: aba Excel -> chave vendedor
 TAB_TO_VENDOR = {v: k for k, v in VENDOR_TAB.items()}
 
