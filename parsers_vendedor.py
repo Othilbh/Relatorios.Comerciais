@@ -87,7 +87,7 @@ def parse_totais_vendedor(file_obj) -> dict:
       'total_geral': {vol, fat, custo, mc_rs, mc_pct, resultado_real} | None,
     }
     nome = valor de VENDOR_ALIASES (ex.: 'Roni', 'Afanais').
-    Luca é incluído caso apareça — o chamador decide se exclui.
+    Luca - Vendedor é incluído caso apareça — o chamador decide se exclui.
     """
     text  = _extract_text(file_obj)
     lines = text.split('\n')
