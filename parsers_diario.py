@@ -35,7 +35,6 @@ VENDOR_ALIASES = {
     'ADILSON-DORA': 'Dora',
     'AFANAIS': 'Afanais',
     'FARLEY': 'Farley',
-    'LUCA': 'Luca',
     'JULIANA AUGUSTA': 'Juliana',
     'LUCA-VENDEDOR': 'Luca',
     'LUCIANO': 'Luciano',
