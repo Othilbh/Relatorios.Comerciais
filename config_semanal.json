@@ -1,74 +1,99 @@
 {
   "produtos": [
     {
-      "nome": "PORTUGUESA 55/60 SABOR ",
-      "codigos_texto": "02050032\n\n",
-      "estoque": 400
+      "nome": "PORTUGUESA 55/60 SABOR",
+      "codigos_texto": "02050032\n",
+      "estoque": 301
     },
     {
       "nome": "PORTUGUESA 60/65 SABOR",
       "codigos_texto": "02050031\n",
-      "estoque": 400
+      "estoque": 224
     },
     {
-      "nome": "GALA SANT  CAROL",
+      "nome": "FORELLE 1/2 ALESSANDRINI",
+      "codigos_texto": "020502701\n",
+      "estoque": 120
+    },
+    {
+      "nome": "GALA SANT CAROL",
       "codigos_texto": "7011961*",
-      "estoque": 483
+      "estoque": 184
     },
     {
       "nome": "FUJI EXPRESSA",
-      "codigos_texto": "7020891*",
-      "estoque": 863
-    },
-    {
-      "nome": "GALA BRANCA POMERANA",
-      "codigos_texto": "7012271*",
-      "estoque": 164
+      "codigos_texto": "702089*",
+      "estoque": 712
     },
     {
       "nome": "MIRTILO DOLE",
       "codigos_texto": "87005909\n",
-      "estoque": 110
+      "estoque": 73
     },
     {
       "nome": "8KG THOMPSON SUEMI PURO NECTA",
       "codigos_texto": "830200703\n",
-      "estoque": 99
+      "estoque": 55
     },
     {
-      "nome": "ARGENTINA  113/125 DOLE",
-      "codigos_texto": "05010191*",
-      "estoque": 400
+      "nome": "MELAO CEPI TP 5/8",
+      "codigos_texto": "3102005*",
+      "estoque": 288
     },
     {
-      "nome": "FUJI 135/165 AZALEIA",
+      "nome": "MELAO CEPI TP 6",
+      "codigos_texto": "3102005006\n",
+      "estoque": 282
+    },
+    {
+      "nome": "MELAO REI TP 8",
+      "codigos_texto": "3102009008\n",
+      "estoque": 122
+    },
+    {
+      "nome": "MELAO REI",
+      "codigos_texto": "3102009*",
+      "estoque": 1176
+    },
+    {
+      "nome": "GRAN SMITH 113 VERFRUT",
+      "codigos_texto": "0503060113\n",
+      "estoque": 49
+    },
+    {
+      "nome": "FUJI AZALEIA",
       "codigos_texto": "7021451*",
-      "estoque": 79
+      "estoque": 54
     },
     {
-      "nome": "GALA 150 AZALEIA",
-      "codigos_texto": "701158150\n",
-      "estoque": 56
-    },
-    {
-      "nome": "MELANCIA MAGALI T5 14KG",
-      "codigos_texto": "50020031005\n",
-      "estoque": 1500
+      "nome": "ARGENTINA 125 DOLE",
+      "codigos_texto": "0501019125.2\n",
+      "estoque": 448
     },
     {
       "nome": "PINK LADY 1/2",
       "codigos_texto": "050201332\n",
-      "estoque": 150
+      "estoque": 200
     },
     {
-      "nome": "MELAO REI",
-      "codigos_texto": "310200900*",
-      "estoque": 1008
+      "nome": "MELANCIA MAGALI T5 14KG",
+      "codigos_texto": "50020031005\n",
+      "estoque": 462
     },
     {
-      "nome": "PINK LADY",
-      "codigos_texto": "0502013*",
-      "estoque": 280
+      "nome": "WILL BREVI VERDE",
+      "codigos_texto": "0101096",
+      "estoque": 558
+    },
+    {
+      "nome": "TANGERINA IMP CX PARDA COMPOSOL",
+      "codigos_texto": "390600180\n",
+      "estoque": 104
+    },
+    {
+      "nome": "NECTARINA",
+      "codigos_texto": "26010*\n\n",
+      "estoque": 160
     }
   ],
   "vendedor_pcts": {
