@@ -99,11 +99,15 @@ st.caption(
 if st.button('➕ Adicionar produto'):
     cfg['produtos'].append({'nome': '', 'codigos_texto': '', 'estoque': 0})
 
+_PRIORIDADES = ['Normal', '🔥 Alta Prioridade', '🚨 Grande Urgência']
+
 remover_idx = None
 for i, p in enumerate(cfg['produtos']):
     p.setdefault('estoque', 0)
-    with st.expander(f"Produto {i+1}: {p['nome'] or '(sem nome)'}", expanded=True):
-        c1, c2, c3, c4 = st.columns([3, 4, 2, 1])
+    p.setdefault('prioridade', 'Normal')
+    prio_label = f' {p["prioridade"]}' if p['prioridade'] != 'Normal' else ''
+    with st.expander(f"Produto {i+1}: {p['nome'] or '(sem nome)'}{prio_label}", expanded=True):
+        c1, c2, c3, c4, c5 = st.columns([3, 4, 1.8, 2, 1])
         with c1:
             p['nome'] = st.text_input('Nome do produto', value=p['nome'], key=f'nome_{i}')
         with c2:
@@ -111,9 +115,13 @@ for i, p in enumerate(cfg['produtos']):
                                                '— usados só para identificar as vendas',
                                                value=p['codigos_texto'], key=f'cod_{i}', height=80)
         with c3:
-            p['estoque'] = st.number_input('Estoque atual (cx)', min_value=0, step=1,
+            p['estoque'] = st.number_input('Quantidade (cx)', min_value=0, step=1,
                                             value=int(p['estoque']), key=f'est_{i}')
         with c4:
+            prio_idx = _PRIORIDADES.index(p['prioridade']) if p['prioridade'] in _PRIORIDADES else 0
+            p['prioridade'] = st.selectbox('Prioridade', _PRIORIDADES,
+                                            index=prio_idx, key=f'prio_{i}')
+        with c5:
             st.write('')
             st.write('')
             if st.button('🗑️', key=f'del_{i}'):
@@ -191,10 +199,14 @@ if st.button('▶️ Calcular metas', type='primary'):
         if vendas_rows is not None:
             produtos_config = [
                 {'nome': p['nome'], 'codigos': parse_codigos_input(p['codigos_texto']),
-                 'estoque': p.get('estoque', 0)}
+                 'estoque': p.get('estoque', 0), 'prioridade': p.get('prioridade', 'Normal')}
                 for p in cfg['produtos'] if p['nome'].strip()
             ]
             resultados = compute_metas(vendas_rows, produtos_config, cfg['vendedor_pcts'])
+            # Anexar prioridade em cada resultado
+            _prio_map = {p['nome']: p.get('prioridade', 'Normal') for p in produtos_config}
+            for _r in resultados:
+                _r['prioridade'] = _prio_map.get(_r['produto'], 'Normal')
             st.session_state['estoque_rows'] = estoque_rows
             st.session_state['vendas_rows'] = vendas_rows
             st.session_state['resultados'] = resultados
@@ -207,7 +219,10 @@ if 'resultados' in st.session_state:
 
     st.subheader('Resultado: Meta / Vendido / Falta por produto e vendedor')
     for r in resultados:
-        st.markdown(f"**{r['produto']}** — Estoque atual: {r['estoque_total']:.0f} cx")
+        prio = r.get('prioridade', 'Normal')
+        prio_badge = f' &nbsp; {prio}' if prio != 'Normal' else ''
+        st.markdown(f"**{r['produto']}**{prio_badge} — Quantidade: {r['estoque_total']:.0f} cx",
+                    unsafe_allow_html=True)
         st.dataframe(
             [{'Vendedor': l['vendedor'], '% Meta': f"{l['pct']:.0f}%",
               'Meta (cx)': l['meta'], 'Vendido (cx)': l['vendido'],

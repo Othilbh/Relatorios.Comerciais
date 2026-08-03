@@ -177,7 +177,9 @@ def _build_relatorio_vendedor(vendedor: str, data_emissao: str,
         meta_t += linha['meta']
         vendido_t += linha['vendido']
         falta_t += linha['falta']
-        mdata.append([r['produto'], f"{linha['meta']:.0f}", f"{linha['vendido']:.1f}",
+        prio = r.get('prioridade', 'Normal')
+        nome_prod = f"{prio} {r['produto']}" if prio != 'Normal' else r['produto']
+        mdata.append([nome_prod, f"{linha['meta']:.0f}", f"{linha['vendido']:.1f}",
                       f"{linha['falta']:.1f}", _fmt_pct(linha['atingido'])])
     pct_t = (vendido_t / meta_t) if meta_t else 0.0
     mdata.append(['TOTAL', f"{meta_t:.0f}", f"{vendido_t:.1f}", f"{falta_t:.1f}", _fmt_pct(pct_t)])
@@ -294,12 +296,16 @@ def generate_dashboard(periodo: str, metas_results: list, vendedor_pcts: dict) -
 
     # Produtos críticos
     elems.append(Paragraph("PRODUTOS CRITICOS — ABAIXO DE 50%", SECTION_STYLE))
-    crit_sorted = sorted(criticos, key=lambda r: _produto_totais(r)[3])
+    _PRIO_ORDER = {'🚨 Grande Urgência': 0, '🔥 Alta Prioridade': 1, 'Normal': 2}
+    crit_sorted = sorted(criticos, key=lambda r: (
+        _PRIO_ORDER.get(r.get('prioridade', 'Normal'), 2), _produto_totais(r)[3]))
     cheader = ['Produto', 'Meta Total', 'Vendido', 'Falta', '% Geral', 'Melhor Vendedor']
     cdata = [cheader]
     for r in crit_sorted:
         m, ve, f, p = _produto_totais(r)
-        cdata.append([r['produto'], f"{m:.0f}", f"{ve:.1f}", f"{f:.1f}",
+        prio = r.get('prioridade', 'Normal')
+        nome_prod = f"{prio} {r['produto']}" if prio != 'Normal' else r['produto']
+        cdata.append([nome_prod, f"{m:.0f}", f"{ve:.1f}", f"{f:.1f}",
                       _fmt_pct(p), _melhor_vendedor(r) or '-'])
     ct = Table(cdata, repeatRows=1, colWidths=[6*cm, 3*cm, 3*cm, 3*cm, 3*cm, 4*cm])
     ct.setStyle(TableStyle([
@@ -331,7 +337,7 @@ def generate_resumo_geral(periodo: str, data_emissao: str, metas_results: list,
     estoque_total = sum(r['estoque_total'] for r in metas_results)
     meta_total, vendido_total, falta_total, pct_total = _totais(metas_results)
     elems.append(Paragraph(
-        f"Estoque Total: {estoque_total:,.0f} cx &nbsp;&nbsp; "
+        f"Quantidade Total: {estoque_total:,.0f} cx &nbsp;&nbsp; "
         f"Meta Total: {meta_total:,.0f} cx &nbsp;&nbsp; "
         f"Vendido Total: {vendido_total:,.0f} cx &nbsp;&nbsp; "
         f"Falta: {falta_total:,.0f} cx &nbsp;&nbsp; "
@@ -339,8 +345,9 @@ def generate_resumo_geral(periodo: str, data_emissao: str, metas_results: list,
         SUB_STYLE))
     elems.append(Spacer(1, 0.3*cm))
 
+    _PRIO_ORDER = {'🚨 Grande Urgência': 0, '🔥 Alta Prioridade': 1, 'Normal': 2}
     vendedores = list(vendedor_pcts.keys())
-    header_row1 = ['Produto', 'Estoque']
+    header_row1 = ['Produto', 'Qtde']
     header_row2 = ['', '']
     for v in vendedores:
         header_row1 += [v, '']
@@ -348,9 +355,13 @@ def generate_resumo_geral(periodo: str, data_emissao: str, metas_results: list,
     header_row1 += ['TOTAL', '']
     header_row2 += ['Vend', '%']
 
+    metas_sorted = sorted(metas_results,
+                          key=lambda r: _PRIO_ORDER.get(r.get('prioridade', 'Normal'), 2))
     data = [header_row1, header_row2]
-    for r in metas_results:
-        row = [r['produto'], f"{r['estoque_total']:.0f}"]
+    for r in metas_sorted:
+        prio = r.get('prioridade', 'Normal')
+        nome_prod = f"{prio} {r['produto']}" if prio != 'Normal' else r['produto']
+        row = [nome_prod, f"{r['estoque_total']:.0f}"]
         for v in vendedores:
             linha = next((l for l in r['linhas'] if l['vendedor'] == v), None)
             vendido = linha['vendido'] if linha else 0.0
@@ -360,7 +371,8 @@ def generate_resumo_geral(periodo: str, data_emissao: str, metas_results: list,
         row += [f"{ve:.1f}", _fmt_pct(p)]
         data.append(row)
 
-    # linha TOTAL
+    # linha TOTAL (uses original metas_results for aggregation)
+
     total_row = ['TOTAL', f"{estoque_total:.0f}"]
     for v in vendedores:
         ve_v = sum(l['vendido'] for r in metas_results for l in r['linhas'] if l['vendedor'] == v)
