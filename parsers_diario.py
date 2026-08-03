@@ -34,16 +34,17 @@ PERIODO_RE = re.compile(r'Período\s*:\s*(\d{2}/\d{2}/\d{4}[^N]*?\d{2}/\d{2}/\d{
 VENDOR_ALIASES = {
     'ADILSON-DORA': 'Dora',
     'AFANAIS': 'Afanais',
+    'CLAUDIA': 'Claudia',
     'FARLEY': 'Farley',
     'JULIANA AUGUSTA': 'Juliana',
-    'LUCA - VENDEDOR': 'Luca',
+    'LUCA-VENDEDOR': 'Luca',
     'LUCIANO': 'Luciano',
     'REGINALDO': 'Reginaldo',
     'RONISTONIS': 'Roni',
 }
 
 _KNOWN_COMPLEMENTOS = sorted([
-    'ADILSON', 'AFANAIS', 'FARLEY', 'JULIANA AUGUSTA', 'JULIANA',
+    'ADILSON', 'AFANAIS', 'CLAUDIA', 'FARLEY', 'JULIANA AUGUSTA', 'JULIANA',
     'LUCA VENDEDOR', 'LUCA', 'LUCIANO', 'REGINALDO', 'RONISTONIS', 'RONI', 'DORA',
 ], key=len, reverse=True)
 

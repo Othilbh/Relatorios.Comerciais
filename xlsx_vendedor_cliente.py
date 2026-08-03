@@ -12,11 +12,13 @@ Regras:
   MC_RS = Fat - Custo_PDF
   MC%   = MC_RS / Custo * 100
   Resultado Real = MC% + 15pp   <- coluna MARGEM %
+  Luca EXCLUIDO.
   Clientes repetidos (mais de uma loja) sao somados pelo nome base.
 """
 from __future__ import annotations
 
 import io
+import unicodedata
 import json
 from collections import defaultdict
 from datetime import datetime
@@ -27,21 +29,22 @@ from openpyxl.utils import get_column_letter
 
 from parsers_diario import parse_relatorio_diario
 
-_EXCLUIDOS = {'giovana'}
+_EXCLUIDOS = set()  # Luca incluido no Vendedor-Cliente
 
 VENDOR_TAB = {
     'Afanais':   'AFANAIS',
-    'Luca - Vendedor':   'LUCA - VENDEDOR',
+    'Claudia':   'CLAUDIA',
     'Dora':      'DORA',
     'Farley':    'FARLEY',
     'Juliana':   'JULIANA',
+    'Luca':      'LUCA',
     'Luciano':   'LUCIANO',
     'Reginaldo': 'REGINALDO',
     'Roni':      'RONISTONIS',
 }
 VENDOR_TITLE = {**VENDOR_TAB, 'Roni': 'RONI'}
-VENDOR_ORDER = ['Afanais', 'Dora', 'Farley', 'Luciano',
-                'Reginaldo', 'Roni', 'Luca - Vendedor', 'Juliana']
+VENDOR_ORDER = ['Afanais', 'Dora', 'Farley', 'Luca', 'Luciano',
+                'Reginaldo', 'Roni', 'Claudia', 'Juliana']
 # Mapeamento inverso: aba Excel -> chave vendedor
 TAB_TO_VENDOR = {v: k for k, v in VENDOR_TAB.items()}
 
@@ -118,6 +121,13 @@ def _dash(ws, r, col, fill, p_key=None):
 
 # ─── Consolidacao de clientes ────────────────────────────────────────────────
 
+def _normalize(name: str) -> str:
+    """Remove acentos, converte para maiusculo e normaliza espacos (para comparacao)."""
+    s = unicodedata.normalize('NFKD', str(name))
+    s = ''.join(c for c in s if not unicodedata.combining(c))
+    return ' '.join(s.upper().split())
+
+
 def _client_base(name: str) -> str:
     """Extrai nome base antes de ' - ' ou ' (' para consolidacao de lojas."""
     name = name.strip()
@@ -127,17 +137,22 @@ def _client_base(name: str) -> str:
     return name
 
 
+def _client_base_norm(name: str) -> str:
+    """Nome base normalizado (sem acento, maiusculo) para comparacao."""
+    return _normalize(_client_base(name))
+
+
 def _lookup_client(data_dict: dict, cli_name: str):
-    """Busca dados do cliente: match exato primeiro, depois match por nome base."""
+    """Busca dados do cliente com normalizacao de acento e nome base."""
     if not data_dict:
         return None
     # 1) match exato
     if cli_name in data_dict:
         return data_dict[cli_name]
-    # 2) match por nome base
-    base = _client_base(cli_name)
+    # 2) match normalizado por nome base (ignora acento, maiusculo/minusculo, sufixo de loja)
+    base_norm = _client_base_norm(cli_name)
     for k, v in data_dict.items():
-        if _client_base(k) == base:
+        if _client_base_norm(k) == base_norm:
             return v
     return None
 
@@ -170,7 +185,7 @@ def parse_e_agregar(file_objs):
             if it.get('vendedor') in _EXCLUIDOS:
                 continue
             v = it['vendedor']
-            c = _client_base(it['cliente_nome'])   # consolida por nome base
+            c = _client_base_norm(it['cliente_nome'])   # chave normalizada para consolidacao
             raw[v][c]['vol']   += it.get('qtd', 0)
             raw[v][c]['fat']   += it.get('faturamento', 0)
             raw[v][c]['custo'] += it.get('custo_total', 0)
@@ -354,13 +369,23 @@ def ler_xlsx_historico(xlsx_bytes, ref_date=None) -> bytes:
                             'custo': 0.0, 'mc_rs': 0.0, 'mc_pct': 0.0,
                             'resultado_real': round(res_am, 4)}
             else:
-                clientes_aa[cli] = {'vol': round(vol_aa), 'fat': round(fat_aa, 2),
-                                    'custo': 0.0, 'mc_rs': 0.0, 'mc_pct': 0.0,
-                                    'resultado_real': round(res_aa, 4)}
-                clientes_am[cli] = {'vol': round(vol_am), 'fat': round(fat_am, 2),
-                                    'custo': 0.0, 'mc_rs': 0.0, 'mc_pct': 0.0,
-                                    'resultado_real': round(res_am, 4)}
-                meta_vend[cli.upper()] = {
+                # Usa chave normalizada para evitar duplicatas por acento/cedilha
+                norm_cli = _normalize(cli)
+                if norm_cli in clientes_aa:
+                    clientes_aa[norm_cli]['vol'] = clientes_aa[norm_cli]['vol'] + round(vol_aa)
+                    clientes_aa[norm_cli]['fat'] = round(clientes_aa[norm_cli]['fat'] + fat_aa, 2)
+                else:
+                    clientes_aa[norm_cli] = {'vol': round(vol_aa), 'fat': round(fat_aa, 2),
+                                        'custo': 0.0, 'mc_rs': 0.0, 'mc_pct': 0.0,
+                                        'resultado_real': round(res_aa, 4)}
+                if norm_cli in clientes_am:
+                    clientes_am[norm_cli]['vol'] = clientes_am[norm_cli]['vol'] + round(vol_am)
+                    clientes_am[norm_cli]['fat'] = round(clientes_am[norm_cli]['fat'] + fat_am, 2)
+                else:
+                    clientes_am[norm_cli] = {'vol': round(vol_am), 'fat': round(fat_am, 2),
+                                        'custo': 0.0, 'mc_rs': 0.0, 'mc_pct': 0.0,
+                                        'resultado_real': round(res_am, 4)}
+                meta_vend[norm_cli] = {
                     'vol':    round(m_vol) if m_vol else None,
                     'fat':    round(m_fat, 2) if m_fat else None,
                     'margem': m_mrg,
@@ -469,21 +494,25 @@ def _build_vendedor_sheet(ws, title_name, clientes_por_periodo, totais_por_perio
     _build_headers(ws, ref_label, labels, 13, _P_COL, title_name)
 
     # Lista predefinida: clientes do historico (ant_ano + ant_mes)
-    predefined = {}
+    # Usa normalizacao para deduplicar clientes com acento/cedilha diferentes
+    predefined_norm = {}   # norm_key -> display_name
     for p in ('ant_ano', 'ant_mes'):
         for cli in clientes_por_periodo.get(p, {}):
-            predefined[cli] = True   # preserva ordem de insercao
+            norm = _normalize(cli)
+            if norm not in predefined_norm:
+                predefined_norm[norm] = cli
+    predefined = {name: True for name in predefined_norm.values()}
 
     # Adiciona clientes novos do atual que nao correspondem a nenhum predefinido
     for cli in clientes_por_periodo.get('atual', {}):
-        base = _client_base(cli)
-        ja_tem = any(_client_base(p) == base for p in predefined)
+        base_norm = _client_base_norm(cli)
+        ja_tem = any(_client_base_norm(p) == base_norm for p in predefined)
         if not ja_tem:
             predefined[cli] = True
 
     # Adiciona clientes de meta nao presentes ainda
     for ck in meta_vend:
-        ja_tem = any(c.upper() == ck for c in predefined)
+        ja_tem = any(_normalize(c) == _normalize(ck) for c in predefined)
         if not ja_tem:
             predefined[ck] = True
 
@@ -498,7 +527,8 @@ def _build_vendedor_sheet(ws, title_name, clientes_por_periodo, totais_por_perio
 
         for p_key, c0 in _P_COL.items():
             if p_key == 'meta':
-                m = meta_vend.get(cli.upper())
+                cli_norm = _normalize(cli)
+                m = next((v for k, v in meta_vend.items() if _normalize(k) == cli_norm), None)
                 if m:
                     cv = ws.cell(r, c0,   m.get('vol'))
                     cf = ws.cell(r, c0+1, m.get('fat'))

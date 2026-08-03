@@ -528,9 +528,22 @@ function montarImpacto() {
 )
 
 
-def gerar_dashboard(parsed, output_path):
+def gerar_dashboard(parsed, output_path, tipo='diario'):
+    """tipo: 'diario' | 'semanal' | 'mensal'"""
     dados = _montar_dados(parsed)
+    _titulos = {
+        'diario':  'Relatorio Diario de Vendas OTHIL -- Dashboard Gerencial',
+        'semanal': 'Dashboard Semanal de Vendas OTHIL',
+        'mensal':  'Dashboard Mensal de Vendas OTHIL',
+    }
+    _prefixos = {'diario': 'Dia', 'semanal': 'Semana', 'mensal': 'Mes'}
+    _top_label = {'diario': 'Top 10 clientes do dia',
+                  'semanal': 'Top 10 clientes da semana',
+                  'mensal': 'Top 10 clientes do mes'}
     html = (_HTML_TEMPLATE
+            .replace('Relatorio Diario de Vendas OTHIL -- Dashboard Gerencial',
+                     _titulos.get(tipo, 'Dashboard de Vendas OTHIL'))
+            .replace('Top 10 clientes do dia', _top_label.get(tipo, 'Top 10 clientes'))
             .replace('__CHARTJS_SRC__', _CHARTJS_SRC)
             .replace('__DATA_EMISSAO__', dados['data_emissao'] or '-')
             .replace('__PERIODO__',      dados['periodo'] or '-')

@@ -20,7 +20,7 @@ VENDOR_LINE_RE = re.compile(r'^Vendedor:\s*(\d+)\s+(.+)$')
 # Ordenado do nome mais longo pro mais curto, pra casar o nome mais
 # específico primeiro quando houver ambiguidade.
 KNOWN_VENDOR_NAMES = sorted(
-    ['REGINALDO', 'AFANAIS', 'LUCIANO', 'LUCA', 'JULIANA', 'FARLEY', 'DORA', 'RONI'],
+    ['REGINALDO', 'AFANAIS', 'LUCIANO', 'CLAUDIA', 'JULIANA', 'FARLEY', 'DORA', 'RONI'],
     key=len, reverse=True,
 )
 
@@ -131,13 +131,7 @@ def parse_vendas(file) -> list[dict]:
                 line = ' '.join(toks)
                 m = VENDOR_LINE_RE.match(line)
                 if m:
-                    # Normaliza o nome do vendedor da mesma forma que
-                    # parse_estoque, pra casar com VENDEDORES_PADRAO.
-                    # Sem isso, nomes completos vindos do relatório (ex.:
-                    # "RONISTONIS", "ADILSON - DORA") nunca batem com os
-                    # nomes curtos configurados no app ("RONI", "DORA"),
-                    # e essas vendas somem do resultado (ficam órfãs).
-                    current_vendor = _clean_complemento(m.group(2).strip())
+                    current_vendor = m.group(2).strip()
                     continue
                 if current_vendor is None or not toks:
                     continue

@@ -1,12 +1,13 @@
 """Página de Gerência OTHIL — acesso restrito por senha."""
 import json
 import os
+import re
+import datetime
 
 import streamlit as st
 import streamlit.components.v1 as components
 
 _GERENCIA_DIR = os.path.join(os.path.dirname(__file__), '..', 'gerencia_data')
-_REC_JSON     = os.path.join(_GERENCIA_DIR, 'recorrencia_latest.json')
 _SENHA_FALLBACK = 'othil2024'
 
 
@@ -20,7 +21,6 @@ def _get_senha() -> str:
 def _check_auth() -> bool:
     if st.session_state.get('_gerencia_auth'):
         return True
-
     st.markdown("""
     <div style="text-align:center; padding:3rem 0 1rem;">
         <div style="display:inline-block; background:#2D6A4F; color:white;
@@ -31,7 +31,6 @@ def _check_auth() -> bool:
         <p style="color:#666; font-size:0.9rem;">Acesso restrito</p>
     </div>
     """, unsafe_allow_html=True)
-
     col = st.columns([1, 2, 1])[1]
     with col:
         pwd = st.text_input('Senha', type='password', key='_gerencia_pwd',
@@ -45,24 +44,100 @@ def _check_auth() -> bool:
     return False
 
 
-def _listar_dashboards():
-    """Retorna lista de (slug, meta_dict) ordenada do mais recente para o mais antigo."""
-    if not os.path.exists(_GERENCIA_DIR):
-        return []
+def _dir_tipo(tipo):
+    d = os.path.join(_GERENCIA_DIR, tipo)
+    os.makedirs(d, exist_ok=True)
+    return d
+
+
+def _listar_dashboards(tipo):
+    d = _dir_tipo(tipo)
     items = []
-    for fname in os.listdir(_GERENCIA_DIR):
-        if fname.startswith('dashboard_') and fname.endswith('.json'):
+    for fname in os.listdir(d):
+        if fname.endswith('.json'):
             try:
-                with open(os.path.join(_GERENCIA_DIR, fname), 'r', encoding='utf-8') as f:
+                with open(os.path.join(d, fname), 'r', encoding='utf-8') as f:
                     meta = json.load(f)
-                slug = meta.get('slug') or fname.replace('dashboard_', '').replace('.json', '')
-                html_path = os.path.join(_GERENCIA_DIR, f'dashboard_{slug}.html')
-                if os.path.exists(html_path):
+                slug = meta.get('slug') or fname.replace('.json', '')
+                if os.path.exists(os.path.join(d, f'{slug}.html')):
                     items.append((slug, meta))
             except Exception:
                 pass
     items.sort(key=lambda x: x[0], reverse=True)
     return items
+
+
+def _label_slug(slug, tipo):
+    try:
+        if tipo == 'semanal':
+            year, week = slug.split('-W')
+            return f'Semana {int(week):02d} / {year}'
+        elif tipo == 'mensal':
+            year, mon = slug.split('-')
+            meses = ['Jan','Fev','Mar','Abr','Mai','Jun',
+                     'Jul','Ago','Set','Out','Nov','Dez']
+            return f'{meses[int(mon)-1]} / {year}'
+        else:
+            return slug
+    except Exception:
+        return slug
+
+
+def _render_secao_dash(tipo, titulo_secao, emoji):
+    st.header(f'{emoji} {titulo_secao}')
+    dashboards = _listar_dashboards(tipo)
+
+    if not dashboards:
+        tipo_label = {'diario': 'Relatório Diário', 'semanal': 'aba Semanal', 'mensal': 'aba Mensal'}
+        st.info(f'Nenhum dashboard disponível. Gere um na página **{tipo_label.get(tipo,tipo)}** primeiro.')
+        return
+
+    slugs  = [s for s, _ in dashboards]
+    if tipo == 'diario':
+        labels = [f"{m.get('emissao', s)}  —  {m.get('periodo','-')}" for s, m in dashboards]
+    else:
+        labels = [_label_slug(s, tipo) + f"  ({m.get('periodo','-')})" for s, m in dashboards]
+
+    idx_key = f'_ger_idx_{tipo}'
+    if idx_key not in st.session_state:
+        st.session_state[idx_key] = 0
+
+    col_prev, col_sel, col_next = st.columns([1, 6, 1])
+    with col_prev:
+        st.write('')
+        if st.button('◀', key=f'ger_prev_{tipo}', help='Período anterior'):
+            st.session_state[idx_key] = min(st.session_state[idx_key] + 1, len(slugs) - 1)
+    with col_next:
+        st.write('')
+        if st.button('▶', key=f'ger_next_{tipo}', help='Próximo período'):
+            st.session_state[idx_key] = max(st.session_state[idx_key] - 1, 0)
+    with col_sel:
+        escolha = st.selectbox(
+            f'{len(dashboards)} período(s) salvo(s):',
+            labels,
+            index=min(st.session_state[idx_key], len(labels)-1),
+            key=f'ger_sel_{tipo}',
+        )
+        st.session_state[idx_key] = labels.index(escolha)
+
+    idx     = st.session_state[idx_key]
+    slug_h  = slugs[idx]
+    meta_h  = dashboards[idx][1]
+    gerado  = meta_h.get('gerado_em', '')[:16].replace('T', ' ')
+    st.caption(f'Período: {meta_h.get("periodo","-")}  |  Gerado em: {gerado}')
+
+    html_path = os.path.join(_dir_tipo(tipo), f'{slug_h}.html')
+    with open(html_path, 'r', encoding='utf-8') as f:
+        html_text = f.read()
+
+    components.html(html_text, height=1400, scrolling=True)
+    st.download_button(
+        f'⬇️ Baixar {_label_slug(slug_h, tipo) if tipo != "diario" else slug_h}',
+        data=html_text.encode('utf-8'),
+        file_name=f'dashboard_{tipo}_{slug_h}_OTHIL.html',
+        mime='text/html',
+        key=f'ger_dl_{tipo}',
+    )
 
 
 # ── Auth ──────────────────────────────────────────────────────────────────────
@@ -84,99 +159,67 @@ if st.button('🔒 Sair', key='_gerencia_logout'):
 
 st.divider()
 
-# ── Dashboards Diários ────────────────────────────────────────────────────────
-st.header('📊 Dashboards Diários')
+# ── Abas ─────────────────────────────────────────────────────────────────────
+tab_d, tab_s, tab_m, tab_rec = st.tabs([
+    '📅 Dashboards Diários',
+    '📆 Dashboards Semanais',
+    '🗓️ Dashboards Mensais',
+    '👥 Ranking Recorrência',
+])
 
-dashboards = _listar_dashboards()
+with tab_d:
+    _render_secao_dash('diario', 'Dashboards Diários', '📅')
 
-if dashboards:
-    opcoes = {
-        f"{m.get('emissao', slug)}  —  {m.get('periodo', '')}": slug
-        for slug, m in dashboards
-    }
-    escolha_label = st.selectbox(
-        f'{len(dashboards)} dashboard(s) salvos — selecione o dia:',
-        list(opcoes.keys()),
-    )
-    slug_sel = opcoes[escolha_label]
-    meta_sel = next(m for s, m in dashboards if s == slug_sel)
+with tab_s:
+    _render_secao_dash('semanal', 'Dashboards Semanais', '📆')
 
-    gerado = meta_sel.get('gerado_em', '')[:16].replace('T', ' ')
-    st.caption(f'Gerado em: {gerado}')
+with tab_m:
+    _render_secao_dash('mensal', 'Dashboards Mensais', '🗓️')
 
-    html_path = os.path.join(_GERENCIA_DIR, f'dashboard_{slug_sel}.html')
-    with open(html_path, 'r', encoding='utf-8') as f:
-        html_text = f.read()
-
-    components.html(html_text, height=1400, scrolling=True)
-
-    st.download_button(
-        '⬇️ Baixar este dashboard (HTML)',
-        data=html_text.encode('utf-8'),
-        file_name=f'dashboard_othil_{slug_sel}.html',
-        mime='text/html',
-    )
-else:
-    st.info('Nenhum dashboard disponível. Gere um na página **Relatório Diário** primeiro.')
-
-st.divider()
-
-# ── Ranking de Clientes (Recorrência) ─────────────────────────────────────────
-st.header('👥 Último Ranking de Clientes — Recorrência')
-
-if os.path.exists(_REC_JSON):
-    try:
-        with open(_REC_JSON, 'r', encoding='utf-8') as f:
-            rec = json.load(f)
-    except Exception as e:
-        st.error(f'Erro ao carregar dados de recorrência: {e}')
-        rec = None
-
-    if rec:
-        periodo_r = rec.get('periodo', '-')
-        emissao_r = rec.get('emissao', '-')
-        gerado_r  = rec.get('gerado_em', '')[:16].replace('T', ' ')
-        totais    = rec.get('totais', {})
-
-        st.caption(f'Período: {periodo_r}  |  Emissão: {emissao_r}  |  Gerado em: {gerado_r}')
-
-        if totais:
-            c1, c2, c3, c4, c5 = st.columns(5)
-            c1.metric('Faturamento', f'R$ {totais.get("faturamento", 0):,.2f}')
-            c2.metric('MC R$', f'R$ {totais.get("mc_rs", 0):,.2f}')
-            c3.metric('MC %', f'{totais.get("mc_pct", 0):.2f}%')
-            c4.metric('Total CX', f'{totais.get("caixas", 0):,.3f}')
-            c5.metric('Clientes', totais.get('n_clientes', '-'))
-
-        clientes = rec.get('clientes', [])
-        if clientes:
-            import pandas as pd
-
-            df = pd.DataFrame(clientes)
-
-            top30 = df.head(30).set_index('Cliente')[['Faturamento R$']]
-            st.subheader('Top 30 por Faturamento')
-            st.bar_chart(top30, color='#2D6A4F')
-
-            st.subheader(f'Todos os clientes ({len(df)})')
-            styled = df.style.format({
-                'Faturamento R$': 'R$ {:,.2f}',
-                'Caixas': '{:,.3f}',
-                'MC R$': 'R$ {:,.2f}',
-                'MC %': '{:.2f}%',
-            }).background_gradient(
-                subset=['Faturamento R$'], cmap='Greens'
-            ).background_gradient(
-                subset=['MC %'], cmap='RdYlGn', vmin=-30, vmax=30
-            )
-            st.dataframe(styled, use_container_width=True, hide_index=True)
-
-            csv = df.to_csv(index=False).encode('utf-8')
-            st.download_button(
-                '⬇️ Baixar ranking CSV',
-                data=csv,
-                file_name=f'ranking_clientes_{emissao_r.replace("/","")}.csv',
-                mime='text/csv',
-            )
-else:
-    st.info('Nenhum ranking disponível. Processe um PDF na página **Recorrência** primeiro.')
+with tab_rec:
+    st.header('👥 Último Ranking de Clientes — Recorrência')
+    _REC_JSON = os.path.join(_GERENCIA_DIR, 'recorrencia_latest.json')
+    if os.path.exists(_REC_JSON):
+        try:
+            with open(_REC_JSON, 'r', encoding='utf-8') as f:
+                rec = json.load(f)
+        except Exception as e:
+            st.error(f'Erro ao carregar dados de recorrência: {e}')
+            rec = None
+        if rec:
+            periodo_r = rec.get('periodo', '-')
+            emissao_r = rec.get('emissao', '-')
+            gerado_r  = rec.get('gerado_em', '')[:16].replace('T', ' ')
+            totais    = rec.get('totais', {})
+            st.caption(f'Período: {periodo_r}  |  Emissão: {emissao_r}  |  Gerado em: {gerado_r}')
+            if totais:
+                c1, c2, c3, c4, c5 = st.columns(5)
+                c1.metric('Faturamento', f'R$ {totais.get("faturamento", 0):,.2f}')
+                c2.metric('MC R$', f'R$ {totais.get("mc_rs", 0):,.2f}')
+                c3.metric('MC %', f'{totais.get("mc_pct", 0):.2f}%')
+                c4.metric('Total CX', f'{totais.get("caixas", 0):,.3f}')
+                c5.metric('Clientes', totais.get('n_clientes', '-'))
+            clientes = rec.get('clientes', [])
+            if clientes:
+                import pandas as pd
+                df = pd.DataFrame(clientes)
+                top30 = df.head(30).set_index('Cliente')[['Faturamento R$']]
+                st.subheader('Top 30 por Faturamento')
+                st.bar_chart(top30, color='#2D6A4F')
+                st.subheader(f'Todos os clientes ({len(df)})')
+                styled = df.style.format({
+                    'Faturamento R$': 'R$ {:,.2f}',
+                    'Caixas': '{:,.3f}',
+                    'MC R$': 'R$ {:,.2f}',
+                    'MC %': '{:.2f}%',
+                })
+                st.dataframe(styled, use_container_width=True, hide_index=True)
+                csv = df.to_csv(index=False).encode('utf-8')
+                st.download_button(
+                    '⬇️ Baixar ranking CSV',
+                    data=csv,
+                    file_name=f'ranking_clientes_{emissao_r.replace("/","")}.csv',
+                    mime='text/csv',
+                )
+    else:
+        st.info('Nenhum ranking disponível. Processe um PDF na página **Recorrência** primeiro.')
