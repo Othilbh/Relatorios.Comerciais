@@ -6,8 +6,11 @@ import datetime
 
 import streamlit as st
 import streamlit.components.v1 as components
+import pandas as pd
 
-_GERENCIA_DIR = os.path.join(os.path.dirname(__file__), '..', 'gerencia_data')
+_GERENCIA_DIR  = os.path.join(os.path.dirname(__file__), '..', 'gerencia_data')
+_QUEBRA_DIR    = os.path.join(_GERENCIA_DIR, 'quebra')
+_MESES_QBR     = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez']
 _SENHA_FALLBACK = 'othil2024'
 
 
@@ -140,6 +143,100 @@ def _render_secao_dash(tipo, titulo_secao, emoji):
     )
 
 
+# ── Quebra helpers ────────────────────────────────────────────────────────────
+
+def _qbr_dir(tipo: str) -> str:
+    d = os.path.join(_QUEBRA_DIR, tipo)
+    os.makedirs(d, exist_ok=True)
+    return d
+
+
+def _qbr_label(slug: str, tipo: str) -> str:
+    try:
+        if tipo == 'semanal':
+            year, week = slug.split('-W')
+            return f"Semana {int(week):02d} / {year}"
+        elif tipo == 'mensal':
+            year, mon = slug.split('-')
+            return f"{_MESES_QBR[int(mon)-1]} / {year}"
+    except Exception:
+        pass
+    return slug
+
+
+def _qbr_listar(tipo: str) -> list:
+    d = _qbr_dir(tipo)
+    items = []
+    for fname in sorted(os.listdir(d), reverse=True):
+        if not fname.endswith('.json'):
+            continue
+        try:
+            with open(os.path.join(d, fname), 'r', encoding='utf-8') as f:
+                meta = json.load(f)
+            items.append((fname.replace('.json', ''), meta))
+        except Exception:
+            pass
+    return items
+
+
+def _render_quebra_secao(tipo: str, titulo: str, emoji: str):
+    st.header(f'{emoji} {titulo}')
+    historico = _qbr_listar(tipo)
+    if not historico:
+        st.info(f'Nenhum relatório de quebra disponível. Envie um PDF na página **Quebras** primeiro.')
+        return
+
+    slugs  = [s for s, _ in historico]
+    labels = [f"{_qbr_label(s, tipo)}  —  {m.get('periodo', '-')}" for s, m in historico]
+
+    idx_key = f'_ger_qbr_idx_{tipo}'
+    if idx_key not in st.session_state:
+        st.session_state[idx_key] = 0
+
+    col_prev, col_sel, col_next = st.columns([1, 6, 1])
+    with col_prev:
+        st.write('')
+        if st.button('◀', key=f'ger_qbr_prev_{tipo}'):
+            st.session_state[idx_key] = min(st.session_state[idx_key] + 1, len(slugs) - 1)
+    with col_next:
+        st.write('')
+        if st.button('▶', key=f'ger_qbr_next_{tipo}'):
+            st.session_state[idx_key] = max(st.session_state[idx_key] - 1, 0)
+    with col_sel:
+        escolha = st.selectbox(
+            f'{len(historico)} período(s) salvo(s):',
+            labels,
+            index=min(st.session_state[idx_key], len(labels) - 1),
+            key=f'ger_qbr_sel_{tipo}',
+        )
+        st.session_state[idx_key] = labels.index(escolha)
+
+    idx = st.session_state[idx_key]
+    slug_sel = slugs[idx]
+    dados = historico[idx][1]
+
+    st.caption(f'Período: {dados.get("periodo", "-")}  |  Emissão: {dados.get("emissao", "-")}')
+
+    total = dados.get('total_cx', 0)
+    categorias = dados.get('categorias', [])
+    grupos = dados.get('grupos', [])
+
+    col1, col2 = st.columns(2)
+    col1.metric('Total CX Quebradas', f"{total:,.0f} cx")
+    if categorias:
+        top = categorias[0]
+        col2.metric(f'Maior: {top["categoria"]}', f"{top['cx']:,.0f} cx")
+
+    if categorias:
+        df_cat = pd.DataFrame(categorias).set_index('categoria')
+        st.bar_chart(df_cat['cx'], color='#2D6A4F')
+
+    if grupos:
+        df_g = pd.DataFrame(grupos)[['grupo', 'categoria', 'cx']]
+        df_g.columns = ['Grupo', 'Categoria', 'CX Quebradas']
+        st.dataframe(df_g, use_container_width=True, hide_index=True)
+
+
 # ── Auth ──────────────────────────────────────────────────────────────────────
 if not _check_auth():
     st.stop()
@@ -160,11 +257,13 @@ if st.button('🔒 Sair', key='_gerencia_logout'):
 st.divider()
 
 # ── Abas ─────────────────────────────────────────────────────────────────────
-tab_d, tab_s, tab_m, tab_rec = st.tabs([
+tab_d, tab_s, tab_m, tab_rec, tab_qbr_s, tab_qbr_m = st.tabs([
     '📅 Dashboards Diários',
     '📆 Dashboards Semanais',
     '🗓️ Dashboards Mensais',
     '👥 Ranking Recorrência',
+    '📦 Quebras Semanais',
+    '📦 Quebras Mensais',
 ])
 
 with tab_d:
@@ -223,3 +322,9 @@ with tab_rec:
                 )
     else:
         st.info('Nenhum ranking disponível. Processe um PDF na página **Recorrência** primeiro.')
+
+with tab_qbr_s:
+    _render_quebra_secao('semanal', 'Quebras Semanais', '📦')
+
+with tab_qbr_m:
+    _render_quebra_secao('mensal', 'Quebras Mensais', '📦')

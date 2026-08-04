@@ -62,6 +62,7 @@ pg = st.navigation(
             st.Page("pages/1_Relatorio_Diario_OTHIL.py", title="Relatório Diário", icon="📊"),
             st.Page("pages/2_Recorrencia_OTHIL.py", title="Recorrência", icon="🔄"),
             st.Page("pages/3_Vendedor_Cliente_OTHIL.py", title="Vendedor-Cliente", icon="👥"),
+            st.Page("pages/4_Quebra_OTHIL.py", title="Quebras", icon="📦"),
         ],
         "Administração": [
             st.Page("pages/gerencia.py", title="Gerência", icon="🔐"),
