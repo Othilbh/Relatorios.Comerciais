@@ -179,6 +179,101 @@ def _qbr_listar(tipo: str) -> list:
     return items
 
 
+def _render_quebra_comparativo():
+    st.header('🔀 Comparativo de Quebras')
+
+    tipo = st.radio(
+        'Tipo de período:',
+        ['semanal', 'mensal'],
+        format_func=lambda x: 'Semanal' if x == 'semanal' else 'Mensal',
+        horizontal=True,
+        key='ger_comp_tipo',
+    )
+
+    historico = _qbr_listar(tipo)
+    if len(historico) < 2:
+        st.info('Necessário ter pelo menos 2 períodos salvos para comparar.')
+        return
+
+    slugs  = [s for s, _ in historico]
+    labels = [f"{_qbr_label(s, tipo)}  —  {m.get('periodo', '-')}" for s, m in historico]
+
+    col_a, col_b = st.columns(2)
+    with col_a:
+        escolha_a = st.selectbox('Período A (base):', labels, index=0, key='ger_comp_sel_a')
+    with col_b:
+        default_b = 1 if len(labels) > 1 else 0
+        escolha_b = st.selectbox('Período B (comparar):', labels, index=default_b, key='ger_comp_sel_b')
+
+    if escolha_a == escolha_b:
+        st.warning('Selecione períodos diferentes para comparar.')
+        return
+
+    dados_a = historico[labels.index(escolha_a)][1]
+    dados_b = historico[labels.index(escolha_b)][1]
+    label_a = _qbr_label(slugs[labels.index(escolha_a)], tipo)
+    label_b = _qbr_label(slugs[labels.index(escolha_b)], tipo)
+
+    st.divider()
+
+    total_a = dados_a.get('total_cx', 0)
+    total_b = dados_b.get('total_cx', 0)
+    delta   = total_b - total_a
+    delta_pct = (delta / total_a * 100) if total_a else 0
+
+    c1, c2, c3 = st.columns(3)
+    c1.metric(f'Total CX — {label_a}', f"{total_a:,.0f} cx")
+    c2.metric(f'Total CX — {label_b}', f"{total_b:,.0f} cx")
+    c3.metric('Variação (B − A)', f"{delta:+,.0f} cx",
+              delta=f"{delta_pct:+.1f}%", delta_color='inverse')
+
+    st.divider()
+    st.subheader('Por Categoria de Produto')
+
+    cat_a = {c['categoria']: c['cx'] for c in dados_a.get('categorias', [])}
+    cat_b = {c['categoria']: c['cx'] for c in dados_b.get('categorias', [])}
+    todas_cats = sorted(set(cat_a) | set(cat_b))
+
+    df_comp = pd.DataFrame({
+        label_a: [cat_a.get(c, 0) for c in todas_cats],
+        label_b: [cat_b.get(c, 0) for c in todas_cats],
+    }, index=todas_cats)
+    st.bar_chart(df_comp, color=['#2D6A4F', '#74C69D'])
+
+    df_cat_tbl = df_comp.copy()
+    df_cat_tbl['Δ (B − A)'] = df_cat_tbl[label_b] - df_cat_tbl[label_a]
+    df_cat_tbl['Δ %'] = df_cat_tbl.apply(
+        lambda r: f"{r['Δ (B − A)'] / r[label_a] * 100:+.1f}%" if r[label_a] else '—', axis=1)
+    df_cat_tbl = df_cat_tbl.reset_index().rename(columns={'index': 'Categoria'})
+    df_cat_tbl[label_a]     = df_cat_tbl[label_a].map(lambda x: f"{x:,.0f}")
+    df_cat_tbl[label_b]     = df_cat_tbl[label_b].map(lambda x: f"{x:,.0f}")
+    df_cat_tbl['Δ (B − A)'] = df_cat_tbl['Δ (B − A)'].map(lambda x: f"{x:+,.0f}")
+    st.dataframe(df_cat_tbl, use_container_width=True, hide_index=True)
+
+    st.divider()
+    st.subheader('Por Grupo de Produto')
+
+    grp_a = {g['grupo']: g for g in dados_a.get('grupos', [])}
+    grp_b = {g['grupo']: g for g in dados_b.get('grupos', [])}
+    rows = []
+    for grp in sorted(set(grp_a) | set(grp_b)):
+        ga, gb = grp_a.get(grp, {}), grp_b.get(grp, {})
+        cx_a, cx_b = ga.get('cx', 0), gb.get('cx', 0)
+        rows.append({
+            'Grupo':     grp,
+            'Categoria': ga.get('categoria') or gb.get('categoria', '—'),
+            label_a:     cx_a,
+            label_b:     cx_b,
+            'Δ (B − A)': cx_b - cx_a,
+        })
+
+    df_grp = pd.DataFrame(rows).sort_values('Δ (B − A)', ascending=False)
+    df_grp[label_a]     = df_grp[label_a].map(lambda x: f"{x:,.0f}")
+    df_grp[label_b]     = df_grp[label_b].map(lambda x: f"{x:,.0f}")
+    df_grp['Δ (B − A)'] = df_grp['Δ (B − A)'].map(lambda x: f"{x:+,.0f}")
+    st.dataframe(df_grp, use_container_width=True, hide_index=True)
+
+
 def _render_quebra_secao(tipo: str, titulo: str, emoji: str):
     st.header(f'{emoji} {titulo}')
     historico = _qbr_listar(tipo)
@@ -257,13 +352,14 @@ if st.button('🔒 Sair', key='_gerencia_logout'):
 st.divider()
 
 # ── Abas ─────────────────────────────────────────────────────────────────────
-tab_d, tab_s, tab_m, tab_rec, tab_qbr_s, tab_qbr_m = st.tabs([
+tab_d, tab_s, tab_m, tab_rec, tab_qbr_s, tab_qbr_m, tab_qbr_comp = st.tabs([
     '📅 Dashboards Diários',
     '📆 Dashboards Semanais',
     '🗓️ Dashboards Mensais',
     '👥 Ranking Recorrência',
     '📦 Quebras Semanais',
     '📦 Quebras Mensais',
+    '🔀 Quebras Comparativo',
 ])
 
 with tab_d:
@@ -328,3 +424,6 @@ with tab_qbr_s:
 
 with tab_qbr_m:
     _render_quebra_secao('mensal', 'Quebras Mensais', '📦')
+
+with tab_qbr_comp:
+    _render_quebra_comparativo()
