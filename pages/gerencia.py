@@ -414,11 +414,10 @@ def _render_fechamentos_semanais():
 
     tg = dados.get('totais_rs', {}).get('total_geral', {})
     if tg:
-        r1, r2, r3, r4 = st.columns(4)
+        r1, r2, r3 = st.columns(3)
         r1.metric('Faturamento', f"R$ {tg.get('fat', 0):,.2f}")
-        r2.metric('MC R$',      f"R$ {tg.get('mc_rs', 0):,.2f}")
-        r3.metric('MC %',       f"{tg.get('mc_pct', 0):.2f}%")
-        r4.metric('Volume',     f"{tg.get('vol', 0):,.0f} cx")
+        r2.metric('MC R$',       f"R$ {tg.get('mc_rs', 0):,.2f}")
+        r3.metric('MC %',        f"{tg.get('mc_pct', 0):.2f}%")
 
     st.divider()
 

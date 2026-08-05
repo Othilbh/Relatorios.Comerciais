@@ -233,11 +233,10 @@ def _render_on_track():
     tg = totais_rs.get('total_geral', {})
     if tg:
         st.subheader('Faturamento Geral (R$)')
-        r1, r2, r3, r4 = st.columns(4)
-        r1.metric('Faturamento',  f"R$ {tg.get('fat', 0):,.2f}")
-        r2.metric('MC R$',        f"R$ {tg.get('mc_rs', 0):,.2f}")
-        r3.metric('MC %',         f"{tg.get('mc_pct', 0):.2f}%")
-        r4.metric('Volume real',  f"{tg.get('vol', 0):,.0f} cx")
+        r1, r2, r3 = st.columns(3)
+        r1.metric('Faturamento', f"R$ {tg.get('fat', 0):,.2f}")
+        r2.metric('MC R$',       f"R$ {tg.get('mc_rs', 0):,.2f}")
+        r3.metric('MC %',        f"{tg.get('mc_pct', 0):.2f}%")
 
     st.divider()
 
@@ -355,11 +354,10 @@ def _render_resumo_geral_inline(resultados: list, totais_rs: dict, dia: int = 5)
 
     tg = totais_rs.get('total_geral', {})
     if tg:
-        f1, f2, f3, f4 = st.columns(4)
-        f1.metric('Faturamento',  f"R$ {tg.get('fat', 0):,.2f}")
-        f2.metric('MC R$',        f"R$ {tg.get('mc_rs', 0):,.2f}")
-        f3.metric('MC %',         f"{tg.get('mc_pct', 0):.2f}%")
-        f4.metric('Volume real',  f"{tg.get('vol', 0):,.0f} cx")
+        f1, f2, f3 = st.columns(3)
+        f1.metric('Faturamento', f"R$ {tg.get('fat', 0):,.2f}")
+        f2.metric('MC R$',       f"R$ {tg.get('mc_rs', 0):,.2f}")
+        f3.metric('MC %',        f"{tg.get('mc_pct', 0):.2f}%")
 
     st.divider()
 
