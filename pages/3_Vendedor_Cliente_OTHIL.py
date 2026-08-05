@@ -17,6 +17,7 @@ Workflow:
       - Clica 'Gerar Excel' -> baixa o .xlsx
 """
 import io
+import calendar as _cal
 from datetime import datetime
 
 import streamlit as st
@@ -24,7 +25,7 @@ import pandas as pd
 
 from xlsx_vendedor_cliente import (
     salvar_historico, carregar_historico, gerar_xlsx, ler_xlsx_historico,
-    parse_e_agregar,
+    parse_e_agregar, VENDOR_TAB, _normalize,
 )
 from parsers_vendedor import parse_totais_vendedor
 
@@ -56,11 +57,47 @@ fname_json = f"historico_{lbl_atual.replace('/','')}.json"
 
 st.divider()
 
+# ── Helpers de formatação ─────────────────────────────────────────────────────
+
+def _brl(v: float) -> str:
+    """Formata valor monetário no padrão brasileiro: R$ 1.234,56"""
+    s = f"{abs(v):,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
+    return f"R$ {'-' if v < 0 else ''}{s}"
+
+def _ot_status(atual_pct: float, elapsed_pct: float):
+    """Retorna (emoji, label, ratio) para status On Track."""
+    if elapsed_pct <= 0:
+        ratio = 1.0
+    else:
+        ratio = atual_pct / elapsed_pct if elapsed_pct > 0 else 0
+    if ratio >= 0.85:   return '🟢', 'No Ritmo',    ratio
+    elif ratio >= 0.55: return '🟡', 'Atenção',      ratio
+    else:               return '🔴', 'Fora do Ritmo', ratio
+
+def _get_meta_fat(historico_data: dict, vend: str, cli_key: str):
+    """Busca meta de faturamento do cliente no histórico."""
+    if not historico_data:
+        return None
+    tab = VENDOR_TAB.get(vend, vend.upper())
+    meta_vend = historico_data.get('meta', {}).get(tab, {})
+    if not meta_vend:
+        return None
+    cli_norm = _normalize(cli_key)
+    # match exato
+    if cli_key in meta_vend:
+        m = meta_vend[cli_key]
+        return m.get('fat') if m else None
+    # match normalizado
+    for k, v in meta_vend.items():
+        if _normalize(k) == cli_norm:
+            return v.get('fat') if v else None
+    return None
+
 # ── Tabs ──────────────────────────────────────────────────────────────────────
 tab_rel, tab_ontrack = st.tabs(['📋 Relatório Semanal', '📊 On Track por Cliente'])
 
 # =============================================================================
-# TAB 1 — Relatório Semanal (conteúdo original)
+# TAB 1 — Relatório Semanal
 # =============================================================================
 with tab_rel:
 
@@ -196,13 +233,15 @@ with tab_rel:
                         ref_date=ref_date,
                     )
 
-                    # Salva dados de clientes para a aba On Track
+                    # Salva dados para a aba On Track
                     try:
                         clientes_data = parse_e_agregar(
                             [io.BytesIO(b) for b in clientes_bytes]
                         )
                         st.session_state['clientes_on_track'] = clientes_data
                         st.session_state['totais_on_track']   = totais_dict
+                        st.session_state['historico_vc']      = historico
+                        st.session_state['ref_date_vc']       = ref_date
                     except Exception:
                         pass
 
@@ -230,32 +269,46 @@ with tab_rel:
 with tab_ontrack:
     st.header('📊 On Track por Cliente')
 
-    clientes_data = st.session_state.get('clientes_on_track')
-    totais_dict   = st.session_state.get('totais_on_track', {})
+    clientes_data  = st.session_state.get('clientes_on_track')
+    historico_data = st.session_state.get('historico_vc')
+    totais_dict_ot = st.session_state.get('totais_on_track', {})
+    ref_date_ot    = st.session_state.get('ref_date_vc', ref_date)
 
     if not clientes_data:
         st.info(
             'Gere o relatório semanal na aba **📋 Relatório Semanal** primeiro. '
-            'Os dados de cliente aparecerão aqui automaticamente.'
+            'Os dados aparecerão aqui automaticamente.'
         )
     else:
+        # Contexto de datas do mês de referência
+        today          = datetime.today()
+        ano_ref        = ref_date_ot.year
+        mes_ref        = ref_date_ot.month
+        days_in_month  = _cal.monthrange(ano_ref, mes_ref)[1]
+        # Dias decorridos: se o mês de referência é o mês atual, usa hoje; senão usa fim do mês
+        if ano_ref == today.year and mes_ref == today.month:
+            days_elapsed = max(today.day, 1)
+        else:
+            days_elapsed = days_in_month
+        days_remaining = max(days_in_month - days_elapsed, 0)
+        elapsed_pct    = days_elapsed / days_in_month
+
         # ── Filtros ──────────────────────────────────────────────────────
-        col_busca, col_vend, col_sort = st.columns([3, 2, 2])
-        with col_busca:
+        f1, f2, f3 = st.columns([3, 2, 2])
+        with f1:
             busca = st.text_input('🔍 Pesquisar cliente', placeholder='Digite parte do nome...', key='ot_busca')
-        with col_vend:
+        with f2:
             vendedores_disp = ['Todos'] + sorted(clientes_data.keys())
             vend_filtro = st.selectbox('Filtrar por vendedor', vendedores_disp, key='ot_vend')
-        with col_sort:
-            sort_cli = st.selectbox(
-                'Ordenar por',
-                ['Maior faturamento', 'Maior MC R$', 'Maior MC %', 'Alfabético'],
-                key='ot_sort',
-            )
+        with f3:
+            sort_cli = st.selectbox('Ordenar por', [
+                'Maior faturamento', 'Maior % atingido', 'Maior MC R$',
+                'Maior margem', 'Maior valor restante', 'Alfabético',
+            ], key='ot_sort')
 
         st.divider()
 
-        # ── Montar tabela de clientes ─────────────────────────────────────
+        # ── Construir linhas com todos os indicadores ─────────────────────
         rows = []
         for vendedor, clientes in clientes_data.items():
             if vend_filtro != 'Todos' and vendedor != vend_filtro:
@@ -263,59 +316,236 @@ with tab_ontrack:
             for cliente, dados in clientes.items():
                 if busca and busca.lower() not in cliente.lower():
                     continue
+
+                fat    = dados.get('fat', 0)
+                mc_rs  = dados.get('mc_rs', 0)
+                mc_pct = dados.get('mc_pct', 0)
+                res    = dados.get('resultado_real', 0)
+
+                meta = _get_meta_fat(historico_data, vendedor, cliente) or 0
+                tem_meta = meta > 0
+
+                pct_atg      = fat / meta if tem_meta else 0.0
+                restante     = max(meta - fat, 0) if tem_meta else 0.0
+                avg_diaria   = fat / days_elapsed if days_elapsed > 0 else 0.0
+                projecao     = fat + avg_diaria * days_remaining
+                diferenca    = projecao - meta if tem_meta else 0.0
+                media_nec    = restante / days_remaining if (tem_meta and days_remaining > 0) else 0.0
+
+                if tem_meta:
+                    em, lb, ratio = _ot_status(pct_atg, elapsed_pct)
+                else:
+                    em, lb, ratio = '—', 'Sem meta', 1.0
+
                 rows.append({
-                    'Vendedor':   vendedor,
-                    'Cliente':    cliente,
-                    'CX':         dados.get('vol', 0),
-                    'Fat R$':     dados.get('fat', 0),
-                    'MC R$':      dados.get('mc_rs', 0),
-                    'MC %':       dados.get('mc_pct', 0),
-                    'Margem %':   dados.get('resultado_real', 0),
+                    'Vendedor':  vendedor,
+                    'Cliente':   cliente,
+                    '_fat':      fat,
+                    '_meta':     meta,
+                    '_mc_rs':    mc_rs,
+                    '_mc_pct':   mc_pct,
+                    '_res':      res,
+                    '_pct_atg':  pct_atg,
+                    '_restante': restante,
+                    '_projecao': projecao,
+                    '_diferenca':diferenca,
+                    '_ratio':    ratio,
+                    '_avg':      avg_diaria,
+                    '_media_nec':media_nec,
+                    '_em':       em,
+                    '_lb':       lb,
+                    '_tem_meta': tem_meta,
                 })
+
+        # Ordenação
+        sort_map = {
+            'Maior faturamento':   ('_fat',      True),
+            'Maior % atingido':    ('_pct_atg',  True),
+            'Maior MC R$':         ('_mc_rs',    True),
+            'Maior margem':        ('_res',      True),
+            'Maior valor restante':('_restante', True),
+            'Alfabético':          ('Cliente',   False),
+        }
+        sk, sr = sort_map[sort_cli]
+        rows.sort(key=lambda r: r[sk], reverse=sr)
 
         if not rows:
             st.info('Nenhum cliente encontrado com os filtros selecionados.')
-        else:
-            # Sort
-            if sort_cli == 'Maior faturamento':
-                rows.sort(key=lambda r: r['Fat R$'], reverse=True)
-            elif sort_cli == 'Maior MC R$':
-                rows.sort(key=lambda r: r['MC R$'], reverse=True)
-            elif sort_cli == 'Maior MC %':
-                rows.sort(key=lambda r: r['MC %'], reverse=True)
-            else:
-                rows.sort(key=lambda r: r['Cliente'])
+            st.stop()
 
-            # KPIs rápidos do filtro atual
-            tot_fat = sum(r['Fat R$'] for r in rows)
-            tot_mc  = sum(r['MC R$']  for r in rows)
-            tot_cx  = sum(r['CX']     for r in rows)
-            mc_pct_medio = (tot_mc / (tot_fat - tot_mc) * 100) if (tot_fat - tot_mc) else 0
+        # ── Totais para cards ─────────────────────────────────────────────
+        tot_fat  = sum(r['_fat']      for r in rows)
+        tot_meta = sum(r['_meta']     for r in rows)
+        tot_mc   = sum(r['_mc_rs']    for r in rows)
+        tot_pct  = tot_fat / tot_meta if tot_meta > 0 else 0.0
+        tot_rest = max(tot_meta - tot_fat, 0)
+        avg_d    = tot_fat / days_elapsed if days_elapsed > 0 else 0.0
+        tot_proj = tot_fat + avg_d * days_remaining
+        tot_dif  = tot_proj - tot_meta
 
-            k1, k2, k3, k4 = st.columns(4)
-            k1.metric('Clientes', len(rows))
-            k2.metric('Faturamento', f'R$ {tot_fat:,.2f}')
-            k3.metric('MC R$', f'R$ {tot_mc:,.2f}')
-            k4.metric('Volume', f'{tot_cx:,.0f} cx')
+        g_em, g_lb, g_ratio = _ot_status(tot_pct, elapsed_pct)
+        _COR = {'🟢': '#2D6A4F', '🟡': '#B8860B', '🔴': '#C00000', '—': '#888'}
+        cor_status = _COR.get(g_em, '#888')
+        cor_dif    = '#2D6A4F' if tot_dif >= 0 else '#C00000'
 
+        # ── Cards de resumo ───────────────────────────────────────────────
+        st.markdown(f"""
+        <div style="display:grid; grid-template-columns:repeat(6,1fr); gap:10px; margin-bottom:14px;">
+          <div style="background:#f8f9fa; border-left:4px solid #2D6A4F; border-radius:8px; padding:12px 10px;">
+            <div style="font-size:10px; color:#666; font-weight:700; letter-spacing:.05em;">META MENSAL</div>
+            <div style="font-size:16px; font-weight:700; color:#1B4332; margin-top:4px;">{_brl(tot_meta)}</div>
+          </div>
+          <div style="background:#f8f9fa; border-left:4px solid #4472C4; border-radius:8px; padding:12px 10px;">
+            <div style="font-size:10px; color:#666; font-weight:700; letter-spacing:.05em;">FATURAMENTO</div>
+            <div style="font-size:16px; font-weight:700; color:#1F4E79; margin-top:4px;">{_brl(tot_fat)}</div>
+          </div>
+          <div style="background:#f8f9fa; border-left:4px solid {cor_status}; border-radius:8px; padding:12px 10px;">
+            <div style="font-size:10px; color:#666; font-weight:700; letter-spacing:.05em;">% ATINGIDO</div>
+            <div style="font-size:16px; font-weight:700; color:{cor_status}; margin-top:4px;">{tot_pct*100:.1f}% {g_em}</div>
+          </div>
+          <div style="background:#f8f9fa; border-left:4px solid #C00000; border-radius:8px; padding:12px 10px;">
+            <div style="font-size:10px; color:#666; font-weight:700; letter-spacing:.05em;">VALOR RESTANTE</div>
+            <div style="font-size:16px; font-weight:700; color:#C00000; margin-top:4px;">{_brl(tot_rest)}</div>
+          </div>
+          <div style="background:#f8f9fa; border-left:4px solid #375623; border-radius:8px; padding:12px 10px;">
+            <div style="font-size:10px; color:#666; font-weight:700; letter-spacing:.05em;">PROJEÇÃO MÊS</div>
+            <div style="font-size:16px; font-weight:700; color:#375623; margin-top:4px;">{_brl(tot_proj)}</div>
+          </div>
+          <div style="background:#f8f9fa; border-left:4px solid {cor_dif}; border-radius:8px; padding:12px 10px;">
+            <div style="font-size:10px; color:#666; font-weight:700; letter-spacing:.05em;">DIFERENÇA PROJ.</div>
+            <div style="font-size:16px; font-weight:700; color:{cor_dif}; margin-top:4px;">{'▲' if tot_dif >= 0 else '▼'} {_brl(abs(tot_dif))}</div>
+          </div>
+        </div>
+        """, unsafe_allow_html=True)
+
+        # Barra de progresso geral com marcador de ritmo esperado
+        prog_w  = min(tot_pct, 1.0) * 100
+        exp_w   = elapsed_pct * 100
+        cor_bar = cor_status
+        st.markdown(f"""
+        <div style="margin-bottom:16px;">
+          <div style="font-size:11px; color:#666; margin-bottom:4px;">
+            Progresso da Meta — Dia {days_elapsed} de {days_in_month} ({elapsed_pct*100:.0f}% do mês)
+          </div>
+          <div style="background:#e0e0e0; border-radius:6px; height:20px; position:relative;">
+            <div style="background:{cor_bar}; width:{prog_w:.1f}%; height:20px; border-radius:6px;
+                        display:flex; align-items:center; justify-content:flex-end; padding-right:6px;">
+              <span style="color:white; font-weight:700; font-size:11px;">{prog_w:.1f}%</span>
+            </div>
+            <div style="position:absolute; top:0; left:{exp_w:.1f}%; width:2px; height:20px;
+                        background:#333; opacity:0.4;" title="Ritmo esperado"></div>
+          </div>
+          <div style="font-size:10px; color:#999; margin-top:2px;">▲ Ritmo esperado: {exp_w:.0f}%  |  Dia {days_elapsed}/{days_in_month}  |  {days_remaining} dias restantes</div>
+        </div>
+        """, unsafe_allow_html=True)
+
+        st.divider()
+
+        # ── Ranking de Vendedores ─────────────────────────────────────────
+        if vend_filtro == 'Todos':
+            st.subheader('🏆 Ranking de Vendedores')
+
+            vend_rank: dict = {}
+            for r in rows:
+                v = r['Vendedor']
+                if v not in vend_rank:
+                    vend_rank[v] = {'fat': 0.0, 'meta': 0.0, 'mc_rs': 0.0}
+                vend_rank[v]['fat']   += r['_fat']
+                vend_rank[v]['meta']  += r['_meta']
+                vend_rank[v]['mc_rs'] += r['_mc_rs']
+
+            rank_rows = []
+            for v, d in vend_rank.items():
+                pct = d['fat'] / d['meta'] if d['meta'] > 0 else 0.0
+                em, lb, ratio = _ot_status(pct, elapsed_pct)
+                tend = '↑ Acima' if ratio >= 1.0 else ('→ No ritmo' if ratio >= 0.85 else '↓ Abaixo')
+                tend_cor = '#2D6A4F' if ratio >= 1.0 else ('#B8860B' if ratio >= 0.85 else '#C00000')
+                rank_rows.append({'v': v, 'fat': d['fat'], 'meta': d['meta'],
+                                  'mc_rs': d['mc_rs'], 'pct': pct,
+                                  'em': em, 'lb': lb, 'ratio': ratio,
+                                  'tend': tend, 'tend_cor': tend_cor})
+            rank_rows.sort(key=lambda x: x['pct'], reverse=True)
+
+            cards = '<div style="display:grid; grid-template-columns:repeat(auto-fill,minmax(270px,1fr)); gap:12px; margin-bottom:16px;">'
+            medals = ['🥇', '🥈', '🥉']
+            for i, rv in enumerate(rank_rows):
+                medal  = medals[i] if i < 3 else f'#{i+1}'
+                cor    = _COR.get(rv['em'], '#888')
+                prog   = min(rv['pct'], 1.0) * 100
+                exp_p  = elapsed_pct * 100
+                cards += f"""
+                <div style="background:white; border:1px solid #e0e0e0; border-radius:10px; padding:14px;
+                            box-shadow:0 1px 4px rgba(0,0,0,.07);">
+                  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                    <span style="font-size:15px; font-weight:700;">{medal} {rv['v']}</span>
+                    <span style="background:{cor}; color:white; padding:2px 9px; border-radius:12px;
+                                 font-size:10px; font-weight:700;">{rv['em']} {rv['lb']}</span>
+                  </div>
+                  <div style="font-size:12px; color:#444; margin-bottom:6px;">
+                    Fat: <b>{_brl(rv['fat'])}</b>&nbsp;&nbsp;/&nbsp;&nbsp;Meta: {_brl(rv['meta'])}
+                  </div>
+                  <div style="background:#e0e0e0; border-radius:4px; height:12px; position:relative; margin-bottom:4px;">
+                    <div style="background:{cor}; width:{prog:.1f}%; height:12px; border-radius:4px;"></div>
+                    <div style="position:absolute; top:0; left:{exp_p:.1f}%; width:2px; height:12px; background:#333; opacity:.4;"></div>
+                  </div>
+                  <div style="display:flex; justify-content:space-between; font-size:11px; color:#666;">
+                    <span>{rv['pct']*100:.1f}% atingido</span>
+                    <span style="color:{rv['tend_cor']}; font-weight:700;">{rv['tend']}</span>
+                  </div>
+                </div>"""
+            cards += '</div>'
+            st.markdown(cards, unsafe_allow_html=True)
             st.divider()
 
-            # Tabela formatada
-            df_cli = pd.DataFrame(rows)
-            df_cli_fmt = df_cli.copy()
-            df_cli_fmt['CX']       = df_cli_fmt['CX'].map(lambda x: f'{x:,.0f}')
-            df_cli_fmt['Fat R$']   = df_cli_fmt['Fat R$'].map(lambda x: f'R$ {x:,.2f}')
-            df_cli_fmt['MC R$']    = df_cli_fmt['MC R$'].map(lambda x: f'R$ {x:,.2f}')
-            df_cli_fmt['MC %']     = df_cli_fmt['MC %'].map(lambda x: f'{x:.2f}%')
-            df_cli_fmt['Margem %'] = df_cli_fmt['Margem %'].map(lambda x: f'{x:.2f}%')
+        # ── Tabela detalhada ──────────────────────────────────────────────
+        st.subheader(f'Detalhamento por Cliente — {len(rows)} cliente(s)')
 
-            st.dataframe(df_cli_fmt, use_container_width=True, hide_index=True)
+        df_rows = []
+        for r in rows:
+            df_rows.append({
+                'Vendedor':      r['Vendedor'],
+                'Cliente':       r['Cliente'],
+                'Meta':          _brl(r['_meta']) if r['_tem_meta'] else '—',
+                'Faturamento':   _brl(r['_fat']),
+                '% Atingido':    f"{r['_pct_atg']*100:.1f}%" if r['_tem_meta'] else '—',
+                'Restante':      _brl(r['_restante']) if r['_tem_meta'] else '—',
+                'Méd. Diária':   _brl(r['_avg']),
+                'Méd. Nec/dia':  _brl(r['_media_nec']) if r['_tem_meta'] else '—',
+                'Projeção':      _brl(r['_projecao']),
+                'Dif. Projeção': ('+' if r['_diferenca'] >= 0 else '') + _brl(r['_diferenca']) if r['_tem_meta'] else '—',
+                'MC R$':         _brl(r['_mc_rs']),
+                'MC %':          f"{r['_mc_pct']:.1f}%",
+                'Status':        f"{r['_em']} {r['_lb']}",
+            })
 
-            # Download CSV
-            csv = df_cli.to_csv(index=False).encode('utf-8')
-            st.download_button(
-                '⬇️ Exportar CSV',
-                data=csv,
-                file_name=f'clientes_on_track_{lbl_atual.replace("/","")}.csv',
-                mime='text/csv',
-            )
+        st.dataframe(pd.DataFrame(df_rows), use_container_width=True, hide_index=True)
+
+        st.divider()
+
+        # ── Exportar CSV ──────────────────────────────────────────────────
+        csv_rows = []
+        for r in rows:
+            csv_rows.append({
+                'Vendedor':                  r['Vendedor'],
+                'Cliente':                   r['Cliente'],
+                'Meta (R$)':                 round(r['_meta'], 2),
+                'Faturamento (R$)':           round(r['_fat'], 2),
+                '% Atingido':                f"{r['_pct_atg']*100:.1f}%" if r['_tem_meta'] else '—',
+                'Valor Restante (R$)':        round(r['_restante'], 2),
+                'Média Diária Atual (R$)':    round(r['_avg'], 2),
+                'Média Necessária/dia (R$)':  round(r['_media_nec'], 2),
+                'Projeção Fechamento (R$)':   round(r['_projecao'], 2),
+                'Dif. Projeção vs Meta (R$)': round(r['_diferenca'], 2),
+                'MC R$':                     round(r['_mc_rs'], 2),
+                'MC %':                      f"{r['_mc_pct']:.1f}%",
+                'Margem %':                  f"{r['_res']:.1f}%",
+                'Status On Track':            f"{r['_em']} {r['_lb']}",
+            })
+
+        csv = pd.DataFrame(csv_rows).to_csv(index=False, sep=';').encode('utf-8-sig')
+        st.download_button(
+            '⬇️ Exportar CSV completo',
+            data=csv,
+            file_name=f'ontrack_cliente_{lbl_atual.replace("/","")}.csv',
+            mime='text/csv',
+        )
