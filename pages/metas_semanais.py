@@ -13,9 +13,9 @@ import datetime
 import streamlit as st
 import pandas as pd
 
-from parsers import parse_estoque, parse_vendas
+from parsers import parse_estoque, parse_vendas, normalize_codigo
 from parsers_vendedor import parse_totais_vendedor
-from calc import compute_metas, VENDEDORES_PADRAO, parse_codigos_input, map_vendedor
+from calc import compute_metas, VENDEDORES_PADRAO, parse_codigos_input, map_vendedor, codigo_matches
 from pdfgen import generate_relatorio_vendedor, generate_dashboard, generate_resumo_geral
 import storage
 
@@ -105,6 +105,42 @@ def _listar_fechamentos():
         except Exception:
             pass
     return items
+
+
+# ---------------------------------------------------------------------------
+# Diagnóstico de códigos
+# ---------------------------------------------------------------------------
+
+def _diagnostico_codigos(vendas_rows: list, produtos_config: list) -> list:
+    """Retorna lista de códigos do PDF que não casaram com nenhum produto configurado.
+
+    Cada item: {'Código', 'CX não reconhecidas', 'Vendedores'}
+    Ordenado por volume decrescente.
+    """
+    from collections import defaultdict
+    agg = defaultdict(lambda: {'qtde': 0.0, 'vendedores': set()})
+    for row in vendas_rows:
+        cn = normalize_codigo(row['codigo'])
+        matched = any(
+            codigo_matches(cn, e)
+            for p in produtos_config
+            for e in p['codigos']
+        )
+        if not matched:
+            agg[row['codigo']]['qtde']      += row['qtde_vendida']
+            agg[row['codigo']]['vendedores'].add(
+                map_vendedor(row['vendedor']) or row['vendedor']
+            )
+    if not agg:
+        return []
+    return [
+        {
+            'Código': cod,
+            'CX não reconhecidas': dados['qtde'],
+            'Vendedores': ', '.join(sorted(v for v in dados['vendedores'] if v)),
+        }
+        for cod, dados in sorted(agg.items(), key=lambda x: -x[1]['qtde'])
+    ]
 
 
 # ---------------------------------------------------------------------------
@@ -698,16 +734,41 @@ with tab_cfg:
                 _prio_map = {p['nome']: p.get('prioridade', 'Normal') for p in produtos_config}
                 for _r in resultados:
                     _r['prioridade'] = _prio_map.get(_r['produto'], 'Normal')
-                st.session_state['estoque_rows'] = estoque_rows
-                st.session_state['vendas_rows']  = vendas_rows
-                st.session_state['resultados']   = resultados
+                st.session_state['estoque_rows']    = estoque_rows
+                st.session_state['vendas_rows']     = vendas_rows
+                st.session_state['resultados']      = resultados
+                st.session_state['produtos_config'] = produtos_config
                 save_config(cfg, show_feedback=False)
                 st.success('Cálculo concluído. Confira a aba **📊 On Track** para o dashboard.')
 
     # ── Resultados ────────────────────────────────────────────────────────
     if 'resultados' in st.session_state:
-        resultados   = st.session_state['resultados']
-        estoque_rows = st.session_state['estoque_rows']
+        resultados      = st.session_state['resultados']
+        estoque_rows    = st.session_state['estoque_rows']
+        vendas_rows_diag = st.session_state.get('vendas_rows', [])
+        produtos_config_diag = st.session_state.get('produtos_config', [])
+
+        # Diagnóstico de códigos não reconhecidos
+        nao_rec = _diagnostico_codigos(vendas_rows_diag, produtos_config_diag)
+        if nao_rec:
+            total_nao_rec = sum(r['CX não reconhecidas'] for r in nao_rec)
+            with st.expander(
+                f'⚠️ {len(nao_rec)} código(s) do PDF não reconhecido(s) '
+                f'— {total_nao_rec:,.0f} cx fora do cálculo',
+                expanded=True,
+            ):
+                st.caption(
+                    'Esses códigos aparecem no PDF mas não casaram com nenhum produto '
+                    'configurado. Se fizerem parte das metas desta semana, adicione ou '
+                    'corrija os códigos na seção **2. Produtos da semana** acima.'
+                )
+                df_diag = pd.DataFrame(nao_rec)
+                df_diag['CX não reconhecidas'] = df_diag['CX não reconhecidas'].map(
+                    lambda x: f'{x:,.0f}'
+                )
+                st.dataframe(df_diag, use_container_width=True, hide_index=True)
+        else:
+            st.success('✅ Todos os códigos do PDF foram reconhecidos — nenhuma cx perdida.')
 
         st.subheader('Resultado: Meta / Vendido / Falta por produto e vendedor')
         for r in resultados:
