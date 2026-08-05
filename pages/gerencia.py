@@ -1,5 +1,6 @@
 """Página de Gerência OTHIL — acesso restrito por senha."""
 import json
+import math
 import os
 import re
 import datetime
@@ -8,7 +9,8 @@ import streamlit as st
 import streamlit.components.v1 as components
 import pandas as pd
 
-_GERENCIA_DIR  = os.path.join(os.path.dirname(__file__), '..', 'gerencia_data')
+_GERENCIA_DIR     = os.path.join(os.path.dirname(__file__), '..', 'gerencia_data')
+_ONTRACK_PUB_FILE = os.path.join(_GERENCIA_DIR, 'ontrack_publicado.json')
 _QUEBRA_DIR    = os.path.join(_GERENCIA_DIR, 'quebra')
 _MESES_QBR     = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez']
 _SENHA_FALLBACK = 'othil2024'
@@ -337,6 +339,128 @@ def _render_quebra_secao(tipo: str, titulo: str, emoji: str):
 _FECHAMENTOS_DIR = os.path.join(_GERENCIA_DIR, 'fechamentos')
 
 
+def _on_track_status_ger(atingido: float, dia: int):
+    if dia <= 0:
+        if atingido >= 0.80: return '🟢', 'On Track', '#2D6A4F'
+        elif atingido >= 0.50: return '🟡', 'Atenção', '#B8860B'
+        else: return '🔴', 'Atrasado', '#C00000'
+    expected = dia / 5
+    ratio = atingido / expected if expected > 0 else 0
+    if ratio >= 0.85: return '🟢', 'On Track', '#2D6A4F'
+    elif ratio >= 0.55: return '🟡', 'Atenção', '#B8860B'
+    else: return '🔴', 'Atrasado', '#C00000'
+
+
+def _render_ontrack_publicado():
+    st.header('📊 On Track Atual')
+
+    if not os.path.exists(_ONTRACK_PUB_FILE):
+        st.info(
+            'Nenhum dado publicado ainda. Na página **Metas Semanais**, '
+            'calcule as metas e clique em **"📤 Publicar On Track para Gerência"**.'
+        )
+        return
+
+    with open(_ONTRACK_PUB_FILE, 'r', encoding='utf-8') as f:
+        snap = json.load(f)
+
+    pub_em     = snap.get('publicado_em', '')[:16].replace('T', ' ')
+    periodo    = snap.get('periodo', '—')
+    resultados = snap.get('resultados', [])
+    totais_rs  = snap.get('totais_rs', {})
+
+    st.caption(f"Período: **{periodo}**  |  Publicado em: **{pub_em}**")
+
+    dia = st.slider(
+        'Dia da semana (para status On Track)', 1, 5,
+        value=min(datetime.date.today().weekday() + 1, 5),
+        format='Dia %d de 5', key='ger_ot_dia',
+    )
+
+    st.divider()
+
+    # KPIs gerais
+    total_meta = sum(l['meta']    for r in resultados for l in r.get('linhas', []))
+    total_vend = sum(l['vendido'] for r in resultados for l in r.get('linhas', []))
+    total_atg  = total_vend / total_meta if total_meta else 0
+    proj_cx    = math.ceil(total_vend / dia * 5) if dia > 0 else total_vend
+    em, lb, _  = _on_track_status_ger(total_atg, dia)
+
+    k1, k2, k3, k4, k5 = st.columns(5)
+    k1.metric('Meta (cx)',     f'{total_meta:,.0f}')
+    k2.metric('Vendido (cx)',  f'{total_vend:,.0f}')
+    k3.metric('% Atingido',    f'{total_atg*100:.1f}%')
+    k4.metric('Projeção (cx)', f'{proj_cx:,.0f}')
+    k5.metric('Status',        f'{em} {lb}')
+
+    tg = totais_rs.get('total_geral', {})
+    if tg:
+        st.subheader('Faturamento Geral (R$)')
+        r1, r2, r3 = st.columns(3)
+        r1.metric('Faturamento', f"R$ {tg.get('fat', 0):,.2f}")
+        r2.metric('MC R$',       f"R$ {tg.get('mc_rs', 0):,.2f}")
+        r3.metric('MC %',        f"{tg.get('mc_pct', 0):.2f}%")
+
+    st.divider()
+
+    # Por produto
+    st.subheader('Por Produto')
+    for r in resultados:
+        p_meta = sum(l['meta']    for l in r.get('linhas', []))
+        p_vend = sum(l['vendido'] for l in r.get('linhas', []))
+        p_atg  = p_vend / p_meta if p_meta else 0
+        p_em, p_lb, _ = _on_track_status_ger(p_atg, dia)
+        prio = r.get('prioridade', 'Normal')
+        badge = f' — {prio}' if prio != 'Normal' else ''
+        with st.expander(
+            f"{p_em} {r.get('produto', '')}{badge}  |  "
+            f"{p_vend:,.0f}/{p_meta:,.0f} cx ({p_atg*100:.1f}%)  —  {p_lb}",
+            expanded=False,
+        ):
+            vrows = []
+            for l in r.get('linhas', []):
+                v_atg = l['vendido'] / l['meta'] if l['meta'] else 0
+                v_em, v_lb, _ = _on_track_status_ger(v_atg, dia)
+                vrows.append({
+                    'Vendedor':     l.get('vendedor', ''),
+                    'Meta (cx)':   f"{l['meta']:,.0f}",
+                    'Vendido (cx)': f"{l['vendido']:,.0f}",
+                    '% Atingido':  f"{v_atg*100:.1f}%",
+                    'Status':      f'{v_em} {v_lb}',
+                })
+            st.dataframe(pd.DataFrame(vrows), use_container_width=True, hide_index=True)
+
+    st.divider()
+
+    # Por vendedor
+    st.subheader('Por Vendedor')
+    vend_agg = {}
+    for r in resultados:
+        for l in r.get('linhas', []):
+            v = l.get('vendedor', '?')
+            if v not in vend_agg:
+                vend_agg[v] = {'meta': 0.0, 'vendido': 0.0}
+            vend_agg[v]['meta']    += l.get('meta', 0)
+            vend_agg[v]['vendido'] += l.get('vendido', 0)
+
+    vend_rs = totais_rs.get('vendedores', {})
+    vrows_all = []
+    for v, ag in sorted(vend_agg.items()):
+        v_atg = ag['vendido'] / ag['meta'] if ag['meta'] else 0
+        v_em, v_lb, _ = _on_track_status_ger(v_atg, dia)
+        rs = vend_rs.get(v, {})
+        vrows_all.append({
+            'Vendedor':     v,
+            'Meta (cx)':   f"{ag['meta']:,.0f}",
+            'Vendido (cx)': f"{ag['vendido']:,.0f}",
+            '% Atingido':  f"{v_atg*100:.1f}%",
+            'Status':      f'{v_em} {v_lb}',
+            'Fat R$':      f"R$ {rs['fat']:,.2f}"   if rs.get('fat')    is not None else '—',
+            'MC R$':       f"R$ {rs['mc_rs']:,.2f}" if rs.get('mc_rs') is not None else '—',
+        })
+    st.dataframe(pd.DataFrame(vrows_all), use_container_width=True, hide_index=True)
+
+
 def _listar_fechamentos():
     os.makedirs(_FECHAMENTOS_DIR, exist_ok=True)
     items = []
@@ -512,11 +636,12 @@ if st.button('🔒 Sair', key='_gerencia_logout'):
 st.divider()
 
 # ── Abas ─────────────────────────────────────────────────────────────────────
-tab_d, tab_s, tab_m, tab_rec, tab_fech, tab_qbr_s, tab_qbr_m, tab_qbr_comp = st.tabs([
+tab_d, tab_s, tab_m, tab_rec, tab_ot, tab_fech, tab_qbr_s, tab_qbr_m, tab_qbr_comp = st.tabs([
     '📅 Dashboards Diários',
     '📆 Dashboards Semanais',
     '🗓️ Dashboards Mensais',
     '👥 Ranking Recorrência',
+    '📊 On Track Atual',
     '🏁 Fechamentos Semanais',
     '📦 Quebras Semanais',
     '📦 Quebras Mensais',
@@ -579,6 +704,9 @@ with tab_rec:
                 )
     else:
         st.info('Nenhum ranking disponível. Processe um PDF na página **Recorrência** primeiro.')
+
+with tab_ot:
+    _render_ontrack_publicado()
 
 with tab_fech:
     _render_fechamentos_semanais()
