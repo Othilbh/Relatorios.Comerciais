@@ -786,21 +786,45 @@ with tab_cfg:
                 except Exception as e:
                     st.error(f'Erro ao publicar: {e}')
 
-        st.subheader('Resultado: Meta / Vendido / Falta por produto e vendedor')
+        st.subheader('Resultado por produto')
+
+        # Tabela resumo compacta
+        resumo_rows = []
         for r in resultados:
-            prio = r.get('prioridade', 'Normal')
-            prio_badge = f' &nbsp; {prio}' if prio != 'Normal' else ''
-            st.markdown(
-                f"**{r['produto']}**{prio_badge} — Quantidade: {r['estoque_total']:.0f} cx",
-                unsafe_allow_html=True,
-            )
-            st.dataframe(
-                [{'Vendedor': l['vendedor'], '% Meta': f"{l['pct']:.0f}%",
-                  'Meta (cx)': l['meta'], 'Vendido (cx)': l['vendido'],
-                  'Falta (cx)': l['falta'], '% Atingido': f"{l['atingido']*100:.1f}%"}
-                 for l in r['linhas']],
-                use_container_width=True, hide_index=True,
-            )
+            p_meta = sum(l['meta']    for l in r['linhas'])
+            p_vend = sum(l['vendido'] for l in r['linhas'])
+            p_atg  = p_vend / p_meta * 100 if p_meta else 0
+            p_falt = max(p_meta - p_vend, 0)
+            resumo_rows.append({
+                'Produto':      r['produto'],
+                'Prioridade':   r.get('prioridade', 'Normal'),
+                'Qtde (cx)':    f"{r['estoque_total']:.0f}",
+                'Meta (cx)':    f"{p_meta:.0f}",
+                'Vendido (cx)': f"{p_vend:.0f}",
+                'Falta (cx)':   f"{p_falt:.0f}",
+                '% Atingido':   f"{p_atg:.1f}%",
+            })
+        st.dataframe(pd.DataFrame(resumo_rows), use_container_width=True, hide_index=True)
+
+        # Detalhe por vendedor (colapsado)
+        st.caption('Clique em um produto para ver o detalhe por vendedor:')
+        for r in resultados:
+            p_meta = sum(l['meta']    for l in r['linhas'])
+            p_vend = sum(l['vendido'] for l in r['linhas'])
+            p_atg  = p_vend / p_meta * 100 if p_meta else 0
+            prio   = r.get('prioridade', 'Normal')
+            badge  = f' — {prio}' if prio != 'Normal' else ''
+            with st.expander(
+                f"{r['produto']}{badge}  |  {p_vend:.0f}/{p_meta:.0f} cx ({p_atg:.1f}%)",
+                expanded=False,
+            ):
+                st.dataframe(
+                    [{'Vendedor': l['vendedor'], '% Meta': f"{l['pct']:.0f}%",
+                      'Meta (cx)': l['meta'], 'Vendido (cx)': l['vendido'],
+                      'Falta (cx)': l['falta'], '% Atingido': f"{l['atingido']*100:.1f}%"}
+                     for l in r['linhas']],
+                    use_container_width=True, hide_index=True,
+                )
 
         st.divider()
         st.subheader('Gerar PDFs')
