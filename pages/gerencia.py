@@ -11,6 +11,7 @@ import pandas as pd
 
 _GERENCIA_DIR     = os.path.join(os.path.dirname(__file__), '..', 'gerencia_data')
 _ONTRACK_PUB_FILE = os.path.join(_GERENCIA_DIR, 'ontrack_publicado.json')
+_ONTRACK_CLI_FILE = os.path.join(_GERENCIA_DIR, 'ontrack_clientes_publicado.json')
 _QUEBRA_DIR    = os.path.join(_GERENCIA_DIR, 'quebra')
 _MESES_QBR     = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez']
 _SENHA_FALLBACK = 'othil2024'
@@ -616,6 +617,177 @@ def _render_fechamentos_semanais():
         st.dataframe(pd.DataFrame(comp_rows), use_container_width=True, hide_index=True)
 
 
+def _render_ontrack_clientes():
+    st.header('👥 On Track Vendedor × Cliente')
+
+    if not os.path.exists(_ONTRACK_CLI_FILE):
+        st.info(
+            'Nenhum dado publicado ainda. Na página **Vendedor-Cliente**, '
+            'gere o relatório semanal e clique em **"📤 Publicar On Track para Gerência"**.'
+        )
+        return
+
+    with open(_ONTRACK_CLI_FILE, 'r', encoding='utf-8') as f:
+        snap = json.load(f)
+
+    pub_em         = snap.get('publicado_em', '')[:16].replace('T', ' ')
+    periodo        = snap.get('periodo', '—')
+    days_elapsed   = snap.get('days_elapsed', 1)
+    days_in_month  = snap.get('days_in_month', 30)
+    days_remaining = snap.get('days_remaining', 0)
+    elapsed_pct    = snap.get('elapsed_pct', 0)
+    totais         = snap.get('totais', {})
+    rows           = snap.get('rows', [])
+
+    st.caption(f"Período: **{periodo}**  |  Publicado em: **{pub_em}**  |  Dia {days_elapsed} de {days_in_month}")
+
+    if not rows:
+        st.info('Nenhum dado disponível no snapshot publicado.')
+        return
+
+    def _brl(v):
+        s = f"{abs(v):,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
+        return f"R$ {'-' if v < 0 else ''}{s}"
+
+    _COR = {'🟢': '#2D6A4F', '🟡': '#B8860B', '🔴': '#C00000', '—': '#888'}
+
+    tot_fat  = totais.get('fat', 0)
+    tot_meta = totais.get('meta', 0)
+    tot_pct  = totais.get('pct', 0)
+    tot_rest = totais.get('rest', 0)
+    tot_proj = totais.get('proj', 0)
+    tot_dif  = totais.get('dif', 0)
+
+    def _ot_status_cli(pct, elp):
+        ratio = pct / elp if elp > 0 else 1.0
+        if ratio >= 0.85:   return '🟢', 'No Ritmo',    ratio
+        elif ratio >= 0.55: return '🟡', 'Atenção',      ratio
+        else:               return '🔴', 'Fora do Ritmo', ratio
+
+    g_em, g_lb, _ = _ot_status_cli(tot_pct, elapsed_pct)
+    cor_s  = _COR.get(g_em, '#888')
+    cor_d  = '#2D6A4F' if tot_dif >= 0 else '#C00000'
+
+    # Cards de resumo
+    st.markdown(f"""
+    <div style="display:grid; grid-template-columns:repeat(6,1fr); gap:10px; margin-bottom:14px;">
+      <div style="background:#f8f9fa; border-left:4px solid #2D6A4F; border-radius:8px; padding:12px 10px;">
+        <div style="font-size:10px; color:#666; font-weight:700;">META MENSAL</div>
+        <div style="font-size:15px; font-weight:700; color:#1B4332; margin-top:4px;">{_brl(tot_meta)}</div>
+      </div>
+      <div style="background:#f8f9fa; border-left:4px solid #4472C4; border-radius:8px; padding:12px 10px;">
+        <div style="font-size:10px; color:#666; font-weight:700;">FATURAMENTO</div>
+        <div style="font-size:15px; font-weight:700; color:#1F4E79; margin-top:4px;">{_brl(tot_fat)}</div>
+      </div>
+      <div style="background:#f8f9fa; border-left:4px solid {cor_s}; border-radius:8px; padding:12px 10px;">
+        <div style="font-size:10px; color:#666; font-weight:700;">% ATINGIDO</div>
+        <div style="font-size:15px; font-weight:700; color:{cor_s}; margin-top:4px;">{tot_pct*100:.1f}% {g_em}</div>
+      </div>
+      <div style="background:#f8f9fa; border-left:4px solid #C00000; border-radius:8px; padding:12px 10px;">
+        <div style="font-size:10px; color:#666; font-weight:700;">VALOR RESTANTE</div>
+        <div style="font-size:15px; font-weight:700; color:#C00000; margin-top:4px;">{_brl(tot_rest)}</div>
+      </div>
+      <div style="background:#f8f9fa; border-left:4px solid #375623; border-radius:8px; padding:12px 10px;">
+        <div style="font-size:10px; color:#666; font-weight:700;">PROJEÇÃO MÊS</div>
+        <div style="font-size:15px; font-weight:700; color:#375623; margin-top:4px;">{_brl(tot_proj)}</div>
+      </div>
+      <div style="background:#f8f9fa; border-left:4px solid {cor_d}; border-radius:8px; padding:12px 10px;">
+        <div style="font-size:10px; color:#666; font-weight:700;">DIFERENÇA PROJ.</div>
+        <div style="font-size:15px; font-weight:700; color:{cor_d}; margin-top:4px;">{'▲' if tot_dif >= 0 else '▼'} {_brl(abs(tot_dif))}</div>
+      </div>
+    </div>
+    """, unsafe_allow_html=True)
+
+    # Barra de progresso
+    prog_w = min(tot_pct, 1.0) * 100
+    exp_w  = elapsed_pct * 100
+    st.markdown(f"""
+    <div style="margin-bottom:16px;">
+      <div style="background:#e0e0e0; border-radius:6px; height:18px; position:relative;">
+        <div style="background:{cor_s}; width:{prog_w:.1f}%; height:18px; border-radius:6px;
+                    display:flex; align-items:center; justify-content:flex-end; padding-right:6px;">
+          <span style="color:white; font-weight:700; font-size:11px;">{prog_w:.1f}%</span>
+        </div>
+        <div style="position:absolute; top:0; left:{exp_w:.1f}%; width:2px; height:18px; background:#333; opacity:.4;"></div>
+      </div>
+      <div style="font-size:10px; color:#999; margin-top:2px;">▲ Ritmo esperado: {exp_w:.0f}%  |  {days_remaining} dias restantes</div>
+    </div>
+    """, unsafe_allow_html=True)
+
+    st.divider()
+
+    # Ranking de vendedores
+    st.subheader('🏆 Ranking de Vendedores')
+    vend_agg: dict = {}
+    for r in rows:
+        v = r['Vendedor']
+        if v not in vend_agg:
+            vend_agg[v] = {'fat': 0.0, 'meta': 0.0, 'mc_rs': 0.0}
+        vend_agg[v]['fat']   += r.get('fat', 0)
+        vend_agg[v]['meta']  += r.get('meta', 0)
+        vend_agg[v]['mc_rs'] += r.get('mc_rs', 0)
+
+    rank_rows = []
+    for v, d in vend_agg.items():
+        pct = d['fat'] / d['meta'] if d['meta'] > 0 else 0.0
+        em, lb, ratio = _ot_status_cli(pct, elapsed_pct)
+        tend = '↑ Acima' if ratio >= 1.0 else ('→ No ritmo' if ratio >= 0.85 else '↓ Abaixo')
+        tend_cor = '#2D6A4F' if ratio >= 1.0 else ('#B8860B' if ratio >= 0.85 else '#C00000')
+        rank_rows.append({'v': v, 'fat': d['fat'], 'meta': d['meta'],
+                          'pct': pct, 'em': em, 'lb': lb, 'tend': tend, 'tend_cor': tend_cor})
+    rank_rows.sort(key=lambda x: x['pct'], reverse=True)
+
+    medals = ['🥇', '🥈', '🥉']
+    cards = '<div style="display:grid; grid-template-columns:repeat(auto-fill,minmax(260px,1fr)); gap:12px; margin-bottom:16px;">'
+    for i, rv in enumerate(rank_rows):
+        medal = medals[i] if i < 3 else f'#{i+1}'
+        cor   = _COR.get(rv['em'], '#888')
+        prog  = min(rv['pct'], 1.0) * 100
+        cards += f"""
+        <div style="background:white; border:1px solid #e0e0e0; border-radius:10px; padding:14px;
+                    box-shadow:0 1px 4px rgba(0,0,0,.07);">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+            <span style="font-size:14px; font-weight:700;">{medal} {rv['v']}</span>
+            <span style="background:{cor}; color:white; padding:2px 8px; border-radius:12px;
+                         font-size:10px; font-weight:700;">{rv['em']} {rv['lb']}</span>
+          </div>
+          <div style="font-size:12px; color:#444; margin-bottom:6px;">
+            Fat: <b>{_brl(rv['fat'])}</b> / Meta: {_brl(rv['meta'])}
+          </div>
+          <div style="background:#e0e0e0; border-radius:4px; height:10px; position:relative; margin-bottom:4px;">
+            <div style="background:{cor}; width:{prog:.1f}%; height:10px; border-radius:4px;"></div>
+            <div style="position:absolute; top:0; left:{exp_w:.1f}%; width:2px; height:10px; background:#333; opacity:.4;"></div>
+          </div>
+          <div style="display:flex; justify-content:space-between; font-size:11px; color:#666;">
+            <span>{rv['pct']*100:.1f}% atingido</span>
+            <span style="color:{rv['tend_cor']}; font-weight:700;">{rv['tend']}</span>
+          </div>
+        </div>"""
+    cards += '</div>'
+    st.markdown(cards, unsafe_allow_html=True)
+
+    st.divider()
+
+    # Tabela detalhada
+    st.subheader(f'Detalhamento — {len(rows)} cliente(s)')
+    df_rows = []
+    for r in rows:
+        df_rows.append({
+            'Vendedor':    r['Vendedor'],
+            'Cliente':     r['Cliente'],
+            'Meta':        _brl(r['meta']) if r.get('tem_meta') else '—',
+            'Faturamento': _brl(r['fat']),
+            '% Atingido':  f"{r['pct_atg']*100:.1f}%" if r.get('tem_meta') else '—',
+            'Restante':    _brl(r['restante']) if r.get('tem_meta') else '—',
+            'Projeção':    _brl(r['projecao']),
+            'Dif. Proj.':  ('+' if r['diferenca'] >= 0 else '') + _brl(r['diferenca']) if r.get('tem_meta') else '—',
+            'MC R$':       _brl(r['mc_rs']),
+            'MC %':        f"{r['mc_pct']:.1f}%",
+            'Status':      f"{r['em']} {r['lb']}",
+        })
+    st.dataframe(pd.DataFrame(df_rows), use_container_width=True, hide_index=True)
+
+
 # ── Auth ──────────────────────────────────────────────────────────────────────
 if not _check_auth():
     st.stop()
@@ -636,12 +808,13 @@ if st.button('🔒 Sair', key='_gerencia_logout'):
 st.divider()
 
 # ── Abas ─────────────────────────────────────────────────────────────────────
-tab_d, tab_s, tab_m, tab_rec, tab_ot, tab_fech, tab_qbr_s, tab_qbr_m, tab_qbr_comp = st.tabs([
+tab_d, tab_s, tab_m, tab_rec, tab_ot, tab_ot_cli, tab_fech, tab_qbr_s, tab_qbr_m, tab_qbr_comp = st.tabs([
     '📅 Dashboards Diários',
     '📆 Dashboards Semanais',
     '🗓️ Dashboards Mensais',
     '👥 Ranking Recorrência',
-    '📊 On Track Atual',
+    '📊 On Track Metas',
+    '👥 On Track Clientes',
     '🏁 Fechamentos Semanais',
     '📦 Quebras Semanais',
     '📦 Quebras Mensais',
@@ -707,6 +880,9 @@ with tab_rec:
 
 with tab_ot:
     _render_ontrack_publicado()
+
+with tab_ot_cli:
+    _render_ontrack_clientes()
 
 with tab_fech:
     _render_fechamentos_semanais()

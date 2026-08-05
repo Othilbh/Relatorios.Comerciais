@@ -17,11 +17,17 @@ Workflow:
       - Clica 'Gerar Excel' -> baixa o .xlsx
 """
 import io
+import json
+import os
 import calendar as _cal
 from datetime import datetime
 
 import streamlit as st
 import pandas as pd
+
+_ONTRACK_CLI_FILE = os.path.join(
+    os.path.dirname(__file__), '..', 'gerencia_data', 'ontrack_clientes_publicado.json'
+)
 
 from xlsx_vendedor_cliente import (
     salvar_historico, carregar_historico, gerar_xlsx, ler_xlsx_historico,
@@ -542,10 +548,55 @@ with tab_ontrack:
                 'Status On Track':            f"{r['_em']} {r['_lb']}",
             })
 
-        csv = pd.DataFrame(csv_rows).to_csv(index=False, sep=';').encode('utf-8-sig')
-        st.download_button(
-            '⬇️ Exportar CSV completo',
-            data=csv,
-            file_name=f'ontrack_cliente_{lbl_atual.replace("/","")}.csv',
-            mime='text/csv',
-        )
+        c_csv, c_pub = st.columns(2)
+        with c_csv:
+            csv = pd.DataFrame(csv_rows).to_csv(index=False, sep=';').encode('utf-8-sig')
+            st.download_button(
+                '⬇️ Exportar CSV completo',
+                data=csv,
+                file_name=f'ontrack_cliente_{lbl_atual.replace("/","")}.csv',
+                mime='text/csv',
+                use_container_width=True,
+            )
+        with c_pub:
+            if st.button('📤 Publicar On Track para Gerência', use_container_width=True):
+                try:
+                    os.makedirs(os.path.dirname(_ONTRACK_CLI_FILE), exist_ok=True)
+                    snapshot = {
+                        'publicado_em':  datetime.now().isoformat(timespec='seconds'),
+                        'periodo':       lbl_atual,
+                        'days_elapsed':  days_elapsed,
+                        'days_in_month': days_in_month,
+                        'days_remaining':days_remaining,
+                        'elapsed_pct':   elapsed_pct,
+                        'totais': {
+                            'fat':  tot_fat,  'meta': tot_meta,
+                            'mc':   tot_mc,   'pct':  tot_pct,
+                            'rest': tot_rest, 'proj': tot_proj,
+                            'dif':  tot_dif,
+                        },
+                        'rows': [{
+                            'Vendedor':  r['Vendedor'],
+                            'Cliente':   r['Cliente'],
+                            'fat':       r['_fat'],
+                            'meta':      r['_meta'],
+                            'mc_rs':     r['_mc_rs'],
+                            'mc_pct':    r['_mc_pct'],
+                            'res':       r['_res'],
+                            'pct_atg':   r['_pct_atg'],
+                            'restante':  r['_restante'],
+                            'projecao':  r['_projecao'],
+                            'diferenca': r['_diferenca'],
+                            'ratio':     r['_ratio'],
+                            'avg':       r['_avg'],
+                            'media_nec': r['_media_nec'],
+                            'em':        r['_em'],
+                            'lb':        r['_lb'],
+                            'tem_meta':  r['_tem_meta'],
+                        } for r in rows],
+                    }
+                    with open(_ONTRACK_CLI_FILE, 'w', encoding='utf-8') as f:
+                        json.dump(snapshot, f, ensure_ascii=False, indent=2)
+                    st.success('✅ On Track de Clientes publicado na Gerência.')
+                except Exception as e:
+                    st.error(f'Erro ao publicar: {e}')
