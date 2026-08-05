@@ -632,29 +632,28 @@ with tab_cfg:
         cfg['produtos'].pop(remover_idx)
         st.rerun()
 
-    st.subheader('Percentuais de meta por vendedor (% sobre o estoque digitado acima)')
-    st.caption('Já vêm preenchidos com os percentuais fixos de cada vendedor — normalmente não precisa alterar.')
-    pct_cols = st.columns(len(cfg['vendedor_pcts']))
-    for col, (vend, pct) in zip(pct_cols, list(cfg['vendedor_pcts'].items())):
-        with col:
-            cfg['vendedor_pcts'][vend] = st.number_input(
-                vend, min_value=0, max_value=200,
-                value=int(pct), key=f'pct_{vend}',
-            )
-
-    cb1, cb2, cb3 = st.columns(3)
+    cb1, cb2 = st.columns([1, 3])
     with cb1:
-        if st.button('💾 Salvar configuração desta semana'):
+        if st.button('💾 Salvar configuração', use_container_width=True):
             save_config(cfg)
-    with cb2:
+
+    with st.expander('⚙️ Percentuais de meta por vendedor — normalmente não precisa alterar'):
+        pct_cols = st.columns(len(cfg['vendedor_pcts']))
+        for col, (vend, pct) in zip(pct_cols, list(cfg['vendedor_pcts'].items())):
+            with col:
+                cfg['vendedor_pcts'][vend] = st.number_input(
+                    vend, min_value=0, max_value=200,
+                    value=int(pct), key=f'pct_{vend}',
+                )
+
+    with st.expander('📤 Exportar / Importar configuração (JSON)'):
         st.download_button(
-            '⬇️ Exportar configuração (JSON)',
+            '⬇️ Exportar configuração',
             data=json.dumps(cfg, ensure_ascii=False, indent=2),
             file_name=f"config_metas_{datetime.date.today().isoformat()}.json",
             mime='application/json',
         )
-    with cb3:
-        up_cfg = st.file_uploader('⬆️ Importar configuração (JSON)', type='json', key='cfg_upload')
+        up_cfg = st.file_uploader('⬆️ Importar configuração', type='json', key='cfg_upload')
         if up_cfg is not None:
             st.session_state.config = json.load(up_cfg)
             save_config(st.session_state.config, show_feedback=False)
@@ -665,14 +664,17 @@ with tab_cfg:
     # ── Calcular ─────────────────────────────────────────────────────────
     st.header('3. Calcular metas e gerar relatórios')
 
-    periodo = st.text_input(
-        'Período (ex.: 22/06/2026 a 26/06/2026)',
-        value=cfg.get('periodo', ''),
-    )
-    data_emissao = st.text_input(
-        'Data de emissão (ex.: 29/06/2026)',
-        value=datetime.date.today().strftime('%d/%m/%Y'),
-    )
+    _pc1, _pc2 = st.columns(2)
+    with _pc1:
+        periodo = st.text_input(
+            'Período (ex.: 22/06/2026 a 26/06/2026)',
+            value=cfg.get('periodo', ''),
+        )
+    with _pc2:
+        data_emissao = st.text_input(
+            'Data de emissão (ex.: 29/06/2026)',
+            value=datetime.date.today().strftime('%d/%m/%Y'),
+        )
     cfg['periodo'] = periodo
 
     if st.button('▶️ Calcular metas', type='primary'):
