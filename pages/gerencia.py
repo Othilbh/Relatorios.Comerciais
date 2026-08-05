@@ -332,6 +332,167 @@ def _render_quebra_secao(tipo: str, titulo: str, emoji: str):
         st.dataframe(df_g, use_container_width=True, hide_index=True)
 
 
+# ── Fechamentos Semanais ──────────────────────────────────────────────────────
+
+_FECHAMENTOS_DIR = os.path.join(_GERENCIA_DIR, 'fechamentos')
+
+
+def _listar_fechamentos():
+    os.makedirs(_FECHAMENTOS_DIR, exist_ok=True)
+    items = []
+    for fname in sorted(os.listdir(_FECHAMENTOS_DIR), reverse=True):
+        if not fname.endswith('.json'):
+            continue
+        try:
+            with open(os.path.join(_FECHAMENTOS_DIR, fname), 'r', encoding='utf-8') as f:
+                data = json.load(f)
+            items.append((fname.replace('.json', ''), data))
+        except Exception:
+            pass
+    return items
+
+
+def _label_fech(slug: str) -> str:
+    try:
+        year, week = slug.split('-W')
+        return f'Semana {int(week):02d} / {year}'
+    except Exception:
+        return slug
+
+
+def _render_fechamentos_semanais():
+    st.header('🏁 Fechamentos Semanais')
+    historico = _listar_fechamentos()
+
+    if not historico:
+        st.info(
+            'Nenhum fechamento salvo ainda. Na página **Metas Semanais**, '
+            'calcule as metas e clique em **"Fechar Semana"** na aba Fechamento Semanal.'
+        )
+        return
+
+    slugs  = [s for s, _ in historico]
+    labels = [f"{_label_fech(s)}  —  {d.get('periodo', '-')}" for s, d in historico]
+
+    idx_key = '_ger_fech_idx'
+    if idx_key not in st.session_state:
+        st.session_state[idx_key] = 0
+
+    col_prev, col_sel, col_next = st.columns([1, 6, 1])
+    with col_prev:
+        st.write('')
+        if st.button('◀', key='ger_fech_prev', help='Semana anterior'):
+            st.session_state[idx_key] = min(st.session_state[idx_key] + 1, len(slugs) - 1)
+    with col_next:
+        st.write('')
+        if st.button('▶', key='ger_fech_next', help='Próxima semana'):
+            st.session_state[idx_key] = max(st.session_state[idx_key] - 1, 0)
+    with col_sel:
+        escolha = st.selectbox(
+            f'{len(historico)} fechamento(s) salvo(s):',
+            labels,
+            index=min(st.session_state[idx_key], len(labels) - 1),
+            key='ger_fech_sel',
+        )
+        st.session_state[idx_key] = labels.index(escolha)
+
+    idx   = st.session_state[idx_key]
+    dados = historico[idx][1]
+
+    gerado = dados.get('gerado_em', '')[:16].replace('T', ' ')
+    st.caption(f"Período: {dados.get('periodo', '-')}  |  Salvo em: {gerado}")
+
+    prods     = dados.get('produtos', [])
+    h_meta    = sum(l['meta']    for r in prods for l in r.get('linhas', []))
+    h_vend    = sum(l['vendido'] for r in prods for l in r.get('linhas', []))
+    h_atg     = h_vend / h_meta if h_meta else 0
+
+    c1, c2, c3 = st.columns(3)
+    c1.metric('Meta total (cx)', f'{h_meta:,.0f}')
+    c2.metric('Vendido (cx)',    f'{h_vend:,.0f}')
+    c3.metric('% Atingido',     f'{h_atg*100:.1f}%')
+
+    tg = dados.get('totais_rs', {}).get('total_geral', {})
+    if tg:
+        r1, r2, r3, r4 = st.columns(4)
+        r1.metric('Faturamento', f"R$ {tg.get('fat', 0):,.2f}")
+        r2.metric('MC R$',      f"R$ {tg.get('mc_rs', 0):,.2f}")
+        r3.metric('MC %',       f"{tg.get('mc_pct', 0):.2f}%")
+        r4.metric('Volume',     f"{tg.get('vol', 0):,.0f} cx")
+
+    st.divider()
+
+    # Tabela por produto
+    prows = []
+    for r in prods:
+        pm = sum(l['meta']    for l in r.get('linhas', []))
+        pv = sum(l['vendido'] for l in r.get('linhas', []))
+        pa = pv / pm if pm else 0
+        prows.append({
+            'Produto':     r.get('produto', ''),
+            'Prioridade':  r.get('prioridade', 'Normal'),
+            'Meta (cx)':  f'{pm:,.0f}',
+            'Vendido (cx)': f'{pv:,.0f}',
+            '% Atingido': f'{pa*100:.1f}%',
+        })
+    if prows:
+        st.subheader('Por Produto')
+        st.dataframe(pd.DataFrame(prows), use_container_width=True, hide_index=True)
+
+    # Tabela por vendedor
+    vend_agg = {}
+    for r in prods:
+        for l in r.get('linhas', []):
+            v = l.get('vendedor', '?')
+            if v not in vend_agg:
+                vend_agg[v] = {'meta': 0, 'vendido': 0}
+            vend_agg[v]['meta']    += l.get('meta', 0)
+            vend_agg[v]['vendido'] += l.get('vendido', 0)
+
+    vend_rs = dados.get('totais_rs', {}).get('vendedores', {})
+    vrows = []
+    for v, ag in sorted(vend_agg.items()):
+        meta_v = ag['meta']
+        vend_v = ag['vendido']
+        atg_v  = vend_v / meta_v if meta_v else 0
+        rs = vend_rs.get(v, {})
+        vrows.append({
+            'Vendedor':     v,
+            'Meta (cx)':   f'{meta_v:,.0f}',
+            'Vendido (cx)': f'{vend_v:,.0f}',
+            '% Atingido':  f'{atg_v*100:.1f}%',
+            'Fat R$':      f"R$ {rs['fat']:,.2f}" if rs.get('fat') is not None else '—',
+            'MC R$':       f"R$ {rs['mc_rs']:,.2f}" if rs.get('mc_rs') is not None else '—',
+            'MC %':        f"{rs['mc_pct']:.2f}%" if rs.get('mc_pct') is not None else '—',
+        })
+    if vrows:
+        st.subheader('Por Vendedor')
+        st.dataframe(pd.DataFrame(vrows), use_container_width=True, hide_index=True)
+
+    # Comparativo entre semanas (se houver mais de 1)
+    if len(historico) >= 2:
+        st.divider()
+        st.subheader('Comparativo de Semanas')
+
+        comp_rows = []
+        for s, d in historico:
+            dp    = d.get('produtos', [])
+            dm    = sum(l['meta']    for r in dp for l in r.get('linhas', []))
+            dv    = sum(l['vendido'] for r in dp for l in r.get('linhas', []))
+            da    = dv / dm if dm else 0
+            dtg   = d.get('totais_rs', {}).get('total_geral', {})
+            comp_rows.append({
+                'Semana':        _label_fech(s),
+                'Período':       d.get('periodo', '-'),
+                'Meta (cx)':    f'{dm:,.0f}',
+                'Vendido (cx)': f'{dv:,.0f}',
+                '% Atingido':   f'{da*100:.1f}%',
+                'Fat R$':       f"R$ {dtg.get('fat', 0):,.2f}" if dtg else '—',
+                'MC %':         f"{dtg.get('mc_pct', 0):.2f}%" if dtg else '—',
+            })
+        st.dataframe(pd.DataFrame(comp_rows), use_container_width=True, hide_index=True)
+
+
 # ── Auth ──────────────────────────────────────────────────────────────────────
 if not _check_auth():
     st.stop()
@@ -352,11 +513,12 @@ if st.button('🔒 Sair', key='_gerencia_logout'):
 st.divider()
 
 # ── Abas ─────────────────────────────────────────────────────────────────────
-tab_d, tab_s, tab_m, tab_rec, tab_qbr_s, tab_qbr_m, tab_qbr_comp = st.tabs([
+tab_d, tab_s, tab_m, tab_rec, tab_fech, tab_qbr_s, tab_qbr_m, tab_qbr_comp = st.tabs([
     '📅 Dashboards Diários',
     '📆 Dashboards Semanais',
     '🗓️ Dashboards Mensais',
     '👥 Ranking Recorrência',
+    '🏁 Fechamentos Semanais',
     '📦 Quebras Semanais',
     '📦 Quebras Mensais',
     '🔀 Quebras Comparativo',
@@ -418,6 +580,9 @@ with tab_rec:
                 )
     else:
         st.info('Nenhum ranking disponível. Processe um PDF na página **Recorrência** primeiro.')
+
+with tab_fech:
+    _render_fechamentos_semanais()
 
 with tab_qbr_s:
     _render_quebra_secao('semanal', 'Quebras Semanais', '📦')
