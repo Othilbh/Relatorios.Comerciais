@@ -290,6 +290,128 @@ def _render_on_track():
 # Render: Fechamento Semanal
 # ---------------------------------------------------------------------------
 
+def _render_resumo_geral_inline(resultados: list, totais_rs: dict, dia: int = 5):
+    """Exibe o Resumo Geral (On Track + matriz produto × vendedor) inline."""
+    if not resultados:
+        return
+
+    vendedores = [l['vendedor'] for l in resultados[0]['linhas']]
+
+    # ── On Track KPIs ────────────────────────────────────────────────────
+    total_meta  = sum(l['meta']    for r in resultados for l in r['linhas'])
+    total_vend  = sum(l['vendido'] for r in resultados for l in r['linhas'])
+    ating_geral = total_vend / total_meta if total_meta else 0
+    proj_cx     = math.ceil(total_vend / dia * 5) if dia > 0 else 0
+    on_em, on_lb, on_cor = _on_track_status(ating_geral, dia)
+
+    st.markdown(
+        f'<div style="background:{on_cor}; color:white; padding:0.45rem 1rem; '
+        f'border-radius:8px; display:inline-block; margin-bottom:0.6rem; font-weight:600;">'
+        f'{on_em} {on_lb} — {ating_geral*100:.1f}%</div>',
+        unsafe_allow_html=True,
+    )
+    c1, c2, c3, c4, c5 = st.columns(5)
+    c1.metric('Meta total (cx)',    f'{total_meta:,.0f}')
+    c2.metric('Vendido (cx)',       f'{total_vend:,.0f}')
+    c3.metric('% Atingido',        f'{ating_geral*100:.1f}%')
+    c4.metric('Falta (cx)',        f'{total_meta - total_vend:,.0f}')
+    c5.metric('Projeção semana (cx)', f'{proj_cx:,.0f}')
+
+    tg = totais_rs.get('total_geral', {})
+    if tg:
+        f1, f2, f3, f4 = st.columns(4)
+        f1.metric('Faturamento',  f"R$ {tg.get('fat', 0):,.2f}")
+        f2.metric('MC R$',        f"R$ {tg.get('mc_rs', 0):,.2f}")
+        f3.metric('MC %',         f"{tg.get('mc_pct', 0):.2f}%")
+        f4.metric('Volume real',  f"{tg.get('vol', 0):,.0f} cx")
+
+    st.divider()
+
+    # ── On Track por Vendedor ─────────────────────────────────────────────
+    st.markdown('**On Track por Vendedor**')
+    vend_agg = {}
+    for r in resultados:
+        for l in r['linhas']:
+            v = l['vendedor']
+            if v not in vend_agg:
+                vend_agg[v] = {'meta': 0, 'vendido': 0}
+            vend_agg[v]['meta']    += l['meta']
+            vend_agg[v]['vendido'] += l['vendido']
+
+    vend_rs = totais_rs.get('vendedores', {})
+    vrows = []
+    for v, ag in vend_agg.items():
+        meta_v = ag['meta']
+        vend_v = ag['vendido']
+        atg_v  = vend_v / meta_v if meta_v else 0
+        proj_v = math.ceil(vend_v / dia * 5) if dia > 0 else 0
+        em, lb, _ = _on_track_status(atg_v, dia)
+        rs = vend_rs.get(v, {})
+        vrows.append({
+            'Vendedor':     v,
+            'Meta (cx)':   f'{meta_v:,.0f}',
+            'Vendido (cx)': f'{vend_v:,.0f}',
+            '% Atingido':  f'{atg_v*100:.1f}%',
+            'Projeção (cx)': f'{proj_v:,.0f}',
+            'Fat R$':      f"R$ {rs['fat']:,.2f}" if rs.get('fat') is not None else '—',
+            'MC %':        f"{rs['mc_pct']:.2f}%" if rs.get('mc_pct') is not None else '—',
+            'Status':      f'{em} {lb}',
+        })
+    st.dataframe(pd.DataFrame(vrows), use_container_width=True, hide_index=True)
+
+    st.divider()
+
+    # ── Resumo Geral: Matriz Produto × Vendedor ───────────────────────────
+    st.markdown('**Resumo Geral — Matriz Produto × Vendedor**')
+
+    _PRIO_ORDER = {'🚨 Grande Urgência': 0, '🔥 Alta Prioridade': 1, 'Normal': 2}
+    grupos_prio: dict = {}
+    for r in resultados:
+        prio = r.get('prioridade', 'Normal')
+        grupos_prio.setdefault(prio, []).append(r)
+
+    for prio_key in ['🚨 Grande Urgência', '🔥 Alta Prioridade', 'Normal']:
+        grupo = grupos_prio.get(prio_key)
+        if not grupo:
+            continue
+        prio_label = prio_key.replace('🚨 ', '').replace('🔥 ', '')
+        st.markdown(f'*{prio_label}*')
+
+        rows_m = []
+        for r in grupo:
+            row = {'Produto': r['produto'], 'Qtde': f"{r['estoque_total']:.0f}"}
+            p_meta = 0; p_vend = 0
+            for l in r['linhas']:
+                row[l['vendedor']] = f"{l['vendido']:.0f}/{l['meta']:.0f} ({l['atingido']*100:.0f}%)"
+                p_meta += l['meta']; p_vend += l['vendido']
+            row['TOTAL'] = f"{p_vend:.0f}/{p_meta:.0f} ({p_vend/p_meta*100:.0f}%)" if p_meta else '—'
+            rows_m.append(row)
+
+        # Linha de subtotal
+        sub = {'Produto': 'SUBTOTAL', 'Qtde': f"{sum(r['estoque_total'] for r in grupo):.0f}"}
+        for v in vendedores:
+            sv = sum(l['vendido'] for r in grupo for l in r['linhas'] if l['vendedor'] == v)
+            sm = sum(l['meta']    for r in grupo for l in r['linhas'] if l['vendedor'] == v)
+            sub[v] = f"{sv:.0f}/{sm:.0f} ({sv/sm*100:.0f}%)" if sm else '—'
+        gv = sum(l['vendido'] for r in grupo for l in r['linhas'])
+        gm = sum(l['meta']    for r in grupo for l in r['linhas'])
+        sub['TOTAL'] = f"{gv:.0f}/{gm:.0f} ({gv/gm*100:.0f}%)" if gm else '—'
+        rows_m.append(sub)
+
+        st.dataframe(pd.DataFrame(rows_m), use_container_width=True, hide_index=True)
+
+    # Total Geral
+    tot = {'Produto': 'TOTAL GERAL', 'Qtde': f"{sum(r['estoque_total'] for r in resultados):.0f}"}
+    for v in vendedores:
+        tv = sum(l['vendido'] for r in resultados for l in r['linhas'] if l['vendedor'] == v)
+        tm = sum(l['meta']    for r in resultados for l in r['linhas'] if l['vendedor'] == v)
+        tot[v] = f"{tv:.0f}/{tm:.0f} ({tv/tm*100:.0f}%)" if tm else '—'
+    gv_all = sum(l['vendido'] for r in resultados for l in r['linhas'])
+    gm_all = sum(l['meta']    for r in resultados for l in r['linhas'])
+    tot['TOTAL'] = f"{gv_all:.0f}/{gm_all:.0f} ({gv_all/gm_all*100:.0f}%)" if gm_all else '—'
+    st.dataframe(pd.DataFrame([tot]), use_container_width=True, hide_index=True)
+
+
 def _render_fechamento_semanal():
     st.header('📅 Fechamento Semanal')
 
@@ -305,23 +427,20 @@ def _render_fechamento_semanal():
         st.subheader(f'Fechar: {label_atual}')
         st.caption(f'Período configurado: **{periodo or "(não informado)"}**')
 
-        total_meta = sum(l['meta']    for r in resultados for l in r['linhas'])
-        total_vend = sum(l['vendido'] for r in resultados for l in r['linhas'])
-        atg        = total_vend / total_meta if total_meta else 0
-
-        c1, c2, c3 = st.columns(3)
-        c1.metric('Meta total (cx)', f'{total_meta:,.0f}')
-        c2.metric('Vendido (cx)',    f'{total_vend:,.0f}')
-        c3.metric('% Atingido',     f'{atg*100:.1f}%')
+        # Dia da semana (para o On Track inline)
+        dia_fech = st.slider(
+            'Dia da semana (para projeção)', 1, 5,
+            value=min(datetime.date.today().weekday() + 1, 5),
+            format='Dia %d de 5',
+            key='fech_dia',
+        )
 
         totais_rs = st.session_state.get('totais_rs', {})
-        tg = totais_rs.get('total_geral', {})
-        if tg:
-            r1, r2, r3 = st.columns(3)
-            r1.metric('Faturamento', f"R$ {tg.get('fat', 0):,.2f}")
-            r2.metric('MC R$',      f"R$ {tg.get('mc_rs', 0):,.2f}")
-            r3.metric('MC %',       f"{tg.get('mc_pct', 0):.2f}%")
 
+        # Resumo inline completo
+        _render_resumo_geral_inline(resultados, totais_rs, dia_fech)
+
+        st.divider()
         if st.button('💾 Fechar Semana e Salvar no Histórico', type='primary', key='btn_fechar'):
             try:
                 _salvar_fechamento(resultados, totais_rs, periodo, slug_atual)

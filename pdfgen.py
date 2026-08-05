@@ -239,12 +239,42 @@ def generate_relatorio_vendedor(vendedor: str, data_emissao: str,
 # 2) Dashboard
 # --------------------------------------------------------------------------
 
-def generate_dashboard(periodo: str, metas_results: list, vendedor_pcts: dict) -> bytes:
+_PRIO_LABEL_TXT = {
+    '🚨 Grande Urgência': 'Grande Urgência',
+    '🔥 Alta Prioridade': 'Alta Prioridade',
+    'Normal': '',
+}
+
+_DASHBOARD_LEVELS = [
+    dict(margin=1.2*cm, font=9,   crit_col=7.5*cm, pad=3),
+    dict(margin=0.9*cm, font=8,   crit_col=7.0*cm, pad=2),
+    dict(margin=0.6*cm, font=7.5, crit_col=6.5*cm, pad=1.5),
+    dict(margin=0.4*cm, font=7,   crit_col=6.0*cm, pad=1),
+]
+
+
+def _build_dashboard(periodo: str, metas_results: list, vendedor_pcts: dict,
+                     level: dict) -> bytes:
+    fs   = level['font']
+    pad  = level['pad']
+    mrg  = level['margin']
+    ccol = level['crit_col']
+
+    prod_style = ParagraphStyle('dp', parent=STYLES['Normal'],
+                                fontSize=fs, leading=fs * 1.2, wordWrap='LTR')
+    hdr_style = ParagraphStyle('dh', parent=STYLES['Normal'],
+                               fontSize=fs, leading=fs * 1.2, textColor=colors.white)
+    sec_style = ParagraphStyle('ds', parent=STYLES['Heading2'],
+                               fontSize=fs + 2, spaceBefore=8, spaceAfter=4)
+
     buf = io.BytesIO()
     doc = SimpleDocTemplate(buf, pagesize=landscape(A4),
-                             topMargin=1.2*cm, bottomMargin=1.2*cm,
-                             leftMargin=1.2*cm, rightMargin=1.2*cm)
-    elems = [Paragraph(f"OTHIL — DASHBOARD DE METAS | {periodo}", TITLE_STYLE)]
+                             topMargin=mrg, bottomMargin=mrg,
+                             leftMargin=mrg, rightMargin=mrg)
+
+    elems = [Paragraph(f"OTHIL — DASHBOARD DE METAS | {periodo}",
+                       ParagraphStyle('dt', parent=STYLES['Heading1'],
+                                      fontSize=14, spaceAfter=4))]
 
     meta_total, vendido_total, falta_total, pct_total = _totais(metas_results)
     criticos = [r for r in metas_results if _produto_totais(r)[3] < 0.5]
@@ -258,14 +288,16 @@ def generate_dashboard(periodo: str, metas_results: list, vendedor_pcts: dict) -
         ('BACKGROUND', (0, 0), (-1, 0), HEADER_BG),
         ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
         ('FONTNAME', (0, 1), (-1, 1), 'Helvetica-Bold'),
-        ('FONTSIZE', (0, 0), (-1, -1), 9),
+        ('FONTSIZE', (0, 0), (-1, -1), fs),
         ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+        ('TOPPADDING', (0, 0), (-1, -1), pad),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), pad),
         ('GRID', (0, 0), (-1, -1), 0.4, colors.lightgrey),
     ]))
     elems.append(card)
 
     # Ranking de vendedores
-    elems.append(Paragraph("RANKING DE VENDEDORES", SECTION_STYLE))
+    elems.append(Paragraph("RANKING DE VENDEDORES", sec_style))
     vend_agg = {}
     for v in vendedor_pcts:
         m = sum(l['meta'] for r in metas_results for l in r['linhas'] if l['vendedor'] == v)
@@ -280,11 +312,14 @@ def generate_dashboard(periodo: str, metas_results: list, vendedor_pcts: dict) -
         status = 'Andamento' if p >= 0.5 else 'Abaixo'
         rdata.append([f"{i}°", v, f"{m:.0f}", f"{ve:.1f}", f"{f:.1f}",
                       _fmt_pct(p), status, f"{vendedor_pcts[v]:.0f}%"])
-    rt = Table(rdata, repeatRows=1, colWidths=[1.2*cm, 4*cm, 3*cm, 3*cm, 3*cm, 3*cm, 3.2*cm, 2.5*cm])
+    rt = Table(rdata, repeatRows=1,
+               colWidths=[1.2*cm, 4*cm, 2.8*cm, 2.8*cm, 2.8*cm, 2.8*cm, 3*cm, 2.3*cm])
     style_cmds = [
         ('BACKGROUND', (0, 0), (-1, 0), HEADER_BG),
         ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
-        ('FONTSIZE', (0, 0), (-1, -1), 9),
+        ('FONTSIZE', (0, 0), (-1, -1), fs),
+        ('TOPPADDING', (0, 0), (-1, -1), pad),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), pad),
         ('GRID', (0, 0), (-1, -1), 0.4, colors.lightgrey),
         ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, LIGHT_BG]),
     ]
@@ -294,26 +329,34 @@ def generate_dashboard(periodo: str, metas_results: list, vendedor_pcts: dict) -
     rt.setStyle(TableStyle(style_cmds))
     elems.append(rt)
 
-    # Produtos críticos
-    elems.append(Paragraph("PRODUTOS CRITICOS — ABAIXO DE 50%", SECTION_STYLE))
+    # Produtos críticos — usa Paragraph no nome para evitar overflow
+    elems.append(Paragraph("PRODUTOS CRITICOS — ABAIXO DE 50%", sec_style))
     _PRIO_ORDER = {'🚨 Grande Urgência': 0, '🔥 Alta Prioridade': 1, 'Normal': 2}
     crit_sorted = sorted(criticos, key=lambda r: (
         _PRIO_ORDER.get(r.get('prioridade', 'Normal'), 2), _produto_totais(r)[3]))
-    cheader = ['Produto', 'Meta Total', 'Vendido', 'Falta', '% Geral', 'Melhor Vendedor']
+    cheader = [Paragraph('Produto', hdr_style), 'Meta Total', 'Vendido',
+               'Falta', '% Geral', 'Melhor Vendedor']
     cdata = [cheader]
     for r in crit_sorted:
         m, ve, f, p = _produto_totais(r)
         prio = r.get('prioridade', 'Normal')
-        nome_prod = f"{prio} {r['produto']}" if prio != 'Normal' else r['produto']
-        cdata.append([nome_prod, f"{m:.0f}", f"{ve:.1f}", f"{f:.1f}",
+        prio_txt = _PRIO_LABEL_TXT.get(prio, prio)
+        nome_raw = f"{prio_txt} {r['produto']}".strip() if prio_txt else r['produto']
+        cdata.append([Paragraph(nome_raw, prod_style),
+                      f"{m:.0f}", f"{ve:.1f}", f"{f:.1f}",
                       _fmt_pct(p), _melhor_vendedor(r) or '-'])
-    ct = Table(cdata, repeatRows=1, colWidths=[6*cm, 3*cm, 3*cm, 3*cm, 3*cm, 4*cm])
+    # Distribui espaço restante após colunas numéricas
+    num_cols = [2.2*cm, 2.2*cm, 2.2*cm, 2.2*cm, 3.0*cm]
+    ct = Table(cdata, repeatRows=1, colWidths=[ccol] + num_cols)
     ct.setStyle(TableStyle([
         ('BACKGROUND', (0, 0), (-1, 0), HEADER_BG),
         ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
-        ('FONTSIZE', (0, 0), (-1, -1), 9),
+        ('FONTSIZE', (0, 0), (-1, -1), fs),
+        ('TOPPADDING', (0, 0), (-1, -1), pad),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), pad),
         ('GRID', (0, 0), (-1, -1), 0.4, colors.lightgrey),
         ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, LIGHT_BG]),
+        ('VALIGN', (0, 0), (-1, -1), 'TOP'),
     ]))
     elems.append(ct)
 
@@ -321,55 +364,106 @@ def generate_dashboard(periodo: str, metas_results: list, vendedor_pcts: dict) -
     return buf.getvalue()
 
 
+def generate_dashboard(periodo: str, metas_results: list, vendedor_pcts: dict) -> bytes:
+    """Gera o Dashboard, reduzindo automaticamente até caber em uma única folha."""
+    last = None
+    for lv in _DASHBOARD_LEVELS:
+        last = _build_dashboard(periodo, metas_results, vendedor_pcts, lv)
+        if _count_pages(last) <= 1:
+            return last
+    return last
+
+
 # --------------------------------------------------------------------------
 # 3) Resumo Geral
 # --------------------------------------------------------------------------
 
-def generate_resumo_geral(periodo: str, data_emissao: str, metas_results: list,
-                           vendedor_pcts: dict) -> bytes:
+_PRIO_ORDER_RG = {'🚨 Grande Urgência': 0, '🔥 Alta Prioridade': 1, 'Normal': 2}
+_PRIO_LABEL_RG = {
+    '🚨 Grande Urgência': 'GRANDE URGENCIA',
+    '🔥 Alta Prioridade': 'ALTA PRIORIDADE',
+    'Normal': 'NORMAL',
+}
+_PRIO_BG_RG = {
+    '🚨 Grande Urgência': colors.HexColor('#922b21'),
+    '🔥 Alta Prioridade': colors.HexColor('#784212'),
+    'Normal': HEADER_BG,
+}
+_PRIO_TITLE_COLOR_RG = {
+    '🚨 Grande Urgência': colors.HexColor('#922b21'),
+    '🔥 Alta Prioridade': colors.HexColor('#784212'),
+    'Normal': colors.HexColor('#1B4332'),
+}
 
-    _PRIO_ORDER = {'🚨 Grande Urgência': 0, '🔥 Alta Prioridade': 1, 'Normal': 2}
-    _PRIO_LABEL = {
-        '🚨 Grande Urgência': 'GRANDE URGENCIA',
-        '🔥 Alta Prioridade': 'ALTA PRIORIDADE',
-        'Normal': 'NORMAL',
-    }
-    _PRIO_BG = {
-        '🚨 Grande Urgência': colors.HexColor('#922b21'),
-        '🔥 Alta Prioridade': colors.HexColor('#784212'),
-        'Normal': HEADER_BG,
-    }
-    _PRIO_TITLE_COLOR = {
-        '🚨 Grande Urgência': colors.HexColor('#922b21'),
-        '🔥 Alta Prioridade': colors.HexColor('#784212'),
-        'Normal': colors.HexColor('#1B4332'),
-    }
+# Níveis de compactação: tenta do primeiro (mais espaçoso) ao último (mais denso).
+# Landscape A4 disponível (com margens): ~27.7 cm largura, ~19.5 cm altura.
+_RESUMO_LEVELS = [
+    dict(margin=1.0*cm, font=7,   prod_col=4.2*cm, qtde_col=1.6*cm,
+         num_col=1.25*cm, pct_col=1.0*cm, pad=2.5, lpad=3, rpad=3,
+         spacer=0.4*cm, sec_font=10),
+    dict(margin=0.8*cm, font=6.5, prod_col=4.0*cm, qtde_col=1.5*cm,
+         num_col=1.18*cm, pct_col=0.93*cm, pad=2.0, lpad=2, rpad=2,
+         spacer=0.3*cm, sec_font=9.5),
+    dict(margin=0.6*cm, font=6,   prod_col=3.7*cm, qtde_col=1.4*cm,
+         num_col=1.1*cm,  pct_col=0.87*cm, pad=1.5, lpad=2, rpad=2,
+         spacer=0.2*cm, sec_font=9),
+    dict(margin=0.4*cm, font=5.5, prod_col=3.4*cm, qtde_col=1.3*cm,
+         num_col=1.02*cm, pct_col=0.8*cm,  pad=1.0, lpad=1, rpad=1,
+         spacer=0.1*cm, sec_font=8.5),
+]
 
-    vendedores = list(vendedor_pcts.keys())
-    col_widths = [4.2*cm, 1.6*cm] + [1.25*cm, 1.0*cm] * (len(vendedores) + 1)
+
+def _build_resumo_geral(periodo: str, data_emissao: str, metas_results: list,
+                         vendedor_pcts: dict, level: dict) -> bytes:
+    fs      = level['font']
+    pad     = level['pad']
+    lpad    = level['lpad']
+    rpad    = level['rpad']
+    mrg     = level['margin']
+    spacer  = level['spacer']
+    sf      = level['sec_font']
+
+    # Styles para células de produto (Paragraph habilita word-wrap automático)
+    prod_style = ParagraphStyle(
+        'rg_prod', parent=STYLES['Normal'],
+        fontSize=fs, leading=fs * 1.2, wordWrap='LTR',
+    )
+    sub_style = ParagraphStyle(
+        'rg_sub', parent=STYLES['Normal'],
+        fontSize=fs, leading=fs * 1.2, fontName='Helvetica-Bold', wordWrap='LTR',
+    )
+    hdr_style = ParagraphStyle(
+        'rg_hdr', parent=STYLES['Normal'],
+        fontSize=fs, leading=fs * 1.2, textColor=colors.white,
+    )
+
+    vendedores  = list(vendedor_pcts.keys())
+    col_widths  = [level['prod_col'], level['qtde_col']] + \
+                  [level['num_col'], level['pct_col']] * (len(vendedores) + 1)
 
     def _header_rows():
-        r1 = ['Produto', 'Qtde']
+        r1 = [Paragraph('Produto', hdr_style), Paragraph('Qtde', hdr_style)]
         r2 = ['', '']
         for v in vendedores:
-            r1 += [v, '']
+            r1 += [Paragraph(v, hdr_style), '']
             r2 += ['Vend', '%']
-        r1 += ['TOTAL', '']
+        r1 += [Paragraph('TOTAL', hdr_style), '']
         r2 += ['Vend', '%']
         return r1, r2
 
     def _produto_row(r):
-        row = [r['produto'], f"{r['estoque_total']:.0f}"]
+        row = [Paragraph(r['produto'], prod_style), f"{r['estoque_total']:.0f}"]
         for v in vendedores:
             l = next((x for x in r['linhas'] if x['vendedor'] == v), None)
-            row += [f"{l['vendido']:.1f}" if l else '-', _fmt_pct(l['atingido']) if l else '-']
+            row += [f"{l['vendido']:.1f}" if l else '-',
+                    _fmt_pct(l['atingido']) if l else '-']
         _, ve, _, p = _produto_totais(r)
         row += [f"{ve:.1f}", _fmt_pct(p)]
         return row
 
     def _subtotal_row(label, group):
         est = sum(r['estoque_total'] for r in group)
-        row = [label, f"{est:.0f}"]
+        row = [Paragraph(label, sub_style), f"{est:.0f}"]
         for v in vendedores:
             ve_v = sum(l['vendido'] for r in group for l in r['linhas'] if l['vendedor'] == v)
             m_v  = sum(l['meta']    for r in group for l in r['linhas'] if l['vendedor'] == v)
@@ -381,24 +475,25 @@ def generate_resumo_geral(periodo: str, data_emissao: str, metas_results: list,
 
     def _build_table(rows, bg_color):
         r1, r2 = _header_rows()
-        data = [r1, r2] + rows
+        data   = [r1, r2] + rows
         n_cols = len(r1)
         t = Table(data, repeatRows=2, colWidths=col_widths[:n_cols])
         cmds = [
-            ('BACKGROUND', (0, 0), (-1, 1), bg_color),
-            ('TEXTCOLOR', (0, 0), (-1, 1), colors.white),
-            ('FONTSIZE', (0, 0), (-1, -1), 7),
-            ('TOPPADDING', (0, 0), (-1, -1), 2.5),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 2.5),
-            ('LEFTPADDING', (0, 0), (-1, -1), 3),
-            ('RIGHTPADDING', (0, 0), (-1, -1), 3),
-            ('GRID', (0, 0), (-1, -1), 0.3, colors.lightgrey),
-            ('ALIGN', (1, 0), (-1, -1), 'CENTER'),
-            ('FONTNAME', (0, -1), (-1, -1), 'Helvetica-Bold'),
-            ('BACKGROUND', (0, -1), (-1, -1), colors.HexColor('#dfe6e9')),
-            ('ROWBACKGROUNDS', (0, 2), (-1, -2), [colors.white, LIGHT_BG]),
-            ('SPAN', (0, 0), (0, 1)),
-            ('SPAN', (1, 0), (1, 1)),
+            ('BACKGROUND',    (0, 0), (-1, 1),   bg_color),
+            ('TEXTCOLOR',     (0, 0), (-1, 1),   colors.white),
+            ('FONTSIZE',      (0, 0), (-1, -1),  fs),
+            ('TOPPADDING',    (0, 0), (-1, -1),  pad),
+            ('BOTTOMPADDING', (0, 0), (-1, -1),  pad),
+            ('LEFTPADDING',   (0, 0), (-1, -1),  lpad),
+            ('RIGHTPADDING',  (0, 0), (-1, -1),  rpad),
+            ('GRID',          (0, 0), (-1, -1),  0.3, colors.lightgrey),
+            ('ALIGN',         (1, 0), (-1, -1),  'CENTER'),
+            ('VALIGN',        (0, 0), (-1, -1),  'MIDDLE'),
+            ('FONTNAME',      (0, -1), (-1, -1), 'Helvetica-Bold'),
+            ('BACKGROUND',    (0, -1), (-1, -1), colors.HexColor('#dfe6e9')),
+            ('ROWBACKGROUNDS',(0, 2), (-1, -2),  [colors.white, LIGHT_BG]),
+            ('SPAN',          (0, 0), (0, 1)),
+            ('SPAN',          (1, 0), (1, 1)),
         ]
         col = 2
         for _ in vendedores:
@@ -409,72 +504,85 @@ def generate_resumo_geral(periodo: str, data_emissao: str, metas_results: list,
         return t
 
     # Agrupar por prioridade
-    groups = {}
+    groups: dict = {}
     for r in metas_results:
         prio = r.get('prioridade', 'Normal')
         groups.setdefault(prio, []).append(r)
 
     buf = io.BytesIO()
     doc = SimpleDocTemplate(buf, pagesize=landscape(A4),
-                             topMargin=1.0*cm, bottomMargin=1.0*cm,
-                             leftMargin=1.0*cm, rightMargin=1.0*cm)
+                             topMargin=mrg, bottomMargin=mrg,
+                             leftMargin=mrg, rightMargin=mrg)
 
     estoque_total = sum(r['estoque_total'] for r in metas_results)
     meta_total, vendido_total, falta_total, pct_total = _totais(metas_results)
 
-    elems = [Paragraph(f"OTHIL — RESUMO GERAL DE METAS | {periodo} | {data_emissao}", TITLE_STYLE)]
+    title_sty = ParagraphStyle('rg_title', parent=STYLES['Heading1'],
+                               fontSize=14, spaceAfter=4)
+    sub_info_sty = ParagraphStyle('rg_info', parent=STYLES['Normal'],
+                                  fontSize=9, textColor=colors.grey)
+
+    elems = [Paragraph(
+        f"OTHIL — RESUMO GERAL DE METAS | {periodo} | {data_emissao}", title_sty)]
     elems.append(Paragraph(
         f"Quantidade Total: {estoque_total:,.0f} cx &nbsp;&nbsp; "
         f"Meta Total: {meta_total:,.0f} cx &nbsp;&nbsp; "
         f"Vendido Total: {vendido_total:,.0f} cx &nbsp;&nbsp; "
         f"Falta: {falta_total:,.0f} cx &nbsp;&nbsp; "
         f"% Geral Atingido: {_fmt_pct(pct_total)}",
-        SUB_STYLE))
-    elems.append(Spacer(1, 0.3*cm))
+        sub_info_sty))
+    elems.append(Spacer(1, spacer * 0.8))
 
-    # Uma tabela por grupo de prioridade
     for prio_key in ['🚨 Grande Urgência', '🔥 Alta Prioridade', 'Normal']:
         group = groups.get(prio_key)
         if not group:
             continue
-
-        title_style = ParagraphStyle(
-            f'prio_{prio_key}',
+        sec_sty = ParagraphStyle(
+            f'rg_prio_{prio_key[:4]}',
             parent=STYLES['Heading2'],
-            fontSize=10,
-            spaceBefore=8,
-            spaceAfter=3,
-            textColor=_PRIO_TITLE_COLOR[prio_key],
+            fontSize=sf, spaceBefore=6, spaceAfter=2,
+            textColor=_PRIO_TITLE_COLOR_RG[prio_key],
         )
-        elems.append(Paragraph(_PRIO_LABEL[prio_key], title_style))
-
+        elems.append(Paragraph(_PRIO_LABEL_RG[prio_key], sec_sty))
         rows = [_produto_row(r) for r in group]
         rows.append(_subtotal_row('SUBTOTAL', group))
-        elems.append(_build_table(rows, _PRIO_BG[prio_key]))
-        elems.append(Spacer(1, 0.5*cm))
+        elems.append(_build_table(rows, _PRIO_BG_RG[prio_key]))
+        elems.append(Spacer(1, spacer))
 
     # Total geral consolidado
-    total_style = ParagraphStyle('total_geral', parent=STYLES['Heading2'],
-                                  fontSize=10, spaceBefore=4, spaceAfter=3,
-                                  textColor=colors.HexColor('#1B4332'))
-    elems.append(Paragraph('TOTAL GERAL', total_style))
+    tot_sty = ParagraphStyle('rg_tot', parent=STYLES['Heading2'],
+                              fontSize=sf, spaceBefore=4, spaceAfter=2,
+                              textColor=colors.HexColor('#1B4332'))
+    elems.append(Paragraph('TOTAL GERAL', tot_sty))
 
     total_row = _subtotal_row('TOTAL GERAL', metas_results)
     n_cols = 2 + (len(vendedores) + 1) * 2
     gt = Table([total_row], colWidths=col_widths[:n_cols])
     gt.setStyle(TableStyle([
-        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#1B4332')),
-        ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
-        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-        ('FONTSIZE', (0, 0), (-1, 0), 8),
-        ('ALIGN', (1, 0), (-1, 0), 'CENTER'),
-        ('TOPPADDING', (0, 0), (-1, 0), 4),
-        ('BOTTOMPADDING', (0, 0), (-1, 0), 4),
-        ('LEFTPADDING', (0, 0), (-1, 0), 3),
-        ('RIGHTPADDING', (0, 0), (-1, 0), 3),
-        ('GRID', (0, 0), (-1, 0), 0.3, colors.lightgrey),
+        ('BACKGROUND',    (0, 0), (-1, 0), colors.HexColor('#1B4332')),
+        ('TEXTCOLOR',     (0, 0), (-1, 0), colors.white),
+        ('FONTNAME',      (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('FONTSIZE',      (0, 0), (-1, 0), fs),
+        ('ALIGN',         (1, 0), (-1, 0), 'CENTER'),
+        ('VALIGN',        (0, 0), (-1, 0), 'MIDDLE'),
+        ('TOPPADDING',    (0, 0), (-1, 0), pad + 1),
+        ('BOTTOMPADDING', (0, 0), (-1, 0), pad + 1),
+        ('LEFTPADDING',   (0, 0), (-1, 0), lpad),
+        ('RIGHTPADDING',  (0, 0), (-1, 0), rpad),
+        ('GRID',          (0, 0), (-1, 0), 0.3, colors.lightgrey),
     ]))
     elems.append(gt)
 
     doc.build(elems)
     return buf.getvalue()
+
+
+def generate_resumo_geral(periodo: str, data_emissao: str, metas_results: list,
+                           vendedor_pcts: dict) -> bytes:
+    """Gera o Resumo Geral, reduzindo automaticamente até caber em uma única folha."""
+    last = None
+    for lv in _RESUMO_LEVELS:
+        last = _build_resumo_geral(periodo, data_emissao, metas_results, vendedor_pcts, lv)
+        if _count_pages(last) <= 1:
+            return last
+    return last
