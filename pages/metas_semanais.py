@@ -588,12 +588,8 @@ with tab_cfg:
 
     st.header('2. Produtos da semana')
     st.caption(
-        'Os produtos e seus códigos variam toda semana. Para cada produto, digite '
-        'a quantidade atual em estoque (a Meta é calculada a partir dela) e cole os '
-        'códigos usados para identificar as vendas desse produto no relatório de '
-        'vendas, separados por vírgula ou quebra de linha. Use um "*" no final de '
-        'um código para casar por prefixo (ex.: "3102006*" casa com qualquer código '
-        'que comece com 3102006). Sem "*", o código precisa ser exato.'
+        'Cole os códigos do relatório de vendas separados por vírgula ou linha. '
+        'Use "*" no final para prefixo (ex.: "3102006*"). Sem "*", código exato.'
     )
 
     if st.button('➕ Adicionar produto'):
@@ -606,7 +602,7 @@ with tab_cfg:
         p.setdefault('estoque', 0)
         p.setdefault('prioridade', 'Normal')
         prio_label = f' {p["prioridade"]}' if p['prioridade'] != 'Normal' else ''
-        with st.expander(f"Produto {i+1}: {p['nome'] or '(sem nome)'}{prio_label}", expanded=True):
+        with st.expander(f"Produto {i+1}: {p['nome'] or '(sem nome)'}{prio_label}", expanded=not bool(p['nome'])):
             c1, c2, c3, c4, c5 = st.columns([3, 4, 1.8, 2, 1])
             with c1:
                 p['nome'] = st.text_input('Nome do produto', value=p['nome'], key=f'nome_{i}')
