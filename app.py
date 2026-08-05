@@ -48,6 +48,10 @@ st.markdown("""
 h1, h2, h3 {
     color: #1B4332;
 }
+/* Reduzir margem superior do conteúdo */
+.block-container {
+    padding-top: 1.5rem !important;
+}
 </style>
 """, unsafe_allow_html=True)
 
