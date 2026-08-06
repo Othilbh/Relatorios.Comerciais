@@ -12,6 +12,8 @@ import pandas as pd
 _GERENCIA_DIR     = os.path.join(os.path.dirname(__file__), '..', 'gerencia_data')
 _ONTRACK_PUB_FILE = os.path.join(_GERENCIA_DIR, 'ontrack_publicado.json')
 _ONTRACK_CLI_FILE = os.path.join(_GERENCIA_DIR, 'ontrack_clientes_publicado.json')
+_ONTRACK_META_DIR = os.path.join(_GERENCIA_DIR, 'ontrack_metas')
+_ONTRACK_CLI_DIR  = os.path.join(_GERENCIA_DIR, 'ontrack_clientes')
 _QUEBRA_DIR    = os.path.join(_GERENCIA_DIR, 'quebra')
 _MESES_QBR     = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez']
 _SENHA_FALLBACK = 'othil2024'
@@ -144,6 +146,23 @@ def _render_secao_dash(tipo, titulo_secao, emoji):
         mime='text/html',
         key=f'ger_dl_{tipo}',
     )
+
+
+def _listar_ontrack_hist(directory):
+    """Lista snapshots de histórico de On Track de um diretório, mais recente primeiro."""
+    if not os.path.isdir(directory):
+        return []
+    items = []
+    for fname in sorted(os.listdir(directory), reverse=True):
+        if not fname.endswith('.json'):
+            continue
+        try:
+            with open(os.path.join(directory, fname), 'r', encoding='utf-8') as f:
+                data = json.load(f)
+            items.append((fname.replace('.json', ''), data))
+        except Exception:
+            pass
+    return items
 
 
 # ── Quebra helpers ────────────────────────────────────────────────────────────
@@ -355,15 +374,27 @@ def _on_track_status_ger(atingido: float, dia: int):
 def _render_ontrack_publicado():
     st.header('📊 On Track Atual')
 
-    if not os.path.exists(_ONTRACK_PUB_FILE):
-        st.info(
-            'Nenhum dado publicado ainda. Na página **Metas Semanais**, '
-            'calcule as metas e clique em **"📤 Publicar On Track para Gerência"**.'
-        )
-        return
+    historico_ot = _listar_ontrack_hist(_ONTRACK_META_DIR)
 
-    with open(_ONTRACK_PUB_FILE, 'r', encoding='utf-8') as f:
-        snap = json.load(f)
+    if not historico_ot:
+        # backward compat: tentar arquivo único
+        if not os.path.exists(_ONTRACK_PUB_FILE):
+            st.info(
+                'Nenhum dado publicado ainda. Na página **Metas Semanais**, '
+                'calcule as metas e clique em **"📤 Publicar On Track para Gerência"**.'
+            )
+            return
+        with open(_ONTRACK_PUB_FILE, 'r', encoding='utf-8') as f:
+            snap = json.load(f)
+    else:
+        labels_ot = [_label_fech(s) + f"  —  {d.get('periodo', '-')}" for s, d in historico_ot]
+        escolha_ot = st.selectbox(
+            f'{len(historico_ot)} semana(s) disponível(is):',
+            labels_ot,
+            index=0,
+            key='ger_ot_meta_sel',
+        )
+        snap = historico_ot[labels_ot.index(escolha_ot)][1]
 
     pub_em     = snap.get('publicado_em', '')[:16].replace('T', ' ')
     periodo    = snap.get('periodo', '—')
@@ -620,15 +651,27 @@ def _render_fechamentos_semanais():
 def _render_ontrack_clientes():
     st.header('👥 On Track Vendedor × Cliente')
 
-    if not os.path.exists(_ONTRACK_CLI_FILE):
-        st.info(
-            'Nenhum dado publicado ainda. Na página **Vendedor-Cliente**, '
-            'gere o relatório semanal e clique em **"📤 Publicar On Track para Gerência"**.'
-        )
-        return
+    historico_cli = _listar_ontrack_hist(_ONTRACK_CLI_DIR)
 
-    with open(_ONTRACK_CLI_FILE, 'r', encoding='utf-8') as f:
-        snap = json.load(f)
+    if not historico_cli:
+        # backward compat: tentar arquivo único
+        if not os.path.exists(_ONTRACK_CLI_FILE):
+            st.info(
+                'Nenhum dado publicado ainda. Na página **Vendedor-Cliente**, '
+                'gere o relatório semanal e clique em **"📤 Publicar On Track para Gerência"**.'
+            )
+            return
+        with open(_ONTRACK_CLI_FILE, 'r', encoding='utf-8') as f:
+            snap = json.load(f)
+    else:
+        labels_cli = [_label_slug(s, 'mensal') + f"  —  {d.get('periodo', '-')}" for s, d in historico_cli]
+        escolha_cli = st.selectbox(
+            f'{len(historico_cli)} mês(es) disponível(is):',
+            labels_cli,
+            index=0,
+            key='ger_ot_cli_sel',
+        )
+        snap = historico_cli[labels_cli.index(escolha_cli)][1]
 
     pub_em         = snap.get('publicado_em', '')[:16].replace('T', ' ')
     periodo        = snap.get('periodo', '—')
