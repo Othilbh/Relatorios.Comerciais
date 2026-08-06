@@ -117,3 +117,32 @@ st.markdown(
     "Use o menu lateral para acessar os módulos</div>",
     unsafe_allow_html=True,
 )
+
+# ── Frase motivacional ────────────────────────────────────────────────────────
+_FRASES = [
+    "Vender é servir. Quem serve bem, vende mais.",
+    "Resultados não acontecem por acidente — acontecem por comprometimento.",
+    "Cada cliente satisfeito é um novo começo.",
+    "O sucesso de hoje é fruto do esforço de ontem.",
+    "Foco, disciplina e atitude fazem a diferença todos os dias.",
+    "Pequenos progressos diários levam a grandes resultados.",
+    "O fruto da vida nasce de quem planta com cuidado.",
+    "Time unido, meta batida.",
+    "Consistência é o segredo dos campeões.",
+    "Um cliente bem atendido traz dez novos.",
+    "Metas existem para ser superadas.",
+    "Faça hoje o que outros deixarão para amanhã.",
+    "Qualidade não é um ato, é um hábito.",
+    "O mercado valoriza quem entrega além do esperado.",
+]
+
+frase = _FRASES[hoje.toordinal() % len(_FRASES)]
+
+st.markdown(
+    "<div style='text-align:center; margin-top:1.4rem; padding:0.9rem 1.5rem;"
+    " background:#F4F6F5; border-radius:10px; border-left:4px solid #2D6A4F;'>"
+    "<div style='font-size:0.82rem; color:#888; margin-bottom:4px; font-style:italic;'>✨ Frase do dia</div>"
+    "<div style='font-size:0.95rem; color:#1B4332; font-weight:500;'>\"" + frase + "\"</div>"
+    "</div>",
+    unsafe_allow_html=True,
+)
