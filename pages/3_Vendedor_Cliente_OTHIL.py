@@ -28,6 +28,9 @@ import pandas as pd
 _ONTRACK_CLI_FILE = os.path.join(
     os.path.dirname(__file__), '..', 'gerencia_data', 'ontrack_clientes_publicado.json'
 )
+_ONTRACK_CLI_DIR = os.path.join(
+    os.path.dirname(__file__), '..', 'gerencia_data', 'ontrack_clientes'
+)
 
 from xlsx_vendedor_cliente import (
     salvar_historico, carregar_historico, gerar_xlsx, ler_xlsx_historico,
@@ -595,7 +598,15 @@ with tab_ontrack:
                             'tem_meta':  r['_tem_meta'],
                         } for r in rows],
                     }
+                    # Arquivo atual (compatibilidade)
                     with open(_ONTRACK_CLI_FILE, 'w', encoding='utf-8') as f:
+                        json.dump(snapshot, f, ensure_ascii=False, indent=2)
+                    # Histórico por mês (usa ref_date_vc se disponível)
+                    os.makedirs(_ONTRACK_CLI_DIR, exist_ok=True)
+                    ref = st.session_state.get('ref_date_vc', datetime.today())
+                    slug_mes = ref.strftime('%Y-%m')
+                    hist_cli_path = os.path.join(_ONTRACK_CLI_DIR, f'{slug_mes}.json')
+                    with open(hist_cli_path, 'w', encoding='utf-8') as f:
                         json.dump(snapshot, f, ensure_ascii=False, indent=2)
                     st.success('✅ On Track de Clientes publicado na Gerência.')
                 except Exception as e:
