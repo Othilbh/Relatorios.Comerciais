@@ -1,21 +1,48 @@
 """Página inicial — OTHIL Relatórios Comerciais."""
 import streamlit as st
+import datetime
 
-st.markdown("""
-<div style="text-align:center; padding: 2rem 0 1rem;">
-    <div style="display:inline-block; background:#2D6A4F; color:white;
-                padding:0.6rem 1.8rem; border-radius:12px; margin-bottom:1rem;">
-        <span style="font-size:1.1rem; font-weight:600; letter-spacing:0.08em;">OTHIL</span>
+# --- Hero ---
+hoje = datetime.date.today()
+dias_pt = ["Segunda-feira", "Terça-feira", "Quarta-feira", "Quinta-feira",
+           "Sexta-feira", "Sábado", "Domingo"]
+meses_pt = ["janeiro", "fevereiro", "março", "abril", "maio", "junho",
+            "julho", "agosto", "setembro", "outubro", "novembro", "dezembro"]
+dia_semana = dias_pt[hoje.weekday()]
+data_fmt = f"{dia_semana}, {hoje.day} de {meses_pt[hoje.month - 1]} de {hoje.year}"
+
+st.markdown(f"""
+<div style="
+    background: linear-gradient(135deg, #1B4332 0%, #2D6A4F 100%);
+    border-radius: 14px;
+    padding: 1.4rem 1.8rem;
+    margin-bottom: 1.6rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+">
+    <div>
+        <div style="display:inline-block; background:rgba(255,255,255,0.15);
+                    color:#a8e6be; padding:0.3rem 1rem; border-radius:8px;
+                    font-size:0.85rem; font-weight:600; letter-spacing:0.1em;
+                    margin-bottom:0.6rem;">
+            ⬡ OTHIL
+        </div>
+        <div style="color:#fff; font-size:1.35rem; font-weight:600; margin-bottom:0.2rem;">
+            Relatórios Comerciais
+        </div>
+        <div style="color:rgba(255,255,255,0.6); font-size:0.88rem;">
+            {data_fmt}
+        </div>
     </div>
-    <h1 style="margin:0.4rem 0 0.2rem; color:#1B4332; font-size:2rem;">Relatórios Comerciais</h1>
-    <p style="color:#555; font-size:1rem; margin:0;">
-        Plataforma interna de análise de vendas, metas e lucratividade.
-    </p>
+    <div style="color:rgba(255,255,255,0.35); font-size:2.2rem; font-weight:700;
+                letter-spacing:-0.02em;">
+        OTHIL
+    </div>
 </div>
 """, unsafe_allow_html=True)
 
-st.markdown("---")
-
+# --- Cards de módulos ---
 cols = st.columns(2, gap="large")
 
 modulos = [
@@ -23,25 +50,21 @@ modulos = [
         "icon": "🎯",
         "titulo": "Metas Semanais e Responsáveis",
         "desc": "Configure os produtos da semana, percentuais por vendedor e gere os relatórios PDF de meta vs. realizado.",
-        "pagina": "Metas Semanais e Responsáveis",
     },
     {
         "icon": "📊",
         "titulo": "Relatório Diário",
         "desc": "Faça upload do PDF diário de Lucratividade e visualize o dashboard com KPIs, alertas e impacto por vendedor.",
-        "pagina": "Relatório Diário",
     },
     {
         "icon": "🔄",
         "titulo": "Recorrência de Vendas",
         "desc": "Analise a recorrência de clientes ao longo do período com a matriz cliente × produto.",
-        "pagina": "Recorrência",
     },
     {
         "icon": "👥",
         "titulo": "Vendedor-Cliente",
         "desc": "Compare desempenho de vendedores por cliente com histórico, metas e resultado real.",
-        "pagina": "Vendedor-Cliente",
     },
 ]
 
@@ -67,5 +90,4 @@ for i, mod in enumerate(modulos):
         </div>
         """, unsafe_allow_html=True)
 
-st.markdown("<br>", unsafe_allow_html=True)
 st.caption("Use o menu lateral para navegar entre os módulos.")

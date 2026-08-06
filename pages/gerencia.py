@@ -807,91 +807,104 @@ if st.button('🔒 Sair', key='_gerencia_logout'):
 
 st.divider()
 
-# ── Abas ─────────────────────────────────────────────────────────────────────
-tab_d, tab_s, tab_m, tab_rec, tab_ot, tab_ot_cli, tab_fech, tab_qbr_s, tab_qbr_m, tab_qbr_comp = st.tabs([
-    '📅 Dashboards Diários',
-    '📆 Dashboards Semanais',
-    '🗓️ Dashboards Mensais',
-    '👥 Ranking Recorrência',
-    '📊 On Track Metas',
-    '👥 On Track Clientes',
-    '🏁 Fechamentos Semanais',
-    '📦 Quebras Semanais',
-    '📦 Quebras Mensais',
-    '🔀 Quebras Comparativo',
+# ── Grupos de abas ───────────────────────────────────────────────────────────
+grp_vendas, grp_metas, grp_clientes, grp_quebras = st.tabs([
+    '📊 Vendas',
+    '🎯 Metas',
+    '👥 Clientes',
+    '📦 Quebras',
 ])
 
-with tab_d:
-    _render_secao_dash('diario', 'Dashboards Diários', '📅')
+# ── VENDAS ────────────────────────────────────────────────────────────────────
+with grp_vendas:
+    tab_d, tab_s, tab_m = st.tabs([
+        '📅 Diário',
+        '📆 Semanal',
+        '🗓️ Mensal',
+    ])
+    with tab_d:
+        _render_secao_dash('diario', 'Dashboards Diários', '📅')
+    with tab_s:
+        _render_secao_dash('semanal', 'Dashboards Semanais', '📆')
+    with tab_m:
+        _render_secao_dash('mensal', 'Dashboards Mensais', '🗓️')
 
-with tab_s:
-    _render_secao_dash('semanal', 'Dashboards Semanais', '📆')
+# ── METAS ─────────────────────────────────────────────────────────────────────
+with grp_metas:
+    tab_ot, tab_fech = st.tabs([
+        '📊 On Track',
+        '🏁 Fechamentos Semanais',
+    ])
+    with tab_ot:
+        _render_ontrack_publicado()
+    with tab_fech:
+        _render_fechamentos_semanais()
 
-with tab_m:
-    _render_secao_dash('mensal', 'Dashboards Mensais', '🗓️')
+# ── CLIENTES ──────────────────────────────────────────────────────────────────
+with grp_clientes:
+    tab_ot_cli, tab_rec = st.tabs([
+        '👥 On Track Clientes',
+        '🔄 Ranking Recorrência',
+    ])
+    with tab_ot_cli:
+        _render_ontrack_clientes()
+    with tab_rec:
+        st.header('👥 Último Ranking de Clientes — Recorrência')
+        _REC_JSON = os.path.join(_GERENCIA_DIR, 'recorrencia_latest.json')
+        if os.path.exists(_REC_JSON):
+            try:
+                with open(_REC_JSON, 'r', encoding='utf-8') as f:
+                    rec = json.load(f)
+            except Exception as e:
+                st.error(f'Erro ao carregar dados de recorrência: {e}')
+                rec = None
+            if rec:
+                periodo_r = rec.get('periodo', '-')
+                emissao_r = rec.get('emissao', '-')
+                gerado_r  = rec.get('gerado_em', '')[:16].replace('T', ' ')
+                totais    = rec.get('totais', {})
+                st.caption(f'Período: {periodo_r}  |  Emissão: {emissao_r}  |  Gerado em: {gerado_r}')
+                if totais:
+                    c1, c2, c3, c4, c5 = st.columns(5)
+                    c1.metric('Faturamento', f'R$ {totais.get("faturamento", 0):,.2f}')
+                    c2.metric('MC R$', f'R$ {totais.get("mc_rs", 0):,.2f}')
+                    c3.metric('MC %', f'{totais.get("mc_pct", 0):.2f}%')
+                    c4.metric('Total CX', f'{totais.get("caixas", 0):,.3f}')
+                    c5.metric('Clientes', totais.get('n_clientes', '-'))
+                clientes = rec.get('clientes', [])
+                if clientes:
+                    df = pd.DataFrame(clientes)
+                    top30 = df.head(30).set_index('Cliente')[['Faturamento R$']]
+                    st.subheader('Top 30 por Faturamento')
+                    st.bar_chart(top30, color='#2D6A4F')
+                    st.subheader(f'Todos os clientes ({len(df)})')
+                    styled = df.style.format({
+                        'Faturamento R$': 'R$ {:,.2f}',
+                        'Caixas': '{:,.3f}',
+                        'MC R$': 'R$ {:,.2f}',
+                        'MC %': '{:.2f}%',
+                    })
+                    st.dataframe(styled, use_container_width=True, hide_index=True)
+                    csv = df.to_csv(index=False).encode('utf-8')
+                    st.download_button(
+                        '⬇️ Baixar ranking CSV',
+                        data=csv,
+                        file_name=f'ranking_clientes_{emissao_r.replace("/","")}.csv',
+                        mime='text/csv',
+                    )
+        else:
+            st.info('Nenhum ranking disponível. Processe um PDF na página **Recorrência** primeiro.')
 
-with tab_rec:
-    st.header('👥 Último Ranking de Clientes — Recorrência')
-    _REC_JSON = os.path.join(_GERENCIA_DIR, 'recorrencia_latest.json')
-    if os.path.exists(_REC_JSON):
-        try:
-            with open(_REC_JSON, 'r', encoding='utf-8') as f:
-                rec = json.load(f)
-        except Exception as e:
-            st.error(f'Erro ao carregar dados de recorrência: {e}')
-            rec = None
-        if rec:
-            periodo_r = rec.get('periodo', '-')
-            emissao_r = rec.get('emissao', '-')
-            gerado_r  = rec.get('gerado_em', '')[:16].replace('T', ' ')
-            totais    = rec.get('totais', {})
-            st.caption(f'Período: {periodo_r}  |  Emissão: {emissao_r}  |  Gerado em: {gerado_r}')
-            if totais:
-                c1, c2, c3, c4, c5 = st.columns(5)
-                c1.metric('Faturamento', f'R$ {totais.get("faturamento", 0):,.2f}')
-                c2.metric('MC R$', f'R$ {totais.get("mc_rs", 0):,.2f}')
-                c3.metric('MC %', f'{totais.get("mc_pct", 0):.2f}%')
-                c4.metric('Total CX', f'{totais.get("caixas", 0):,.3f}')
-                c5.metric('Clientes', totais.get('n_clientes', '-'))
-            clientes = rec.get('clientes', [])
-            if clientes:
-                import pandas as pd
-                df = pd.DataFrame(clientes)
-                top30 = df.head(30).set_index('Cliente')[['Faturamento R$']]
-                st.subheader('Top 30 por Faturamento')
-                st.bar_chart(top30, color='#2D6A4F')
-                st.subheader(f'Todos os clientes ({len(df)})')
-                styled = df.style.format({
-                    'Faturamento R$': 'R$ {:,.2f}',
-                    'Caixas': '{:,.3f}',
-                    'MC R$': 'R$ {:,.2f}',
-                    'MC %': '{:.2f}%',
-                })
-                st.dataframe(styled, use_container_width=True, hide_index=True)
-                csv = df.to_csv(index=False).encode('utf-8')
-                st.download_button(
-                    '⬇️ Baixar ranking CSV',
-                    data=csv,
-                    file_name=f'ranking_clientes_{emissao_r.replace("/","")}.csv',
-                    mime='text/csv',
-                )
-    else:
-        st.info('Nenhum ranking disponível. Processe um PDF na página **Recorrência** primeiro.')
-
-with tab_ot:
-    _render_ontrack_publicado()
-
-with tab_ot_cli:
-    _render_ontrack_clientes()
-
-with tab_fech:
-    _render_fechamentos_semanais()
-
-with tab_qbr_s:
-    _render_quebra_secao('semanal', 'Quebras Semanais', '📦')
-
-with tab_qbr_m:
-    _render_quebra_secao('mensal', 'Quebras Mensais', '📦')
-
-with tab_qbr_comp:
-    _render_quebra_comparativo()
+# ── QUEBRAS ───────────────────────────────────────────────────────────────────
+with grp_quebras:
+    tab_qbr_s, tab_qbr_m, tab_qbr_comp = st.tabs([
+        '📦 Semanal',
+        '📦 Mensal',
+        '🔀 Comparativo',
+    ])
+    with tab_qbr_s:
+        _render_quebra_secao('semanal', 'Quebras Semanais', '📦')
+    with tab_qbr_m:
+        _render_quebra_secao('mensal', 'Quebras Mensais', '📦')
+    with tab_qbr_comp:
+        _render_quebra_comparativo()
