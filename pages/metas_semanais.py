@@ -22,6 +22,7 @@ import storage
 CONFIG_PATH = 'config_semanal.json'
 _FECHAMENTOS_DIR  = os.path.join(os.path.dirname(__file__), '..', 'gerencia_data', 'fechamentos')
 _ONTRACK_PUB_FILE = os.path.join(os.path.dirname(__file__), '..', 'gerencia_data', 'ontrack_publicado.json')
+_ONTRACK_META_DIR = os.path.join(os.path.dirname(__file__), '..', 'gerencia_data', 'ontrack_metas')
 
 # ---------------------------------------------------------------------------
 # Persistência da configuração da semana
@@ -774,13 +775,21 @@ with tab_cfg:
             if st.button('📤 Publicar On Track para Gerência', use_container_width=True):
                 try:
                     os.makedirs(os.path.dirname(_ONTRACK_PUB_FILE), exist_ok=True)
+                    os.makedirs(_ONTRACK_META_DIR, exist_ok=True)
                     snapshot = {
                         'publicado_em': datetime.datetime.now().isoformat(timespec='seconds'),
                         'periodo':      st.session_state.get('config', {}).get('periodo', ''),
                         'resultados':   resultados,
                         'totais_rs':    st.session_state.get('totais_rs', {}),
                     }
+                    # Arquivo atual (compatibilidade)
                     with open(_ONTRACK_PUB_FILE, 'w', encoding='utf-8') as f:
+                        json.dump(snapshot, f, ensure_ascii=False, indent=2)
+                    # Histórico por semana ISO
+                    iso = datetime.date.today().isocalendar()
+                    slug_sem = f'{iso[0]}-W{iso[1]:02d}'
+                    hist_path = os.path.join(_ONTRACK_META_DIR, f'{slug_sem}.json')
+                    with open(hist_path, 'w', encoding='utf-8') as f:
                         json.dump(snapshot, f, ensure_ascii=False, indent=2)
                     st.success('✅ On Track publicado — disponível na aba Gerência.')
                 except Exception as e:
