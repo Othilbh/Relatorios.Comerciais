@@ -23,7 +23,7 @@ _NIVEL = {
     1: '🟢 Controlado',
 }
 _ACAO = {
-    4: 'Promoção urgente / Avaliar descarte',
+    4: 'Promoção urgente / Vender urgente',
     3: 'Priorizar venda / Contatar vendedor',
     2: 'Monitorar / Ação preventiva',
     1: 'Manter monitoramento',
