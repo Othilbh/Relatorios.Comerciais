@@ -1,6 +1,7 @@
 """Página Prevenção de Perdas — Estoque Parado."""
 import datetime
 import io
+import json
 import subprocess
 import tempfile
 import os
@@ -9,6 +10,9 @@ import streamlit as st
 import pandas as pd
 
 from parsers_estoque import parse_estoque_fisico
+
+_GERENCIA_DIR   = os.path.join(os.path.dirname(__file__), '..', 'gerencia_data')
+_PREVPERDAS_DIR = os.path.join(_GERENCIA_DIR, 'prevencao_perdas')
 
 st.set_page_config(page_title="Prevenção de Perdas", layout="wide")
 
@@ -277,6 +281,45 @@ def _gerar_excel(df, titulo, emissao_str, periodo_str):
 
 # ── UI Helpers ────────────────────────────────────────────────────────────────
 
+def _publicar_gerencia(df, emissao_str, periodo_str, tipo):
+    """Salva snapshot JSON na pasta gerencia_data/prevencao_perdas/."""
+    os.makedirs(_PREVPERDAS_DIR, exist_ok=True)
+    slug = f"{datetime.date.today().strftime('%Y-%m-%d')}_{tipo}"
+    snapshot = {
+        'publicado_em': datetime.datetime.now().isoformat(),
+        'emissao':      emissao_str,
+        'periodo':      periodo_str or '',
+        'tipo':         tipo,
+        'resumo': {
+            'total':           len(df),
+            'criticos':        int((df['Prioridade'] == '🔴 Crítico').sum()),
+            'alta_prioridade': int((df['Prioridade'] == '🟠 Alta Prioridade').sum()),
+            'atencao':         int((df['Prioridade'] == '🟡 Atenção').sum()),
+            'valor_risco':     float(df['Valor em Estoque (R$)'].sum()),
+            'sem_venda_7d':    int((df['Dias sem Venda'] >= 7).sum()),
+            'estoque_30d':     int((df['Dias em Estoque'] >= 30).sum()),
+        },
+        'produtos': [
+            {
+                'prioridade':    r['Prioridade'],
+                'produto':       r['Produto'],
+                'responsavel':   r['Responsável'],
+                'dias_estoque':  int(r['Dias em Estoque']),
+                'dias_sem_venda': int(r['Dias sem Venda']),
+                'saldo_cx':      float(r['Estoque Atual (cx)']),
+                'qtd_vendida':   float(r['Qtd Vendida']),
+                'valor_estoque': float(r['Valor em Estoque (R$)']),
+                'acao':          r['Ação Recomendada'],
+            }
+            for _, r in df.iterrows()
+        ],
+    }
+    path = os.path.join(_PREVPERDAS_DIR, f'{slug}.json')
+    with open(path, 'w', encoding='utf-8') as f:
+        json.dump(snapshot, f, ensure_ascii=False, indent=2)
+    return slug
+
+
 def _pdf_to_text(uploaded_file):
     with tempfile.NamedTemporaryFile(delete=False, suffix='.pdf') as tmp:
         tmp.write(uploaded_file.read())
@@ -423,19 +466,27 @@ def _render_tab(key, titulo, upload_label, filtro_sem_venda, dias_min):
 
     # Download Excel
     excel = _gerar_excel(df_show, titulo, emissao_str, periodo_str or '')
-    if excel:
-        nome_arquivo = f"prevencao_perdas_{key}_{emissao_str.replace('/', '-')}.xlsx"
-        st.download_button(
-            "⬇️ Baixar Planilha Excel",
-            data=excel,
-            file_name=nome_arquivo,
-            mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-            type='primary',
-        )
-    else:
-        csv = df_show.to_csv(sep=';', decimal=',').encode('utf-8-sig')
-        st.download_button("⬇️ Baixar CSV", data=csv,
-                           file_name=f"prevperdas_{key}.csv", mime='text/csv')
+    col_dl, col_pub = st.columns([2, 1])
+    with col_dl:
+        if excel:
+            nome_arquivo = f"prevencao_perdas_{key}_{emissao_str.replace('/', '-')}.xlsx"
+            st.download_button(
+                "⬇️ Baixar Planilha Excel",
+                data=excel,
+                file_name=nome_arquivo,
+                mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                type='primary',
+                use_container_width=True,
+            )
+        else:
+            csv = df_show.to_csv(sep=';', decimal=',').encode('utf-8-sig')
+            st.download_button("⬇️ Baixar CSV", data=csv,
+                               file_name=f"prevperdas_{key}.csv", mime='text/csv',
+                               use_container_width=True)
+    with col_pub:
+        if st.button("📤 Publicar na Gerência", key=f'pub_{key}', use_container_width=True):
+            slug = _publicar_gerencia(df_show, emissao_str, periodo_str or '', key)
+            st.success(f"✅ Publicado! Disponível na Gerência como **{slug}**.")
 
 
 # ── Tabs ──────────────────────────────────────────────────────────────────────
