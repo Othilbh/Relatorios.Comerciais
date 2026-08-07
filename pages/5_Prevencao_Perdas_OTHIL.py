@@ -90,7 +90,7 @@ def _df_mes_estoque(produtos, emissao_date, dias=30):
         return pd.DataFrame(), cutoff
 
     df = pd.DataFrame(filtrado)
-    df['dias_estoque'] = (emissao_date - df['data_entrada']).dt.days
+    df['dias_estoque'] = df['data_entrada'].apply(lambda d: (emissao_date - d).days)
     df = df[['codigo', 'produto', 'complemento', 'data_entrada_str',
              'dias_estoque', 'saldo_atual', 'custo_unit', 'valor_estoque']].copy()
     df.columns = ['Código', 'Produto', 'Depto', 'Data Entrada',
