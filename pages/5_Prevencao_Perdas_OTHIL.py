@@ -589,103 +589,11 @@ def _render_alerta_recebimento():
                          column_config={'Saldo (cx)': st.column_config.NumberColumn(format='%.3f')})
 
 
-# ── Registrar Perda Realizada ─────────────────────────────────────────────────
-
-def _salvar_perda(produto, data, qtd_cx, valor_rs, motivo, obs):
-    import uuid
-    os.makedirs(_PERDAS_DIR, exist_ok=True)
-    mes_slug = data.strftime('%Y-%m')
-    path     = os.path.join(_PERDAS_DIR, f'{mes_slug}.json')
-
-    registro = {
-        'id':            str(uuid.uuid4())[:8],
-        'data':          data.strftime('%d/%m/%Y'),
-        'produto':       produto,
-        'quantidade_cx': qtd_cx,
-        'valor_rs':      valor_rs,
-        'motivo':        motivo,
-        'observacao':    obs,
-        'registrado_em': datetime.datetime.now().isoformat(),
-    }
-
-    lista = []
-    if os.path.exists(path):
-        try:
-            with open(path, 'r', encoding='utf-8') as f:
-                lista = json.load(f)
-        except Exception:
-            lista = []
-
-    lista.append(registro)
-    with open(path, 'w', encoding='utf-8') as f:
-        json.dump(lista, f, ensure_ascii=False, indent=2)
-    return mes_slug
-
-
-def _render_registrar_perda():
-    st.subheader("📋 Registrar Perda Realizada")
-    st.info("Registre produtos descartados, devolvidos ou vendidos abaixo do custo. "
-            "O histórico fica disponível na Gerência.")
-
-    _MOTIVOS = ['Excesso de Estoque', 'Qualidade', 'Vencimento',
-                'Dano no Transporte', 'Outro']
-
-    with st.form('form_perda', clear_on_submit=True):
-        c1, c2 = st.columns(2)
-        produto  = c1.text_input("Produto *", placeholder="Ex: PACKMANS 110 JOSELIA VERDE")
-        data_p   = c2.date_input("Data da Perda *", value=datetime.date.today())
-
-        c3, c4 = st.columns(2)
-        qtd_cx   = c3.number_input("Quantidade (cx) *", min_value=0.0, step=0.5, format="%.3f")
-        valor_rs = c4.number_input("Valor Total (R$) *", min_value=0.0, step=1.0, format="%.2f")
-
-        motivo = st.selectbox("Motivo *", _MOTIVOS)
-        obs    = st.text_area("Observação", height=68, placeholder="Detalhes adicionais...")
-
-        if st.form_submit_button("💾 Salvar Perda", type='primary', use_container_width=True):
-            if not produto.strip():
-                st.error("Informe o nome do produto.")
-            elif qtd_cx <= 0 and valor_rs <= 0:
-                st.error("Informe quantidade ou valor.")
-            else:
-                slug = _salvar_perda(produto.strip(), data_p, qtd_cx, valor_rs, motivo, obs)
-                st.success(f"✅ Perda registrada! Disponível na Gerência ({slug}).")
-
-    # Histórico do mês atual
-    mes_slug = datetime.date.today().strftime('%Y-%m')
-    path     = os.path.join(_PERDAS_DIR, f'{mes_slug}.json')
-    if os.path.exists(path):
-        try:
-            with open(path, 'r', encoding='utf-8') as f:
-                lista = json.load(f)
-            if lista:
-                st.divider()
-                total_cx  = sum(r.get('quantidade_cx', 0) for r in lista)
-                total_val = sum(r.get('valor_rs', 0) for r in lista)
-                st.subheader(f"Perdas registradas este mês — {len(lista)} registro(s)")
-                c1, c2, c3 = st.columns(3)
-                c1.metric("Registros", len(lista))
-                c2.metric("Total CX", f"{total_cx:,.3f}".replace(',','X').replace('.',',').replace('X','.'))
-                tv = f"R$ {total_val:,.2f}".replace(',','X').replace('.',',').replace('X','.')
-                c3.metric("Valor total perdido", tv)
-
-                df_p = pd.DataFrame(lista)[['data','produto','quantidade_cx','valor_rs','motivo','observacao']]
-                df_p.columns = ['Data','Produto','CX','Valor (R$)','Motivo','Observação']
-                st.dataframe(df_p, use_container_width=True, hide_index=True,
-                             column_config={
-                                 'CX':       st.column_config.NumberColumn(format='%.3f'),
-                                 'Valor (R$)': st.column_config.NumberColumn(format='R$ %.2f'),
-                             })
-        except Exception:
-            pass
-
-
 # ── Tabs ──────────────────────────────────────────────────────────────────────
-tab1, tab2, tab3, tab4 = st.tabs([
+tab1, tab2, tab3 = st.tabs([
     "🕐 1 Semana Sem Venda",
     "📦 1 Mês em Estoque",
     "🔔 Alerta de Recebimento",
-    "📋 Registrar Perda",
 ])
 
 with tab1:
@@ -718,6 +626,3 @@ with tab2:
 
 with tab3:
     _render_alerta_recebimento()
-
-with tab4:
-    _render_registrar_perda()
