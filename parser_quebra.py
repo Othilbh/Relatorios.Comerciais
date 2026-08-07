@@ -5,29 +5,12 @@ O PDF contém blocos por grupo de produto. Cada bloco termina com uma linha
 """
 import re
 import pdfplumber
+from categorias import map_categoria
 
 _VENDEDORES = {
     'AFANAIS', 'DORA', 'FARLEY', 'LUCA', 'LUCIANO', 'REGINALDO',
     'RONI', 'RONISTONIS', 'JULIANA', 'CLAUDIA',
 }
-
-# Prefixos do código do grupo → categoria legível
-_CATEGORIAS = [
-    ('1.1.01',    'Pera'),
-    ('1.1.02.01', 'Maçã Argentina'),
-    ('1.1.02.02', 'Maçã Dom. (Gala / Fuji)'),
-    ('1.1.03',    'Uva'),
-    ('1.1.04.01', 'Frutas (Ameixa / Pêssego / Mamão)'),
-    ('1.1.04.02', 'Melão / Frutas Tropicais'),
-    ('1.1.04.06', 'Outros'),
-]
-
-
-def _categorizar(codigo: str) -> str:
-    for prefixo, nome in _CATEGORIAS:
-        if codigo.startswith(prefixo):
-            return nome
-    return 'Outros'
 
 
 def _parse_num(s: str) -> float:
@@ -105,7 +88,7 @@ def parse_quebra(pdf_file) -> dict:
                         grupos.append({
                             'grupo': grupo_nome,
                             'codigo': grupo_codigo or '',
-                            'categoria': _categorizar(grupo_codigo or ''),
+                            'categoria': map_categoria(grupo_nome),
                             'cx': cx,
                         })
                 except (ValueError, IndexError):
