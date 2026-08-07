@@ -21,7 +21,6 @@ st.caption(
 # ---------------------------------------------------------------------------
 
 def _pdf_to_text(uploaded_file):
-    """Converte PDF enviado pelo usuário em texto usando pdftotext -layout."""
     with tempfile.NamedTemporaryFile(delete=False, suffix='.pdf') as tmp:
         tmp.write(uploaded_file.read())
         tmp_path = tmp.name
@@ -45,7 +44,6 @@ def _pdf_to_text(uploaded_file):
 
 
 def _fmt_float(v):
-    """Formata número com vírgula decimal, ex: 1.234,56."""
     return f"{v:,.3f}".replace(',', 'X').replace('.', ',').replace('X', '.')
 
 
@@ -53,13 +51,11 @@ def _fmt_moeda(v):
     return f"R$ {v:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
 
 
-def _render_metricas(df, label_saldo='Saldo (cx)', saldo_col='Saldo (cx)', valor_col='Valor Estoque'):
+def _render_metricas(n_produtos, total_cx, total_valor):
     c1, c2, c3 = st.columns(3)
-    c1.metric("Produtos encontrados", len(df))
-    total_saldo = df[saldo_col].sum()
-    c2.metric(label_saldo, _fmt_float(total_saldo))
-    total_valor = df[valor_col].sum()
-    c3.metric("Valor em estoque", _fmt_moeda(total_valor))
+    c1.metric("Produtos encontrados", n_produtos)
+    c2.metric("Total em estoque (cx)", _fmt_float(total_cx))
+    c3.metric("Valor parado", _fmt_moeda(total_valor))
 
 
 def _df_sem_venda(produtos):
@@ -71,11 +67,12 @@ def _df_sem_venda(produtos):
     if not filtrado:
         return pd.DataFrame()
     df = pd.DataFrame(filtrado)
-    df = df[['codigo', 'produto', 'complemento', 'saldo_atual',
-             'custo_unit', 'valor_estoque', 'data_entrada_str']].copy()
-    df.columns = ['Código', 'Produto', 'Depto', 'Saldo (cx)',
-                  'Custo Unit.', 'Valor Estoque', 'Data Entrada']
-    df = df.sort_values('Valor Estoque', ascending=False).reset_index(drop=True)
+    df = df[['produto', 'complemento', 'saldo_atual', 'custo_unit',
+             'valor_estoque', 'data_entrada_str']].copy()
+    df.columns = ['Produto', 'Depto', 'Saldo (cx)', 'Custo Unit. (R$)',
+                  'Valor em Estoque (R$)', 'Data Entrada']
+    df = df.sort_values('Valor em Estoque (R$)', ascending=False).reset_index(drop=True)
+    df.index += 1
     return df
 
 
@@ -91,12 +88,27 @@ def _df_mes_estoque(produtos, emissao_date, dias=30):
 
     df = pd.DataFrame(filtrado)
     df['dias_estoque'] = df['data_entrada'].apply(lambda d: (emissao_date - d).days)
-    df = df[['codigo', 'produto', 'complemento', 'data_entrada_str',
-             'dias_estoque', 'saldo_atual', 'custo_unit', 'valor_estoque']].copy()
-    df.columns = ['Código', 'Produto', 'Depto', 'Data Entrada',
-                  'Dias em Estoque', 'Saldo (cx)', 'Custo Unit.', 'Valor Estoque']
+    df = df[['produto', 'complemento', 'data_entrada_str', 'dias_estoque',
+             'saldo_atual', 'custo_unit', 'valor_estoque']].copy()
+    df.columns = ['Produto', 'Depto', 'Data Entrada', 'Dias em Estoque',
+                  'Saldo (cx)', 'Custo Unit. (R$)', 'Valor em Estoque (R$)']
     df = df.sort_values('Dias em Estoque', ascending=False).reset_index(drop=True)
+    df.index += 1
     return df, cutoff
+
+
+def _col_config_base():
+    return {
+        'Saldo (cx)': st.column_config.NumberColumn(
+            'Saldo (cx)', format="%.3f"
+        ),
+        'Custo Unit. (R$)': st.column_config.NumberColumn(
+            'Custo Unit. (R$)', format="R$ %.2f"
+        ),
+        'Valor em Estoque (R$)': st.column_config.NumberColumn(
+            'Valor em Estoque (R$)', format="R$ %.2f"
+        ),
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -125,12 +137,12 @@ with tab1:
 
         if texto:
             dados = parse_estoque_fisico(texto)
-            emissao = dados['emissao']
-            periodo = dados['periodo']
+            emissao  = dados['emissao']
+            periodo  = dados['periodo']
             produtos = dados['produtos']
 
             st.success(
-                f"PDF lido com sucesso · Emissão: **{emissao}** · "
+                f"PDF lido · Emissão: **{emissao}** · "
                 f"Período desde: **{periodo}** · "
                 f"Total no relatório: **{len(produtos)} produtos**"
             )
@@ -143,17 +155,19 @@ with tab1:
                 st.warning(
                     f"⚠️ **{len(df)} produto(s)** com saldo em estoque e **zero vendas** na semana."
                 )
-                _render_metricas(df, label_saldo='Total cx paradas')
+                _render_metricas(
+                    len(df),
+                    df['Saldo (cx)'].sum(),
+                    df['Valor em Estoque (R$)'].sum(),
+                )
 
-                # Formatar para exibição
-                df_show = df.copy()
-                df_show['Saldo (cx)']     = df_show['Saldo (cx)'].apply(_fmt_float)
-                df_show['Custo Unit.']    = df_show['Custo Unit.'].apply(_fmt_moeda)
-                df_show['Valor Estoque']  = df_show['Valor Estoque'].apply(_fmt_moeda)
-                st.dataframe(df_show, use_container_width=True, hide_index=True)
+                st.dataframe(
+                    df,
+                    use_container_width=True,
+                    column_config=_col_config_base(),
+                )
 
-                # Download CSV
-                csv = df.to_csv(index=False, sep=';', decimal=',').encode('utf-8-sig')
+                csv = df.to_csv(sep=';', decimal=',').encode('utf-8-sig')
                 st.download_button(
                     "⬇️ Baixar CSV",
                     data=csv,
@@ -180,13 +194,13 @@ with tab2:
             texto2 = _pdf_to_text(uploaded2)
 
         if texto2:
-            dados2 = parse_estoque_fisico(texto2)
+            dados2       = parse_estoque_fisico(texto2)
             emissao2     = dados2['emissao']
             emissao_date = dados2['emissao_date']
             produtos2    = dados2['produtos']
 
             st.success(
-                f"PDF lido com sucesso · Emissão: **{emissao2}** · "
+                f"PDF lido · Emissão: **{emissao2}** · "
                 f"Total no relatório: **{len(produtos2)} produtos**"
             )
 
@@ -199,17 +213,24 @@ with tab2:
                     f"⚠️ **{len(df2)} produto(s)** com **mais de 30 dias em estoque** "
                     f"(entrada antes de {cutoff.strftime('%d/%m/%Y')})."
                 )
-                _render_metricas(df2, label_saldo='Total cx paradas')
+                _render_metricas(
+                    len(df2),
+                    df2['Saldo (cx)'].sum(),
+                    df2['Valor em Estoque (R$)'].sum(),
+                )
 
-                # Formatar para exibição
-                df_show2 = df2.copy()
-                df_show2['Saldo (cx)']    = df_show2['Saldo (cx)'].apply(_fmt_float)
-                df_show2['Custo Unit.']   = df_show2['Custo Unit.'].apply(_fmt_moeda)
-                df_show2['Valor Estoque'] = df_show2['Valor Estoque'].apply(_fmt_moeda)
-                st.dataframe(df_show2, use_container_width=True, hide_index=True)
+                col_cfg2 = _col_config_base()
+                col_cfg2['Dias em Estoque'] = st.column_config.NumberColumn(
+                    'Dias em Estoque', format="%d dias"
+                )
 
-                # Download CSV
-                csv2 = df2.to_csv(index=False, sep=';', decimal=',').encode('utf-8-sig')
+                st.dataframe(
+                    df2,
+                    use_container_width=True,
+                    column_config=col_cfg2,
+                )
+
+                csv2 = df2.to_csv(sep=';', decimal=',').encode('utf-8-sig')
                 st.download_button(
                     "⬇️ Baixar CSV",
                     data=csv2,
