@@ -13,6 +13,7 @@ from parsers_estoque import parse_estoque_fisico
 
 _GERENCIA_DIR   = os.path.join(os.path.dirname(__file__), '..', 'gerencia_data')
 _PREVPERDAS_DIR = os.path.join(_GERENCIA_DIR, 'prevencao_perdas')
+_PERDAS_DIR     = os.path.join(_GERENCIA_DIR, 'perdas_realizadas')
 
 st.set_page_config(page_title="Prevenção de Perdas", layout="wide")
 
@@ -491,8 +492,201 @@ def _render_tab(key, titulo, upload_label, filtro_sem_venda, dias_min):
             st.success(f"✅ Publicado! Disponível na Gerência como **{slug}**.")
 
 
+# ── Alerta de Recebimento ─────────────────────────────────────────────────────
+
+def _carregar_pp_mais_recente():
+    """Retorna o snapshot de PP mais recente publicado (qualquer tipo)."""
+    if not os.path.isdir(_PREVPERDAS_DIR):
+        return None
+    arquivos = sorted([f for f in os.listdir(_PREVPERDAS_DIR) if f.endswith('.json')], reverse=True)
+    if not arquivos:
+        return None
+    try:
+        with open(os.path.join(_PREVPERDAS_DIR, arquivos[0]), 'r', encoding='utf-8') as f:
+            return json.load(f)
+    except Exception:
+        return None
+
+
+def _render_alerta_recebimento():
+    st.subheader("🔔 Alerta de Recebimento")
+    st.info(
+        "Envie o **Estoque Físico do dia**. O app identifica produtos que "
+        "**entraram hoje** e que **já estão na lista de estoque parado** — "
+        "sinal de que está sendo comprado mais do que se consegue girar."
+    )
+
+    snap = _carregar_pp_mais_recente()
+    if not snap:
+        st.warning("Nenhum dado de Prevenção de Perdas publicado ainda. "
+                   "Publique primeiro nas abas 1 ou 2.")
+        return
+
+    nomes_pp = {p['produto'].strip().upper() for p in snap.get('produtos', [])}
+    tipo_pp  = '1 Semana Sem Venda' if snap.get('tipo') == 'sem_venda' else '1 Mês em Estoque'
+    pub_em   = snap.get('publicado_em', '')[:10]
+    st.caption(f"Comparando com: snapshot **{tipo_pp}** publicado em **{pub_em}** "
+               f"({len(nomes_pp)} produtos em alerta)")
+
+    uploaded = st.file_uploader("Estoque Físico — Do dia atual (PDF)",
+                                 type='pdf', key='up_receb')
+    if not uploaded:
+        return
+
+    with st.spinner("Processando PDF..."):
+        texto = _pdf_to_text(uploaded)
+    if not texto:
+        st.error("Não foi possível processar o PDF.")
+        return
+
+    dados        = parse_estoque_fisico(texto)
+    emissao_date = dados['emissao_date']
+    emissao_str  = dados['emissao']
+    produtos     = dados['produtos']
+
+    recebidos = [p for p in produtos if p['data_entrada'] == emissao_date]
+
+    st.success(
+        f"PDF lido · Emissão: **{emissao_str}** · "
+        f"**{len(recebidos)}** produto(s) com entrada hoje"
+    )
+
+    if not recebidos:
+        st.info("Nenhum produto com entrada na data de emissão.")
+        return
+
+    alertas = [p for p in recebidos if p['produto'].strip().upper() in nomes_pp]
+    sem_alerta = [p for p in recebidos if p not in alertas]
+
+    if not alertas:
+        st.success(f"✅ Nenhum dos {len(recebidos)} produtos recebidos hoje "
+                   "consta na lista de estoque parado.")
+    else:
+        st.error(f"⚠️ **{len(alertas)} produto(s) recebido(s) hoje JÁ ESTÃO "
+                 "na lista de estoque parado!**")
+        df_al = pd.DataFrame([{
+            'Produto':              p['produto'],
+            'Responsável':         p['complemento'],
+            'Saldo em Estoque (cx)': p['saldo_atual'],
+            'Custo Unit. (R$)':    p['custo_unit'],
+            'Valor Parado (R$)':   p['valor_estoque'],
+        } for p in alertas])
+        st.dataframe(df_al, use_container_width=True, hide_index=True,
+                     column_config={
+                         'Saldo em Estoque (cx)': st.column_config.NumberColumn(format='%.3f'),
+                         'Custo Unit. (R$)':      st.column_config.NumberColumn(format='R$ %.2f'),
+                         'Valor Parado (R$)':     st.column_config.NumberColumn(format='R$ %.2f'),
+                     })
+
+    if sem_alerta:
+        with st.expander(f"Ver {len(sem_alerta)} produto(s) recebidos hoje sem alerta"):
+            df_sa = pd.DataFrame([{
+                'Produto':      p['produto'],
+                'Responsável':  p['complemento'],
+                'Saldo (cx)':   p['saldo_atual'],
+            } for p in sem_alerta])
+            st.dataframe(df_sa, use_container_width=True, hide_index=True,
+                         column_config={'Saldo (cx)': st.column_config.NumberColumn(format='%.3f')})
+
+
+# ── Registrar Perda Realizada ─────────────────────────────────────────────────
+
+def _salvar_perda(produto, data, qtd_cx, valor_rs, motivo, obs):
+    import uuid
+    os.makedirs(_PERDAS_DIR, exist_ok=True)
+    mes_slug = data.strftime('%Y-%m')
+    path     = os.path.join(_PERDAS_DIR, f'{mes_slug}.json')
+
+    registro = {
+        'id':            str(uuid.uuid4())[:8],
+        'data':          data.strftime('%d/%m/%Y'),
+        'produto':       produto,
+        'quantidade_cx': qtd_cx,
+        'valor_rs':      valor_rs,
+        'motivo':        motivo,
+        'observacao':    obs,
+        'registrado_em': datetime.datetime.now().isoformat(),
+    }
+
+    lista = []
+    if os.path.exists(path):
+        try:
+            with open(path, 'r', encoding='utf-8') as f:
+                lista = json.load(f)
+        except Exception:
+            lista = []
+
+    lista.append(registro)
+    with open(path, 'w', encoding='utf-8') as f:
+        json.dump(lista, f, ensure_ascii=False, indent=2)
+    return mes_slug
+
+
+def _render_registrar_perda():
+    st.subheader("📋 Registrar Perda Realizada")
+    st.info("Registre produtos descartados, devolvidos ou vendidos abaixo do custo. "
+            "O histórico fica disponível na Gerência.")
+
+    _MOTIVOS = ['Excesso de Estoque', 'Qualidade', 'Vencimento',
+                'Dano no Transporte', 'Outro']
+
+    with st.form('form_perda', clear_on_submit=True):
+        c1, c2 = st.columns(2)
+        produto  = c1.text_input("Produto *", placeholder="Ex: PACKMANS 110 JOSELIA VERDE")
+        data_p   = c2.date_input("Data da Perda *", value=datetime.date.today())
+
+        c3, c4 = st.columns(2)
+        qtd_cx   = c3.number_input("Quantidade (cx) *", min_value=0.0, step=0.5, format="%.3f")
+        valor_rs = c4.number_input("Valor Total (R$) *", min_value=0.0, step=1.0, format="%.2f")
+
+        motivo = st.selectbox("Motivo *", _MOTIVOS)
+        obs    = st.text_area("Observação", height=68, placeholder="Detalhes adicionais...")
+
+        if st.form_submit_button("💾 Salvar Perda", type='primary', use_container_width=True):
+            if not produto.strip():
+                st.error("Informe o nome do produto.")
+            elif qtd_cx <= 0 and valor_rs <= 0:
+                st.error("Informe quantidade ou valor.")
+            else:
+                slug = _salvar_perda(produto.strip(), data_p, qtd_cx, valor_rs, motivo, obs)
+                st.success(f"✅ Perda registrada! Disponível na Gerência ({slug}).")
+
+    # Histórico do mês atual
+    mes_slug = datetime.date.today().strftime('%Y-%m')
+    path     = os.path.join(_PERDAS_DIR, f'{mes_slug}.json')
+    if os.path.exists(path):
+        try:
+            with open(path, 'r', encoding='utf-8') as f:
+                lista = json.load(f)
+            if lista:
+                st.divider()
+                total_cx  = sum(r.get('quantidade_cx', 0) for r in lista)
+                total_val = sum(r.get('valor_rs', 0) for r in lista)
+                st.subheader(f"Perdas registradas este mês — {len(lista)} registro(s)")
+                c1, c2, c3 = st.columns(3)
+                c1.metric("Registros", len(lista))
+                c2.metric("Total CX", f"{total_cx:,.3f}".replace(',','X').replace('.',',').replace('X','.'))
+                tv = f"R$ {total_val:,.2f}".replace(',','X').replace('.',',').replace('X','.')
+                c3.metric("Valor total perdido", tv)
+
+                df_p = pd.DataFrame(lista)[['data','produto','quantidade_cx','valor_rs','motivo','observacao']]
+                df_p.columns = ['Data','Produto','CX','Valor (R$)','Motivo','Observação']
+                st.dataframe(df_p, use_container_width=True, hide_index=True,
+                             column_config={
+                                 'CX':       st.column_config.NumberColumn(format='%.3f'),
+                                 'Valor (R$)': st.column_config.NumberColumn(format='R$ %.2f'),
+                             })
+        except Exception:
+            pass
+
+
 # ── Tabs ──────────────────────────────────────────────────────────────────────
-tab1, tab2 = st.tabs(["🕐 1 Semana Sem Venda", "📦 1 Mês em Estoque"])
+tab1, tab2, tab3, tab4 = st.tabs([
+    "🕐 1 Semana Sem Venda",
+    "📦 1 Mês em Estoque",
+    "🔔 Alerta de Recebimento",
+    "📋 Registrar Perda",
+])
 
 with tab1:
     st.subheader("1 Semana Sem Venda")
@@ -521,3 +715,9 @@ with tab2:
         filtro_sem_venda=False,
         dias_min=30,
     )
+
+with tab3:
+    _render_alerta_recebimento()
+
+with tab4:
+    _render_registrar_perda()
