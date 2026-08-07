@@ -89,19 +89,39 @@ def _render_dashboard(dados: dict, tipo: str, slug: str):
             f"{top_cat['cx']:,.0f} cx"
         )
 
+    # Filtro por categoria
+    grupos = dados.get('grupos', [])
+    categorias_disponiveis = sorted({g['categoria'] for g in grupos})
+
+    cats_sel = st.multiselect(
+        '🔍 Filtrar por categoria:',
+        options=categorias_disponiveis,
+        default=categorias_disponiveis,
+        key=f'qbr_cat_filter_{slug}',
+    )
+
+    grupos_filtrados = [g for g in grupos if g['categoria'] in cats_sel] if cats_sel else []
+
+    # Recalcula categorias com base no filtro
+    cat_dict: dict[str, float] = {}
+    for g in grupos_filtrados:
+        cat_dict[g['categoria']] = cat_dict.get(g['categoria'], 0.0) + g['cx']
+    categorias_filtradas = sorted(cat_dict.items(), key=lambda x: -x[1])
+
     # Gráfico por categoria
-    if categorias:
+    if categorias_filtradas:
         st.subheader('Por Categoria de Produto')
-        df_cat = pd.DataFrame(categorias).set_index('categoria')
+        df_cat = pd.DataFrame(categorias_filtradas, columns=['categoria', 'cx']).set_index('categoria')
         st.bar_chart(df_cat['cx'], color='#2D6A4F')
 
     # Tabela por grupo
-    grupos = dados.get('grupos', [])
-    if grupos:
+    if grupos_filtrados:
         st.subheader('Por Grupo de Produto')
-        df_g = pd.DataFrame(grupos)[['grupo', 'categoria', 'cx']]
+        df_g = pd.DataFrame(grupos_filtrados)[['grupo', 'categoria', 'cx']]
         df_g.columns = ['Grupo', 'Categoria', 'CX Quebradas']
         st.dataframe(df_g, use_container_width=True, hide_index=True)
+    elif cats_sel:
+        st.info('Nenhum grupo encontrado para a seleção.')
 
     # Download JSON
     st.download_button(
