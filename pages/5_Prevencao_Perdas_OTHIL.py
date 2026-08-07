@@ -53,10 +53,10 @@ def _fmt_moeda(v):
     return f"R$ {v:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
 
 
-def _render_metricas(df, label_saldo='Saldo (cx)', valor_col='valor_estoque'):
+def _render_metricas(df, label_saldo='Saldo (cx)', saldo_col='Saldo (cx)', valor_col='Valor Estoque'):
     c1, c2, c3 = st.columns(3)
     c1.metric("Produtos encontrados", len(df))
-    total_saldo = df['saldo_atual'].sum()
+    total_saldo = df[saldo_col].sum()
     c2.metric(label_saldo, _fmt_float(total_saldo))
     total_valor = df[valor_col].sum()
     c3.metric("Valor em estoque", _fmt_moeda(total_valor))
