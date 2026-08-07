@@ -14,7 +14,8 @@ _ONTRACK_PUB_FILE = os.path.join(_GERENCIA_DIR, 'ontrack_publicado.json')
 _ONTRACK_CLI_FILE = os.path.join(_GERENCIA_DIR, 'ontrack_clientes_publicado.json')
 _ONTRACK_META_DIR = os.path.join(_GERENCIA_DIR, 'ontrack_metas')
 _ONTRACK_CLI_DIR  = os.path.join(_GERENCIA_DIR, 'ontrack_clientes')
-_QUEBRA_DIR    = os.path.join(_GERENCIA_DIR, 'quebra')
+_QUEBRA_DIR       = os.path.join(_GERENCIA_DIR, 'quebra')
+_PREVPERDAS_DIR   = os.path.join(_GERENCIA_DIR, 'prevencao_perdas')
 _MESES_QBR     = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez']
 _SENHA_FALLBACK = 'othil2024'
 
@@ -831,6 +832,116 @@ def _render_ontrack_clientes():
     st.dataframe(pd.DataFrame(df_rows), use_container_width=True, hide_index=True)
 
 
+# ── Prevenção de Perdas ───────────────────────────────────────────────────────
+
+_NIVEL_COR = {
+    '🔴 Crítico':         '#FFDADA',
+    '🟠 Alta Prioridade': '#FFE8CC',
+    '🟡 Atenção':         '#FFF9CC',
+    '🟢 Controlado':      '#D8F3DC',
+}
+
+
+def _prevperdas_listar(tipo):
+    """Lista snapshots de prevenção de perdas de um tipo (sem_venda / mes_estoque)."""
+    if not os.path.isdir(_PREVPERDAS_DIR):
+        return []
+    items = []
+    for fname in sorted(os.listdir(_PREVPERDAS_DIR), reverse=True):
+        if not fname.endswith('.json') or tipo not in fname:
+            continue
+        try:
+            with open(os.path.join(_PREVPERDAS_DIR, fname), 'r', encoding='utf-8') as f:
+                data = json.load(f)
+            items.append((fname.replace('.json', ''), data))
+        except Exception:
+            pass
+    return items
+
+
+def _render_prevperdas_secao(tipo, titulo):
+    st.header(f'🚨 {titulo}')
+    historico = _prevperdas_listar(tipo)
+
+    if not historico:
+        st.info(
+            'Nenhum dado publicado ainda. Na página **Prevenção de Perdas**, '
+            'processe um PDF e clique em **"📤 Publicar na Gerência"**.'
+        )
+        return
+
+    # Selectbox de datas
+    labels = []
+    for slug, d in historico:
+        data_str = slug.split('_')[0]  # YYYY-MM-DD
+        try:
+            dt = datetime.datetime.strptime(data_str, '%Y-%m-%d')
+            label = dt.strftime('%d/%m/%Y')
+        except Exception:
+            label = data_str
+        pub = d.get('publicado_em', '')[:16].replace('T', ' ')
+        labels.append(f"{label}  —  Publicado: {pub}")
+
+    escolha = st.selectbox(f'{len(historico)} publicação(ões):', labels, index=0,
+                            key=f'ger_pp_sel_{tipo}')
+    snap = historico[labels.index(escolha)][1]
+
+    resumo = snap.get('resumo', {})
+    emissao = snap.get('emissao', '-')
+    periodo = snap.get('periodo', '')
+
+    st.caption(
+        f"Emissão: **{emissao}**"
+        + (f"  |  Período desde: **{periodo}**" if periodo else "")
+        + f"  |  Publicado em: **{snap.get('publicado_em','')[:16].replace('T',' ')}**"
+    )
+
+    # Cards
+    c1, c2, c3, c4, c5, c6 = st.columns(6)
+    c1.metric("📦 Total",             resumo.get('total', 0))
+    c2.metric("🔴 Críticos",          resumo.get('criticos', 0))
+    c3.metric("🟠 Alta Prioridade",   resumo.get('alta_prioridade', 0))
+    c4.metric("🟡 Atenção",           resumo.get('atencao', 0))
+    vr = resumo.get('valor_risco', 0)
+    vr_fmt = f"R$ {vr:,.0f}".replace(',', 'X').replace('.', ',').replace('X', '.')
+    c5.metric("💰 Valor em Risco",    vr_fmt)
+    c6.metric("📅 Estoque ≥ 30 dias", resumo.get('estoque_30d', 0))
+
+    st.divider()
+
+    # Tabela de produtos
+    produtos = snap.get('produtos', [])
+    if not produtos:
+        st.info('Nenhum produto no snapshot.')
+        return
+
+    df_pp = pd.DataFrame(produtos)
+    df_pp = df_pp.rename(columns={
+        'prioridade':     'Prioridade',
+        'produto':        'Produto',
+        'responsavel':    'Responsável',
+        'dias_estoque':   'Dias em Estoque',
+        'dias_sem_venda': 'Dias sem Venda',
+        'saldo_cx':       'Saldo (cx)',
+        'qtd_vendida':    'Qtd Vendida',
+        'valor_estoque':  'Valor em Estoque (R$)',
+        'acao':           'Ação Recomendada',
+    })
+
+    st.dataframe(
+        df_pp,
+        use_container_width=True,
+        hide_index=True,
+        column_config={
+            'Saldo (cx)':          st.column_config.NumberColumn(format='%.3f'),
+            'Qtd Vendida':         st.column_config.NumberColumn(format='%.3f'),
+            'Valor em Estoque (R$)': st.column_config.NumberColumn(format='R$ %.2f'),
+            'Dias em Estoque':     st.column_config.NumberColumn(format='%d'),
+            'Dias sem Venda':      st.column_config.NumberColumn(format='%d'),
+        },
+    )
+
+
 # ── Auth ──────────────────────────────────────────────────────────────────────
 if not _check_auth():
     st.stop()
@@ -851,11 +962,12 @@ if st.button('🔒 Sair', key='_gerencia_logout'):
 st.divider()
 
 # ── Grupos de abas ───────────────────────────────────────────────────────────
-grp_vendas, grp_metas, grp_clientes, grp_quebras = st.tabs([
+grp_vendas, grp_metas, grp_clientes, grp_quebras, grp_prevperdas = st.tabs([
     '📊 Vendas',
     '🎯 Metas',
     '👥 Clientes',
     '📦 Quebras',
+    '🚨 Prevenção de Perdas',
 ])
 
 # ── VENDAS ────────────────────────────────────────────────────────────────────
@@ -951,3 +1063,14 @@ with grp_quebras:
         _render_quebra_secao('mensal', 'Quebras Mensais', '📦')
     with tab_qbr_comp:
         _render_quebra_comparativo()
+
+# ── PREVENÇÃO DE PERDAS ───────────────────────────────────────────────────────
+with grp_prevperdas:
+    tab_pp_sv, tab_pp_me = st.tabs([
+        '🕐 1 Semana Sem Venda',
+        '📦 1 Mês em Estoque',
+    ])
+    with tab_pp_sv:
+        _render_prevperdas_secao('sem_venda', '1 Semana Sem Venda')
+    with tab_pp_me:
+        _render_prevperdas_secao('mes_estoque', '1 Mês em Estoque')
