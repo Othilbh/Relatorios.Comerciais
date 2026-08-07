@@ -8,6 +8,9 @@ import datetime
 import streamlit as st
 import streamlit.components.v1 as components
 import pandas as pd
+import sys, pathlib
+sys.path.insert(0, str(pathlib.Path(__file__).parent.parent))
+from categorias import map_categoria
 
 _GERENCIA_DIR     = os.path.join(os.path.dirname(__file__), '..', 'gerencia_data')
 _ONTRACK_PUB_FILE = os.path.join(_GERENCIA_DIR, 'ontrack_publicado.json')
@@ -911,11 +914,11 @@ def _render_cruzamento_quebra():
             cruzados.append({
                 'Prioridade PP':   p['prioridade'],
                 'Produto':         p['produto'],
+                'Categoria':       map_categoria(p['produto']),
                 'Responsável':     p['responsavel'],
                 'Valor Parado (R$)': p['valor_estoque'],
                 'Grupo Quebra':    melhor[3],
                 'CX Quebradas':    melhor[1],
-                'Categoria':       melhor[2],
                 'Ação Recomendada': p['acao'],
             })
 
