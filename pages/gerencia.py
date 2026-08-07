@@ -1252,11 +1252,10 @@ with grp_quebras:
 
 # ── PREVENÇÃO DE PERDAS ───────────────────────────────────────────────────────
 with grp_prevperdas:
-    tab_pp_sv, tab_pp_me, tab_pp_cruz, tab_pp_perdas = st.tabs([
+    tab_pp_sv, tab_pp_me, tab_pp_cruz = st.tabs([
         '🕐 1 Semana Sem Venda',
         '📦 1 Mês em Estoque',
         '🔗 Cruzamento com Quebra',
-        '📊 Perdas Realizadas',
     ])
     with tab_pp_sv:
         _render_prevperdas_secao('sem_venda', '1 Semana Sem Venda')
@@ -1264,5 +1263,3 @@ with grp_prevperdas:
         _render_prevperdas_secao('mes_estoque', '1 Mês em Estoque')
     with tab_pp_cruz:
         _render_cruzamento_quebra()
-    with tab_pp_perdas:
-        _render_perdas_realizadas_ger()
