@@ -16,6 +16,7 @@ _ONTRACK_META_DIR = os.path.join(_GERENCIA_DIR, 'ontrack_metas')
 _ONTRACK_CLI_DIR  = os.path.join(_GERENCIA_DIR, 'ontrack_clientes')
 _QUEBRA_DIR       = os.path.join(_GERENCIA_DIR, 'quebra')
 _PREVPERDAS_DIR   = os.path.join(_GERENCIA_DIR, 'prevencao_perdas')
+_PERDAS_DIR       = os.path.join(_GERENCIA_DIR, 'perdas_realizadas')
 _MESES_QBR     = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez']
 _SENHA_FALLBACK = 'othil2024'
 
@@ -842,6 +843,180 @@ _NIVEL_COR = {
 }
 
 
+def _render_cruzamento_quebra():
+    st.header('🔗 Cruzamento com Quebra')
+    st.caption('Produtos que aparecem TANTO no estoque parado QUANTO nos relatórios de quebra — duplo risco operacional.')
+
+    # Carregar PP mais recente (qualquer tipo)
+    if not os.path.isdir(_PREVPERDAS_DIR):
+        st.info('Nenhum dado de Prevenção de Perdas publicado.')
+        return
+    arqs_pp = sorted([f for f in os.listdir(_PREVPERDAS_DIR) if f.endswith('.json')], reverse=True)
+    if not arqs_pp:
+        st.info('Nenhum dado de Prevenção de Perdas publicado.')
+        return
+    with open(os.path.join(_PREVPERDAS_DIR, arqs_pp[0]), 'r', encoding='utf-8') as f:
+        snap_pp = json.load(f)
+
+    prods_pp = snap_pp.get('produtos', [])
+    tipo_pp  = '1 Semana Sem Venda' if snap_pp.get('tipo') == 'sem_venda' else '1 Mês em Estoque'
+    pub_pp   = snap_pp.get('publicado_em', '')[:10]
+
+    # Carregar quebra mais recente (semanal, ou mensal como fallback)
+    snap_qbr = None
+    label_qbr = ''
+    for tipo_q in ('semanal', 'mensal'):
+        d = os.path.join(_QUEBRA_DIR, tipo_q)
+        if not os.path.isdir(d):
+            continue
+        arqs_q = sorted([f for f in os.listdir(d) if f.endswith('.json')], reverse=True)
+        if arqs_q:
+            try:
+                with open(os.path.join(d, arqs_q[0]), 'r', encoding='utf-8') as f:
+                    snap_qbr = json.load(f)
+                label_qbr = f"Quebra {tipo_q} — {snap_qbr.get('periodo','-')}"
+                break
+            except Exception:
+                pass
+
+    if not snap_qbr:
+        st.info('Nenhum dado de Quebra disponível. Processe um PDF na página **Quebras** primeiro.')
+        return
+
+    st.caption(
+        f"Prevenção de Perdas: **{tipo_pp}** (publicado {pub_pp})  ·  "
+        f"Quebra: **{label_qbr}**"
+    )
+
+    # Grupos de quebra como palavras-chave
+    grupos_qbr = snap_qbr.get('grupos', [])
+    palavras_qbr = []
+    for g in grupos_qbr:
+        nome = g.get('grupo', '')
+        for token in nome.upper().split():
+            if len(token) >= 3:
+                palavras_qbr.append((token, g.get('cx', 0), g.get('categoria', ''), nome))
+
+    if not palavras_qbr:
+        st.info('Os dados de Quebra não possuem grupos de produto para cruzar.')
+        return
+
+    # Cruzar por nome
+    cruzados = []
+    for p in prods_pp:
+        nome_prod = p['produto'].upper()
+        hits = [pw for pw in palavras_qbr if pw[0] in nome_prod]
+        if hits:
+            melhor = max(hits, key=lambda x: x[1])
+            cruzados.append({
+                'Prioridade PP':   p['prioridade'],
+                'Produto':         p['produto'],
+                'Responsável':     p['responsavel'],
+                'Valor Parado (R$)': p['valor_estoque'],
+                'Grupo Quebra':    melhor[3],
+                'CX Quebradas':    melhor[1],
+                'Categoria':       melhor[2],
+                'Ação Recomendada': p['acao'],
+            })
+
+    if not cruzados:
+        st.success('✅ Nenhum produto em comum entre o estoque parado e os relatórios de quebra.')
+        return
+
+    st.warning(f"⚠️ **{len(cruzados)} produto(s)** com duplo risco: parado em estoque E com quebra registrada.")
+
+    df_cruz = pd.DataFrame(cruzados).sort_values('Valor Parado (R$)', ascending=False)
+    st.dataframe(
+        df_cruz,
+        use_container_width=True,
+        hide_index=True,
+        column_config={
+            'Valor Parado (R$)': st.column_config.NumberColumn(format='R$ %.2f'),
+            'CX Quebradas':      st.column_config.NumberColumn(format='%.0f'),
+        }
+    )
+
+
+def _render_perdas_realizadas_ger():
+    st.header('📊 Histórico de Perdas Realizadas')
+
+    if not os.path.isdir(_PERDAS_DIR):
+        st.info('Nenhuma perda registrada ainda. Use a aba **📋 Registrar Perda** na página Prevenção de Perdas.')
+        return
+
+    arqs = sorted([f for f in os.listdir(_PERDAS_DIR) if f.endswith('.json')], reverse=True)
+    if not arqs:
+        st.info('Nenhuma perda registrada ainda.')
+        return
+
+    _MESES_PT = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez']
+
+    def _label_mes(slug):
+        try:
+            y, m = slug.split('-')
+            return f"{_MESES_PT[int(m)-1]} / {y}"
+        except Exception:
+            return slug
+
+    labels = [_label_mes(a.replace('.json','')) for a in arqs]
+    escolha = st.selectbox(f'{len(arqs)} mês(es) com registros:', labels, index=0,
+                            key='ger_perdas_sel')
+    arq_sel = arqs[labels.index(escolha)]
+
+    try:
+        with open(os.path.join(_PERDAS_DIR, arq_sel), 'r', encoding='utf-8') as f:
+            lista = json.load(f)
+    except Exception:
+        st.error('Erro ao carregar dados.')
+        return
+
+    if not lista:
+        st.info('Nenhum registro neste mês.')
+        return
+
+    total_cx  = sum(r.get('quantidade_cx', 0) for r in lista)
+    total_val = sum(r.get('valor_rs', 0) for r in lista)
+    motivos   = {}
+    for r in lista:
+        m = r.get('motivo', 'Outro')
+        motivos[m] = motivos.get(m, 0) + 1
+
+    c1, c2, c3, c4 = st.columns(4)
+    c1.metric("Registros",       len(lista))
+    c2.metric("Total CX",        f"{total_cx:,.3f}".replace(',','X').replace('.',',').replace('X','.'))
+    tv = f"R$ {total_val:,.2f}".replace(',','X').replace('.',',').replace('X','.')
+    c3.metric("Valor Perdido",   tv)
+    top_motivo = max(motivos, key=motivos.get) if motivos else '—'
+    c4.metric("Motivo Principal", top_motivo)
+
+    st.divider()
+
+    # Breakdown por motivo
+    if len(motivos) > 1:
+        df_mot = pd.DataFrame([{'Motivo': k, 'Qtd': v} for k,v in sorted(motivos.items(), key=lambda x:-x[1])])
+        st.subheader('Por Motivo')
+        st.bar_chart(df_mot.set_index('Motivo')['Qtd'], color='#2D6A4F')
+
+    # Tabela completa
+    st.subheader(f'Todos os registros — {len(lista)}')
+    df_p = pd.DataFrame(lista)
+    cols_disp = ['data','produto','quantidade_cx','valor_rs','motivo','observacao']
+    cols_disp = [c for c in cols_disp if c in df_p.columns]
+    df_p = df_p[cols_disp].copy()
+    df_p.columns = ['Data','Produto','CX','Valor (R$)','Motivo','Observação'][:len(cols_disp)]
+    st.dataframe(df_p, use_container_width=True, hide_index=True,
+                 column_config={
+                     'CX':        st.column_config.NumberColumn(format='%.3f'),
+                     'Valor (R$)':st.column_config.NumberColumn(format='R$ %.2f'),
+                 })
+
+    # Download CSV
+    csv = df_p.to_csv(index=False, sep=';', decimal=',').encode('utf-8-sig')
+    st.download_button('⬇️ Baixar CSV', data=csv,
+                        file_name=f"perdas_{arq_sel.replace('.json','')}.csv",
+                        mime='text/csv')
+
+
 def _prevperdas_listar(tipo):
     """Lista snapshots de prevenção de perdas de um tipo (sem_venda / mes_estoque)."""
     if not os.path.isdir(_PREVPERDAS_DIR):
@@ -1066,11 +1241,17 @@ with grp_quebras:
 
 # ── PREVENÇÃO DE PERDAS ───────────────────────────────────────────────────────
 with grp_prevperdas:
-    tab_pp_sv, tab_pp_me = st.tabs([
+    tab_pp_sv, tab_pp_me, tab_pp_cruz, tab_pp_perdas = st.tabs([
         '🕐 1 Semana Sem Venda',
         '📦 1 Mês em Estoque',
+        '🔗 Cruzamento com Quebra',
+        '📊 Perdas Realizadas',
     ])
     with tab_pp_sv:
         _render_prevperdas_secao('sem_venda', '1 Semana Sem Venda')
     with tab_pp_me:
         _render_prevperdas_secao('mes_estoque', '1 Mês em Estoque')
+    with tab_pp_cruz:
+        _render_cruzamento_quebra()
+    with tab_pp_perdas:
+        _render_perdas_realizadas_ger()
