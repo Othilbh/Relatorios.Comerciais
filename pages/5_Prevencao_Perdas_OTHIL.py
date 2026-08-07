@@ -407,7 +407,9 @@ def _render_tab(key, titulo, upload_label, filtro_sem_venda, dias_min):
         return
 
     if filtro_sem_venda:
-        df_full = df_full[df_full['Qtd Vendida'] == 0].reset_index(drop=True)
+        df_full = df_full[
+            (df_full['Qtd Vendida'] == 0) & (df_full['Dias em Estoque'] > 0)
+        ].reset_index(drop=True)
         df_full.index += 1
     if dias_min > 0:
         df_full = df_full[df_full['Dias em Estoque'] >= dias_min].reset_index(drop=True)
