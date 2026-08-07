@@ -1103,18 +1103,26 @@ def _render_prevperdas_secao(tipo, titulo):
         'acao':           'Ação Recomendada',
     })
 
-    st.dataframe(
-        df_pp,
-        use_container_width=True,
-        hide_index=True,
-        column_config={
-            'Saldo (cx)':          st.column_config.NumberColumn(format='%.3f'),
-            'Qtd Vendida':         st.column_config.NumberColumn(format='%.3f'),
-            'Valor em Estoque (R$)': st.column_config.NumberColumn(format='R$ %.2f'),
-            'Dias em Estoque':     st.column_config.NumberColumn(format='%d'),
-            'Dias sem Venda':      st.column_config.NumberColumn(format='%d'),
-        },
-    )
+    _COR_PP = {
+        '🔴 Crítico':        'background-color:#FFCCCC',
+        '🟠 Alta Prioridade':'background-color:#FFE0B2',
+        '🟡 Atenção':        'background-color:#FFFDE7',
+        '🟢 Controlado':     'background-color:#E8F5E9',
+    }
+
+    def _colorir_linha(row):
+        cor = _COR_PP.get(row.get('Prioridade', ''), '')
+        return [cor] * len(row)
+
+    styled = df_pp.style.apply(_colorir_linha, axis=1).format({
+        'Saldo (cx)':           '{:.3f}',
+        'Qtd Vendida':          '{:.3f}',
+        'Valor em Estoque (R$)':'R$ {:.2f}',
+        'Dias em Estoque':      '{:.0f}',
+        'Dias sem Venda':       '{:.0f}',
+    }, na_rep='-')
+
+    st.dataframe(styled, use_container_width=True, hide_index=True)
 
 
 # ── Auth ──────────────────────────────────────────────────────────────────────
