@@ -141,9 +141,11 @@ def parse_vendas(file) -> list[dict]:
                     continue
                 codigo = codematch.group(1)
                 nums = [t for t in toks if NUM_RE.match(t)]
-                if not nums:
+                # índice 6 = Total das Saídas Qtd (Saídas por Vendas + Outras Saídas)
+                # igual ao vals[6] usado em parsers_diario.py
+                if len(nums) < 7:
                     continue
-                qtde = to_float(nums[0])
+                qtde = to_float(nums[6])
                 rows_out.append({
                     'vendedor': current_vendor,
                     'codigo': codigo,
