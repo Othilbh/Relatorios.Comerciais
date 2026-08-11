@@ -1,33 +1,21 @@
 {
   "produtos": [
     {
-      "nome": "PORTUGUESA 55/60 SABOR",
-      "codigos_texto": "02050032\n",
-      "estoque": 102,
+      "nome": "AMEIXA 45-50 + 50/55",
+      "codigos_texto": "250100101\n250100102\n250107605\n250107603\n",
+      "estoque": 618,
       "prioridade": "🚨 Grande Urgência"
     },
     {
       "nome": "WILL BREVI VERDE",
-      "codigos_texto": "01010961*",
+      "codigos_texto": "0101096100\n",
       "estoque": 116,
       "prioridade": "🚨 Grande Urgência"
     },
     {
-      "nome": "WILL 135 GAUCHO",
-      "codigos_texto": "0101057135\n",
-      "estoque": 57,
-      "prioridade": "🚨 Grande Urgência"
-    },
-    {
-      "nome": "FUJI EXPRESSA",
-      "codigos_texto": "702089*",
-      "estoque": 145,
-      "prioridade": "🚨 Grande Urgência"
-    },
-    {
-      "nome": "8KG THOMPSON SUEMI PURO NECTA",
-      "codigos_texto": "830200703\n",
-      "estoque": 15,
+      "nome": "WILLIANS 100 DOLE PONTO VERDE",
+      "codigos_texto": "0101100100.1\n",
+      "estoque": 31,
       "prioridade": "🚨 Grande Urgência"
     },
     {
@@ -37,21 +25,27 @@
       "prioridade": "🚨 Grande Urgência"
     },
     {
-      "nome": "GALA 165 SANT CAROL",
-      "codigos_texto": "701196165\n",
-      "estoque": 55,
+      "nome": "PACKMANS 1/2 MONO AZUL",
+      "codigos_texto": "020200501\n",
+      "estoque": 100,
       "prioridade": "🚨 Grande Urgência"
     },
     {
-      "nome": "PORTUGUESA 60/65 SABOR",
-      "codigos_texto": "02050031\n",
-      "estoque": 191,
+      "nome": "NECTARINA",
+      "codigos_texto": "260100101\n260104801\n",
+      "estoque": 250,
+      "prioridade": "🚨 Grande Urgência"
+    },
+    {
+      "nome": "FUJI 165 POMERANA CX PLAST",
+      "codigos_texto": "702172165.3\n",
+      "estoque": 136,
       "prioridade": "🔥 Alta Prioridade"
     },
     {
-      "nome": "FORELLE 1/2 ALESSANDRINI",
-      "codigos_texto": "020502701\n",
-      "estoque": 50,
+      "nome": "Fuji Azaleia + Gala Santa Carolina + Fuji Expressa",
+      "codigos_texto": "702145135\n702145165\n701196165\n702089150\n",
+      "estoque": 71,
       "prioridade": "🔥 Alta Prioridade"
     },
     {
@@ -68,45 +62,39 @@
     },
     {
       "nome": "MELAO CEPI",
-      "codigos_texto": "31020050*",
+      "codigos_texto": "3102005*",
       "estoque": 1200,
       "prioridade": "🔥 Alta Prioridade"
     },
     {
       "nome": "MELAO REI",
-      "codigos_texto": "31020090*",
+      "codigos_texto": "3102009*",
       "estoque": 1800,
       "prioridade": "🔥 Alta Prioridade"
     },
     {
-      "nome": "NECTARINA IMP VILLA",
-      "codigos_texto": "260104801\n",
-      "estoque": 89,
-      "prioridade": "🔥 Alta Prioridade"
+      "nome": "CUMB RED GLOBE MANAIRA",
+      "codigos_texto": "830100530\n",
+      "estoque": 55,
+      "prioridade": "Normal"
     },
     {
-      "nome": "FUJI 165 POMERANA CX PLAST",
-      "codigos_texto": "702172165.3\n",
-      "estoque": 136,
-      "prioridade": "🔥 Alta Prioridade"
+      "nome": "CUMB CRINSON CHERRY BELLA",
+      "codigos_texto": "830100696\n",
+      "estoque": 40,
+      "prioridade": "Normal"
     },
     {
-      "nome": "TANGERINA IMP CX PARDA COMPOSOL",
-      "codigos_texto": "390600180\n",
-      "estoque": 57,
-      "prioridade": "🔥 Alta Prioridade"
+      "nome": "CUMB CRINSON CHERRY GRANDVALLE",
+      "codigos_texto": "830100625\n\n",
+      "estoque": 82,
+      "prioridade": "Normal"
     },
     {
-      "nome": "FUJI 165 AZALEIA",
-      "codigos_texto": "702145165\n",
-      "estoque": 17,
-      "prioridade": "🔥 Alta Prioridade"
-    },
-    {
-      "nome": "PACKMANS 1/2 MONO AZUL",
-      "codigos_texto": "020200501\n",
-      "estoque": 100,
-      "prioridade": "🔥 Alta Prioridade"
+      "nome": "GALA 165 DELICIA",
+      "codigos_texto": "701184165\n",
+      "estoque": 297,
+      "prioridade": "Normal"
     }
   ],
   "vendedor_pcts": {
@@ -119,5 +107,5 @@
     "Juliana": 7,
     "Luca": 7
   },
-  "periodo": "03/08 a 07/08"
+  "periodo": "10/08 a 14/08"
 }
