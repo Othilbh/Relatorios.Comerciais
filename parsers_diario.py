@@ -341,18 +341,30 @@ def parse_vendas_pdftotext(file) -> list[dict]:
 
             tail = line[cxm.end():]
             vals = _tokenize_tail(tail)
-            if not vals:
-                continue
 
-            # Pega o Total das Saídas Qtd (índice 6) se disponível;
-            # caso contrário, o maior índice de qty que existir; fallback: vals[0]
-            qtde = 0.0
-            for idx in reversed(_QTY_INDICES):
-                if idx < len(vals):
-                    qtde = vals[idx]
-                    break
-            if qtde == 0.0 and vals:
-                qtde = vals[0]
+            if vals:
+                # Formato completo: pega Total das Saídas Qtd (último idx de qty)
+                qtde = 0.0
+                for idx in reversed(_QTY_INDICES):
+                    if idx < len(vals):
+                        qtde = vals[idx]
+                        break
+                if qtde == 0.0:
+                    qtde = vals[0]
+            else:
+                # Formato com "--------" nas colunas zeradas: _tokenize_tail falha
+                # pois "---" não é número. Extrai todos os números com 3 casas
+                # decimais da tail e pega o último (= Total das Saídas se houver
+                # múltiplos, ou a única qty se o relatório for simplificado).
+                qty3_matches = re.findall(r'\b\d[\d.]*,\d{3}\b', tail)
+                if not qty3_matches:
+                    # Sem 3 casas: tenta qualquer número (fallback)
+                    any_nums = re.findall(r'\b\d[\d.]*,\d+\b', tail)
+                    if not any_nums:
+                        continue
+                    qtde = _to_float(any_nums[-1])
+                else:
+                    qtde = _to_float(qty3_matches[-1])
 
             rows_out.append({
                 'vendedor': cur_vendor_raw,
