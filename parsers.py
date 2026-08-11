@@ -10,7 +10,8 @@ os campos numéricos pelo formato (####,###) em vez de por nome de coluna.
 import re
 import pdfplumber
 
-NUM_RE = re.compile(r'^-?[\d.]+,\d+$')
+NUM_RE  = re.compile(r'^-?[\d.]+,\d+$')
+QTY3_RE = re.compile(r'^-?\d[\d.]*,\d{3}$')  # números com 3 casas decimais (quantidades)
 DATE_RE = re.compile(r'^\d{2}/\d{2}/\d{4}$')
 VENDOR_LINE_RE = re.compile(r'^Vendedor:\s*(\d+)\s+(.+)$')
 
@@ -141,11 +142,15 @@ def parse_vendas(file) -> list[dict]:
                     continue
                 codigo = codematch.group(1)
                 nums = [t for t in toks if NUM_RE.match(t)]
-                # índice 6 = Total das Saídas Qtd (Saídas por Vendas + Outras Saídas)
-                # igual ao vals[6] usado em parsers_diario.py
-                if len(nums) < 7:
+                # Filtra só os tokens com 3 casas decimais (formato quantidade: 5,000)
+                # O último desses é sempre o Total das Saídas Qtd (Saídas por Vendas
+                # + Outras Saídas). Usando o último em vez do índice fixo 6 porque o
+                # pdfplumber funde colunas adjacentes em algumas linhas, deslocando os índices.
+                qty_nums = [n for n in nums if QTY3_RE.match(n)]
+                if not qty_nums:
                     continue
-                qtde = to_float(nums[6])
+                # Preferência: 3º qty (Total das Saídas); fallback: último disponível
+                qtde = to_float(qty_nums[2] if len(qty_nums) >= 3 else qty_nums[-1])
                 rows_out.append({
                     'vendedor': current_vendor,
                     'codigo': codigo,
