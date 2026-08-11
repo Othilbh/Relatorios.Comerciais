@@ -14,6 +14,7 @@ import streamlit as st
 import pandas as pd
 
 from parsers import parse_estoque, parse_vendas, normalize_codigo
+from parsers_diario import parse_vendas_pdftotext
 from parsers_vendedor import parse_totais_vendedor
 from calc import compute_metas, VENDEDORES_PADRAO, parse_codigos_input, map_vendedor, codigo_matches
 from pdfgen import generate_relatorio_vendedor, generate_dashboard, generate_resumo_geral
@@ -701,14 +702,21 @@ with tab_cfg:
                 # Lê os bytes uma vez para reusar nos dois parsers
                 vendas_bytes = vendas_file.read()
                 try:
-                    vendas_rows = parse_vendas(io.BytesIO(vendas_bytes))
+                    # Usa pdftotext -layout (mais confiável para colunas adjacentes)
+                    vendas_rows = parse_vendas_pdftotext(io.BytesIO(vendas_bytes))
+                    # Fallback para pdfplumber se pdftotext não encontrou linhas
+                    if not vendas_rows:
+                        vendas_rows = parse_vendas(io.BytesIO(vendas_bytes))
                 except Exception:
-                    st.error(
-                        'Não foi possível ler o PDF de Vendas/Lucratividade enviado. '
-                        'Verifique se o arquivo não está corrompido ou protegido por '
-                        'senha e tente enviar novamente.'
-                    )
-                    vendas_rows = None
+                    try:
+                        vendas_rows = parse_vendas(io.BytesIO(vendas_bytes))
+                    except Exception:
+                        st.error(
+                            'Não foi possível ler o PDF de Vendas/Lucratividade enviado. '
+                            'Verifique se o arquivo não está corrompido ou protegido por '
+                            'senha e tente enviar novamente.'
+                        )
+                        vendas_rows = None
 
                 # Tenta extrair dados em R$ do mesmo PDF (Lucratividade por Vendedor)
                 if vendas_rows is not None:
