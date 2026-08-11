@@ -89,6 +89,18 @@
       "codigos_texto": "830100625\n",
       "estoque": 82,
       "prioridade": "Normal"
+    },
+    {
+      "nome": "GALA 165 DELICIA",
+      "codigos_texto": "701184165",
+      "estoque": 297,
+      "prioridade": "Normal"
+    },
+    {
+      "nome": "ROMA",
+      "codigos_texto": "8704714\n",
+      "estoque": 150,
+      "prioridade": "🔥 Alta Prioridade"
     }
   ],
   "vendedor_pcts": {
