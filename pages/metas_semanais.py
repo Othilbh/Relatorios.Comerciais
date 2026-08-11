@@ -768,6 +768,31 @@ with tab_cfg:
         else:
             st.success('✅ Todos os códigos do PDF foram reconhecidos — nenhuma cx perdida.')
 
+        # Diagnóstico por produto: mostra o que foi extraído do PDF para cada produto
+        with st.expander('🔍 Diagnóstico por produto (vendas extraídas do PDF)'):
+            from collections import defaultdict
+            agg_debug = defaultdict(lambda: defaultdict(float))
+            for row in vendas_rows_diag:
+                cn = normalize_codigo(row['codigo'])
+                for p in produtos_config_diag:
+                    if any(codigo_matches(cn, e) for e in p['codigos']):
+                        vendor_raw = row['vendedor']
+                        vendor_disp = map_vendedor(vendor_raw) or f'❓ {vendor_raw}'
+                        agg_debug[p['nome']][vendor_disp] += row['qtde_vendida']
+            if not agg_debug:
+                st.info('Nenhum dado extraído.')
+            else:
+                for nome_prod in [p['nome'] for p in produtos_config_diag]:
+                    total = sum(agg_debug[nome_prod].values())
+                    st.markdown(f"**{nome_prod}** — total: `{total:.3f} cx`")
+                    if agg_debug[nome_prod]:
+                        rows_d = [{'Vendedor': v, 'CX': f'{q:.3f}'}
+                                  for v, q in sorted(agg_debug[nome_prod].items())]
+                        st.dataframe(pd.DataFrame(rows_d), use_container_width=True,
+                                     hide_index=True)
+                    else:
+                        st.caption('— nenhuma venda encontrada no PDF para este produto')
+
         # ── Publicar para Gerência ────────────────────────────────────────
         st.divider()
         pub_col, _ = st.columns([2, 4])
