@@ -283,3 +283,86 @@ def parse_relatorio_diario(file, tolerancia=1.0):
         'total_geral': total_geral,
         'divergencias': divergencias,
     }
+
+
+# ---------------------------------------------------------------------------
+# Parser de Lucratividade por Vendedor (formato sem traço — relatório de metas)
+# ---------------------------------------------------------------------------
+
+# "Vendedor: 11  REGINALDO"  (sem traço entre número e nome)
+_VENDOR_RE_META = re.compile(r'^Vendedor:\s*\d+\s+(.+)$')
+
+# Índices de campos com 3 casas decimais em _SEQ (= campos de quantidade)
+_QTY_INDICES = [i for i, d in enumerate(_SEQ) if d == 3]  # [0, 3, 6, 14]
+
+
+def parse_vendas_pdftotext(file) -> list[dict]:
+    """Parseia o relatório 'Lucratividade por Vendedor' (formato sem traço no
+    cabeçalho do vendedor) usando pdftotext -layout.
+
+    Retorna lista de dicts: {'vendedor': str, 'codigo': str, 'qtde_vendida': float}
+    — mesmo formato de parse_vendas() em parsers.py, mas usando a tokenização
+    posicional de _tokenize_tail para não depender de espaços entre colunas.
+
+    Estratégia de extração de quantidade:
+      - Pega o último campo de quantidade disponível em _SEQ (Total das Saídas
+        Qtd = índice 6). Se o relatório for simplificado e tiver menos campos,
+        usa o maior índice de qty disponível. Fallback: primeiro valor extraído.
+    """
+    text = extract_text(file)
+    rows_out = []
+    cur_vendor_raw = None
+    pending_lines = []
+
+    for line in text.split('\n'):
+        # Cabeçalho de vendedor
+        m = _VENDOR_RE_META.match(line)
+        if m:
+            cur_vendor_raw = m.group(1).strip()
+            pending_lines = []
+            continue
+
+        if _is_junk_line(line):
+            pending_lines = []
+            continue
+
+        # Linha de produto (tem "CX " seguido de número)
+        cxm = CX_RE.search(line)
+        if cxm and cur_vendor_raw:
+            before = line[:cxm.start()].strip()
+            full_desc = ' '.join(pending_lines + ([before] if before else []))
+            pending_lines = []
+
+            # Extrai código do início da descrição
+            cm = re.match(r'^(\d[\d.]*)', full_desc.strip())
+            if not cm:
+                continue
+            codigo = cm.group(1)
+
+            tail = line[cxm.end():]
+            vals = _tokenize_tail(tail)
+            if not vals:
+                continue
+
+            # Pega o Total das Saídas Qtd (índice 6) se disponível;
+            # caso contrário, o maior índice de qty que existir; fallback: vals[0]
+            qtde = 0.0
+            for idx in reversed(_QTY_INDICES):
+                if idx < len(vals):
+                    qtde = vals[idx]
+                    break
+            if qtde == 0.0 and vals:
+                qtde = vals[0]
+
+            rows_out.append({
+                'vendedor': cur_vendor_raw,
+                'codigo': codigo,
+                'qtde_vendida': qtde,
+            })
+            continue
+
+        stripped = line.strip()
+        if stripped:
+            pending_lines.append(stripped)
+
+    return rows_out
