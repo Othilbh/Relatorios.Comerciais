@@ -768,30 +768,25 @@ with tab_cfg:
         else:
             st.success('✅ Todos os códigos do PDF foram reconhecidos — nenhuma cx perdida.')
 
-        # Diagnóstico por produto: mostra o que foi extraído do PDF para cada produto
-        with st.expander('🔍 Diagnóstico por produto (vendas extraídas do PDF)'):
-            from collections import defaultdict
-            agg_debug = defaultdict(lambda: defaultdict(float))
-            for row in vendas_rows_diag:
-                cn = normalize_codigo(row['codigo'])
-                for p in produtos_config_diag:
-                    if any(codigo_matches(cn, e) for e in p['codigos']):
-                        vendor_raw = row['vendedor']
-                        vendor_disp = map_vendedor(vendor_raw) or f'❓ {vendor_raw}'
-                        agg_debug[p['nome']][vendor_disp] += row['qtde_vendida']
-            if not agg_debug:
-                st.info('Nenhum dado extraído.')
-            else:
-                for nome_prod in [p['nome'] for p in produtos_config_diag]:
-                    total = sum(agg_debug[nome_prod].values())
-                    st.markdown(f"**{nome_prod}** — total: `{total:.3f} cx`")
-                    if agg_debug[nome_prod]:
-                        rows_d = [{'Vendedor': v, 'CX': f'{q:.3f}'}
-                                  for v, q in sorted(agg_debug[nome_prod].items())]
-                        st.dataframe(pd.DataFrame(rows_d), use_container_width=True,
-                                     hide_index=True)
-                    else:
-                        st.caption('— nenhuma venda encontrada no PDF para este produto')
+        # Diagnóstico por produto: mostra linhas brutas extraídas do PDF
+        with st.expander('🔍 Diagnóstico por produto (linhas brutas do PDF)'):
+            for p in produtos_config_diag:
+                linhas_brutas = [
+                    row for row in vendas_rows_diag
+                    if any(codigo_matches(normalize_codigo(row['codigo']), e) for e in p['codigos'])
+                ]
+                total = sum(r['qtde_vendida'] for r in linhas_brutas)
+                st.markdown(f"**{p['nome']}** — {len(linhas_brutas)} linha(s) — total bruto: `{total:.3f} cx`")
+                if linhas_brutas:
+                    df_bruto = pd.DataFrame([{
+                        'Código':   r['codigo'],
+                        'Vendedor Raw': r['vendedor'],
+                        'Vendedor Mapeado': map_vendedor(r['vendedor']) or '❓ NÃO MAPEADO',
+                        'CX Extraída': r['qtde_vendida'],
+                    } for r in linhas_brutas])
+                    st.dataframe(df_bruto, use_container_width=True, hide_index=True)
+                else:
+                    st.caption('— nenhuma linha encontrada')
 
         # ── Publicar para Gerência ────────────────────────────────────────
         st.divider()
