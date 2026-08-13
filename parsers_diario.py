@@ -16,6 +16,7 @@ import re
 import subprocess
 import tempfile
 import os
+import unicodedata
 
 MONEY2 = r'-?\d{1,3}(?:\.\d{3})*,\d{2}'
 QTY3 = r'-?\d{1,3}(?:\.\d{3})*,\d{3}'
@@ -112,13 +113,24 @@ _JUNK_MARKERS = [
 ]
 
 
+def _strip_accents(s: str) -> str:
+    return unicodedata.normalize('NFKD', s).encode('ascii', 'ignore').decode('ascii')
+
+
 def _is_junk_line(line: str) -> bool:
-    if line.lstrip().startswith('Codigo Descricao'):
+    """Reconhece linhas de cabeçalho/rodapé repetidas (empresa, período,
+    cabeçalho de coluna 'Código Descrição...', etc.) que aparecem entre
+    clientes/páginas e não são produto. Compara sem acento porque o PDF usa
+    acentuação (ex.: 'Código Descrição', 'Saídas por Vendas') enquanto
+    _JUNK_MARKERS está em ASCII — sem essa normalização essas linhas
+    "vazam" pro nome do produto seguinte."""
+    line_na = _strip_accents(line)
+    if line_na.lstrip().startswith('Codigo Descricao'):
         return True
     stripped = line.strip()
     if not stripped:
         return False
-    return any(marker in line for marker in _JUNK_MARKERS)
+    return any(marker in line_na for marker in _JUNK_MARKERS)
 
 
 def extract_text(file) -> str:
