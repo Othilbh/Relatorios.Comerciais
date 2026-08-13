@@ -4,6 +4,7 @@ import math
 import os
 import re
 import datetime
+import tempfile
 
 import streamlit as st
 import streamlit.components.v1 as components
@@ -11,12 +12,14 @@ import pandas as pd
 import sys, pathlib
 sys.path.insert(0, str(pathlib.Path(__file__).parent.parent))
 from categorias import map_categoria
+from dashboard_diario import gerar_dashboard
 import periodo as periodo_mod
 import comparativo
 import on_track
 import data_store as ds
 import metas_gerais as mg
 
+MOD_RELATORIO_DIARIO = 'relatorio_diario'
 MOD_FECHAMENTO = 'metas_semanais_fechamento'
 MOD_ONTRACK_METAS = 'metas_semanais_ontrack'
 MOD_QUEBRA = 'quebra'
@@ -77,20 +80,57 @@ def _dir_tipo(tipo):
 
 
 def _listar_dashboards(tipo):
+    """Lista os dashboards salvos, mais recente primeiro. Lê da persistência
+    real (data_store — sobrevive a restart/redeploy/hibernação do Streamlit
+    Cloud); quando o HTML local não existir mais, regenera automaticamente a
+    partir dos itens persistidos, para o dashboard não "sumir" após um
+    reboot. Arquivos locais entram como complemento/fallback."""
     d = _dir_tipo(tipo)
-    items = []
+    items = {}
+
+    try:
+        for slug in ds.list_periodos(MOD_RELATORIO_DIARIO, tipo):
+            registro = ds.load_current(MOD_RELATORIO_DIARIO, tipo, slug)
+            if not registro:
+                continue
+            valores = registro['valores']
+            meta = {
+                'slug': slug, 'tipo': tipo,
+                'periodo': valores.get('periodo'), 'emissao': valores.get('emissao'),
+                'gerado_em': registro.get('atualizado_em', ''),
+            }
+            html_path = os.path.join(d, f'{slug}.html')
+            if not os.path.exists(html_path) and valores.get('itens'):
+                try:
+                    with tempfile.NamedTemporaryFile(suffix='.html', delete=False,
+                                                      mode='w', encoding='utf-8') as tmp:
+                        pass
+                    gerar_dashboard({'itens': valores['itens'], 'periodo': valores.get('periodo'),
+                                      'data_emissao': valores.get('emissao')}, tmp.name, tipo=tipo)
+                    with open(tmp.name, 'r', encoding='utf-8') as f_html:
+                        html_regen = f_html.read()
+                    with open(html_path, 'w', encoding='utf-8') as f_out:
+                        f_out.write(html_regen)
+                except Exception:
+                    pass
+            items[slug] = meta
+    except Exception:
+        pass
+
     for fname in os.listdir(d):
         if fname.endswith('.json'):
             try:
                 with open(os.path.join(d, fname), 'r', encoding='utf-8') as f:
                     meta = json.load(f)
                 slug = meta.get('slug') or fname.replace('.json', '')
+                if slug in items:
+                    continue
                 if os.path.exists(os.path.join(d, f'{slug}.html')):
-                    items.append((slug, meta))
+                    items[slug] = meta
             except Exception:
                 pass
-    items.sort(key=lambda x: x[0], reverse=True)
-    return items
+
+    return sorted(items.items(), key=lambda kv: kv[0], reverse=True)
 
 
 def _label_slug(slug, tipo):
@@ -153,6 +193,11 @@ def _render_secao_dash(tipo, titulo_secao, emoji):
     st.caption(f'Período: {meta_h.get("periodo","-")}  |  Gerado em: {gerado}')
 
     html_path = os.path.join(_dir_tipo(tipo), f'{slug_h}.html')
+    if not os.path.exists(html_path):
+        st.warning('Este dashboard não pôde ser regenerado automaticamente '
+                    '(dado antigo, salvo antes da persistência com histórico de itens). '
+                    'Gere novamente na página de origem.')
+        return
     with open(html_path, 'r', encoding='utf-8') as f:
         html_text = f.read()
 
@@ -1034,37 +1079,28 @@ def _render_cruzamento_quebra():
     st.header('🔗 Cruzamento com Quebra')
     st.caption('Produtos que aparecem TANTO no estoque parado QUANTO nos relatórios de quebra — duplo risco operacional.')
 
-    # Carregar PP mais recente (qualquer tipo)
-    if not os.path.isdir(_PREVPERDAS_DIR):
+    # PP mais recente (qualquer tipo) — lê da persistência real (data_store),
+    # com fallback local; sobrevive a restart/redeploy do Streamlit Cloud.
+    hist_pp = _prevperdas_listar('sem_venda') + _prevperdas_listar('mes_estoque')
+    if not hist_pp:
         st.info('Nenhum dado de Prevenção de Perdas publicado.')
         return
-    arqs_pp = sorted([f for f in os.listdir(_PREVPERDAS_DIR) if f.endswith('.json')], reverse=True)
-    if not arqs_pp:
-        st.info('Nenhum dado de Prevenção de Perdas publicado.')
-        return
-    with open(os.path.join(_PREVPERDAS_DIR, arqs_pp[0]), 'r', encoding='utf-8') as f:
-        snap_pp = json.load(f)
+    hist_pp.sort(key=lambda kv: kv[0], reverse=True)
+    _slug_pp, snap_pp = hist_pp[0]
 
     prods_pp = snap_pp.get('produtos', [])
     tipo_pp  = '1 Semana Sem Venda' if snap_pp.get('tipo') == 'sem_venda' else '1 Mês em Estoque'
     pub_pp   = snap_pp.get('publicado_em', '')[:10]
 
-    # Carregar quebra mais recente (semanal, ou mensal como fallback)
+    # Quebra mais recente (semanal, ou mensal como fallback) — idem
     snap_qbr = None
     label_qbr = ''
     for tipo_q in ('semanal', 'mensal'):
-        d = os.path.join(_QUEBRA_DIR, tipo_q)
-        if not os.path.isdir(d):
-            continue
-        arqs_q = sorted([f for f in os.listdir(d) if f.endswith('.json')], reverse=True)
-        if arqs_q:
-            try:
-                with open(os.path.join(d, arqs_q[0]), 'r', encoding='utf-8') as f:
-                    snap_qbr = json.load(f)
-                label_qbr = f"Quebra {tipo_q} — {snap_qbr.get('periodo','-')}"
-                break
-            except Exception:
-                pass
+        hist_q = _qbr_listar(tipo_q)
+        if hist_q:
+            _slug_q, snap_qbr = hist_q[0]
+            label_qbr = f"Quebra {tipo_q} — {snap_qbr.get('periodo','-')}"
+            break
 
     if not snap_qbr:
         st.info('Nenhum dado de Quebra disponível. Processe um PDF na página **Quebras** primeiro.')
