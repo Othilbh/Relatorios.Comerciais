@@ -10,6 +10,10 @@ import streamlit as st
 import pandas as pd
 
 from parsers_estoque import parse_estoque_fisico
+import data_store as ds
+import comparativo
+
+MODULO = 'prevencao_perdas'
 
 _GERENCIA_DIR   = os.path.join(os.path.dirname(__file__), '..', 'gerencia_data')
 _PREVPERDAS_DIR = os.path.join(_GERENCIA_DIR, 'prevencao_perdas')
@@ -19,6 +23,11 @@ st.set_page_config(page_title="Prevenção de Perdas", layout="wide")
 
 st.title("🚨 Prevenção de Perdas — Estoque Parado")
 st.caption("Identifica produtos parados antes que virem prejuízo.")
+
+with st.expander('👤 Seu nome (fica registrado no histórico de quem publicou)'):
+    st.session_state['usuario_nome'] = st.text_input(
+        'Seu nome', value=st.session_state.get('usuario_nome', 'Ingrid'), key='usuario_nome_input_pp',
+    )
 
 # ── Constantes ────────────────────────────────────────────────────────────────
 _NIVEL = {
@@ -318,6 +327,15 @@ def _publicar_gerencia(df, emissao_str, periodo_str, tipo):
     path = os.path.join(_PREVPERDAS_DIR, f'{slug}.json')
     with open(path, 'w', encoding='utf-8') as f:
         json.dump(snapshot, f, ensure_ascii=False, indent=2)
+    # Persistência real e versionada (sobrevive a restart do Streamlit Cloud;
+    # antes só existia em gerencia_data/, apagado a cada restart)
+    try:
+        ds.save_record(
+            modulo=MODULO, tipo_periodo='diario', periodo_ref=slug,
+            valores=snapshot, usuario=st.session_state.get('usuario_nome'),
+        )
+    except Exception as e:
+        st.warning(f'Publicado localmente, mas houve um problema ao salvar de forma permanente: {e}')
     return slug
 
 
@@ -337,7 +355,20 @@ def _pdf_to_text(uploaded_file):
         os.unlink(tmp_path)
 
 
-def _cards(df):
+def _publicacao_anterior(tipo: str):
+    """Última publicação salva para este tipo (sem_venda / mes_estoque),
+    usada como base do comparativo — não inclui os dados que ainda estão
+    só na tela (não publicados)."""
+    try:
+        slugs = [s for s in ds.list_periodos(MODULO, 'diario') if tipo in s]
+        if not slugs:
+            return None
+        return ds.load_current(MODULO, 'diario', slugs[0])
+    except Exception:
+        return None
+
+
+def _cards(df, tipo: str = None):
     total       = len(df)
     criticos    = int((df['Prioridade'] == '🔴 Crítico').sum())
     alta        = int((df['Prioridade'] == '🟠 Alta Prioridade').sum())
@@ -353,6 +384,22 @@ def _cards(df):
     c4.metric("💰 Valor em risco",      vr_fmt)
     c5.metric("🕐 Sem venda ≥ 7 dias",  sem_v7)
     c6.metric("📅 Estoque ≥ 30 dias",   est30)
+
+    if tipo:
+        anterior = _publicacao_anterior(tipo)
+        if anterior:
+            resumo_ant = anterior.get('valores', {}).get('resumo', {})
+            st.caption(
+                f"📊 Comparativo vs última publicação "
+                f"({anterior.get('atualizado_em', '')[:10]}):"
+            )
+            pc1, pc2, pc3 = st.columns(3)
+            comp_total = comparativo.calcular(total, resumo_ant.get('total'), menor_e_melhor=True)
+            comp_crit  = comparativo.calcular(criticos, resumo_ant.get('criticos'), menor_e_melhor=True)
+            comp_vr    = comparativo.calcular(valor_risco, resumo_ant.get('valor_risco'), menor_e_melhor=True)
+            pc1.metric("📦 Total", total, delta=comparativo.formatar_variacao(comp_total, casas=1))
+            pc2.metric("🔴 Críticos", criticos, delta=comparativo.formatar_variacao(comp_crit, casas=1))
+            pc3.metric("💰 Valor em risco", vr_fmt, delta=comparativo.formatar_variacao(comp_vr, casas=1))
 
 
 def _col_config():
@@ -422,7 +469,7 @@ def _render_tab(key, titulo, upload_label, filtro_sem_venda, dias_min):
 
     # Painel resumo
     st.markdown("---")
-    _cards(df_full)
+    _cards(df_full, tipo=key)
     st.markdown("---")
 
     # Filtros
@@ -495,7 +542,18 @@ def _render_tab(key, titulo, upload_label, filtro_sem_venda, dias_min):
 # ── Alerta de Recebimento ─────────────────────────────────────────────────────
 
 def _carregar_pp_mais_recente():
-    """Retorna o snapshot de PP mais recente publicado (qualquer tipo)."""
+    """Retorna o snapshot de PP mais recente publicado (qualquer tipo).
+    Lê da persistência real (data_store) primeiro — sobrevive a restart do
+    app; arquivo local entra como complemento/fallback."""
+    try:
+        slugs = ds.list_periodos(MODULO, 'diario')
+        if slugs:
+            registro = ds.load_current(MODULO, 'diario', slugs[0])
+            if registro:
+                return registro['valores']
+    except Exception:
+        pass
+
     if not os.path.isdir(_PREVPERDAS_DIR):
         return None
     arquivos = sorted([f for f in os.listdir(_PREVPERDAS_DIR) if f.endswith('.json')], reverse=True)
