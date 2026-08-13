@@ -37,8 +37,20 @@ from xlsx_vendedor_cliente import (
     parse_e_agregar, VENDOR_TAB, _normalize,
 )
 from parsers_vendedor import parse_totais_vendedor
+import periodo
+import comparativo
+import on_track
+import data_store as ds
+
+MODULO = 'vendedor_cliente'
+MODULO_ONTRACK = 'vendedor_cliente_ontrack'
 
 st.title('Relatorio Vendedor-Cliente')
+
+with st.expander('👤 Seu nome (fica registrado no histórico de quem gerou/publicou)'):
+    st.session_state['usuario_nome'] = st.text_input(
+        'Seu nome', value=st.session_state.get('usuario_nome', 'Ingrid'), key='usuario_nome_input_vc',
+    )
 
 MESES = ['Janeiro','Fevereiro','Marco','Abril','Maio','Junho',
          'Julho','Agosto','Setembro','Outubro','Novembro','Dezembro']
@@ -63,6 +75,20 @@ lbl_atual  = f"{MESES_ABR[mes-1].upper()}/{ano}"
 lbl_ant_m  = f"{MESES_ABR[m_ant-1]}./{y_ant}"
 lbl_ant_a  = f"{MESES_ABR[mes-1]}./{ano-1}"
 fname_json = f"historico_{lbl_atual.replace('/','')}.json"
+PERIODO_REF = periodo.periodo_ref('mensal', ref_date.date())
+
+# ── Persistência real: se os dados deste mês já foram gerados antes (nesta
+# sessão ou em qualquer sessão anterior, mesmo depois de um restart do app),
+# recupera automaticamente — sem precisar reprocessar os PDFs de novo só
+# porque a página foi recarregada.
+if st.session_state.get('_vc_periodo_carregado') != PERIODO_REF:
+    _registro_vc = ds.load_current(MODULO, 'mensal', PERIODO_REF)
+    if _registro_vc:
+        st.session_state['clientes_on_track'] = _registro_vc['valores'].get('clientes_data')
+        st.session_state['totais_on_track']   = _registro_vc['valores'].get('totais_dict')
+        st.session_state['historico_vc']      = _registro_vc['valores'].get('historico')
+        st.session_state['ref_date_vc']       = ref_date
+    st.session_state['_vc_periodo_carregado'] = PERIODO_REF
 
 st.divider()
 
@@ -74,14 +100,14 @@ def _brl(v: float) -> str:
     return f"R$ {'-' if v < 0 else ''}{s}"
 
 def _ot_status(atual_pct: float, elapsed_pct: float):
-    """Retorna (emoji, label, ratio) para status On Track."""
-    if elapsed_pct <= 0:
-        ratio = 1.0
-    else:
-        ratio = atual_pct / elapsed_pct if elapsed_pct > 0 else 0
-    if ratio >= 0.85:   return '🟢', 'No Ritmo',    ratio
-    elif ratio >= 0.55: return '🟡', 'Atenção',      ratio
-    else:               return '🔴', 'Fora do Ritmo', ratio
+    """Retorna (emoji, label, ratio) para status On Track — via lógica
+    central (on_track.py), mesmos limiares 0,85/0,55 usados em todo o app."""
+    r = on_track.calcular(
+        meta=1.0, realizado=atual_pct, tipo_periodo='mensal',
+        periodo_ref='(pct)', pct_tempo_decorrido=elapsed_pct,
+    )
+    ratio = r['ratio'] if r['ratio'] is not None else 1.0
+    return r['emoji'], r['label'], ratio
 
 def _get_meta_fat(historico_data: dict, vend: str, cli_key: str):
     """Busca meta de faturamento do cliente no histórico."""
@@ -103,7 +129,10 @@ def _get_meta_fat(historico_data: dict, vend: str, cli_key: str):
     return None
 
 # ── Tabs ──────────────────────────────────────────────────────────────────────
-tab_rel, tab_ontrack = st.tabs(['📋 Relatório Semanal', '📊 On Track por Cliente'])
+tab_rel, tab_ontrack, tab_top50, tab_por_vend = st.tabs([
+    '📋 Relatório Semanal', '📊 On Track por Cliente',
+    '🏆 Top 50 Clientes', '👤 Clientes por Vendedor',
+])
 
 # =============================================================================
 # TAB 1 — Relatório Semanal
@@ -242,7 +271,11 @@ with tab_rel:
                         ref_date=ref_date,
                     )
 
-                    # Salva dados para a aba On Track
+                    # Salva dados para a aba On Track — e persiste de forma
+                    # real (data_store), com histórico versionado: gerar de
+                    # novo na mesma semana/mês não apaga a versão anterior,
+                    # e os dados continuam disponíveis mesmo depois de um
+                    # restart do app (antes só existiam em session_state).
                     try:
                         clientes_data = parse_e_agregar(
                             [io.BytesIO(b) for b in clientes_bytes]
@@ -251,8 +284,21 @@ with tab_rel:
                         st.session_state['totais_on_track']   = totais_dict
                         st.session_state['historico_vc']      = historico
                         st.session_state['ref_date_vc']       = ref_date
-                    except Exception:
-                        pass
+                        st.session_state['_vc_periodo_carregado'] = PERIODO_REF
+                        ds.save_record(
+                            modulo=MODULO, tipo_periodo='mensal', periodo_ref=PERIODO_REF,
+                            valores={
+                                'clientes_data': clientes_data,
+                                'totais_dict': totais_dict,
+                                'historico': historico,
+                            },
+                            usuario=st.session_state.get('usuario_nome'),
+                        )
+                    except Exception as _e_persist:
+                        st.warning(
+                            f'Relatório gerado, mas houve um problema ao salvar de forma '
+                            f'permanente para a aba On Track: {_e_persist}'
+                        )
 
                     fname = f"Vendedor_Cliente_{MESES_ABR[mes-1]}{ano}_OTHIL.xlsx"
                     st.success(f'Planilha gerada: {fname}')
@@ -450,6 +496,40 @@ with tab_ontrack:
 
         st.divider()
 
+        # ── Comparativo (componente central comparativo.py) ────────────────
+        st.subheader('📊 Comparativo')
+        periodo_ref_ot = periodo.periodo_ref('mensal', ref_date_ot.date())
+        slug_ant_ot = periodo.periodo_anterior('mensal', periodo_ref_ot)
+        slug_ano_ant_ot = periodo.periodo_ano_anterior('mensal', periodo_ref_ot)
+
+        def _fat_total_periodo(pref):
+            reg = ds.load_current(MODULO, 'mensal', pref)
+            if not reg:
+                return None
+            cdata = reg['valores'].get('clientes_data', {})
+            return sum(c.get('fat', 0) for cli in cdata.values() for c in cli.values())
+
+        fat_ant_ot = _fat_total_periodo(slug_ant_ot)
+        fat_ano_ant_ot = _fat_total_periodo(slug_ano_ant_ot)
+
+        cc1, cc2 = st.columns(2)
+        with cc1:
+            st.markdown(f'**{lbl_atual} × {periodo.rotulo("mensal", slug_ant_ot)}**')
+            if fat_ant_ot is None:
+                st.caption('Sem dado salvo do mês anterior para comparar.')
+            else:
+                comp_m = comparativo.calcular(tot_fat, fat_ant_ot)
+                st.metric('Faturamento', _brl(tot_fat), delta=comparativo.formatar_variacao(comp_m))
+        with cc2:
+            st.markdown(f'**{lbl_atual} × {periodo.rotulo("mensal", slug_ano_ant_ot)} (ano anterior)**')
+            if fat_ano_ant_ot is None:
+                st.caption('Sem dado salvo da mesma época no ano anterior para comparar.')
+            else:
+                comp_a = comparativo.calcular(tot_fat, fat_ano_ant_ot)
+                st.metric('Faturamento', _brl(tot_fat), delta=comparativo.formatar_variacao(comp_a))
+
+        st.divider()
+
         # ── Ranking de Vendedores ─────────────────────────────────────────
         if vend_filtro == 'Todos':
             st.subheader('🏆 Ranking de Vendedores')
@@ -608,6 +688,188 @@ with tab_ontrack:
                     hist_cli_path = os.path.join(_ONTRACK_CLI_DIR, f'{slug_mes}.json')
                     with open(hist_cli_path, 'w', encoding='utf-8') as f:
                         json.dump(snapshot, f, ensure_ascii=False, indent=2)
+                    # Persistência real e versionada (sobrevive a restart do app)
+                    try:
+                        ds.save_record(
+                            modulo=MODULO_ONTRACK, tipo_periodo='mensal', periodo_ref=slug_mes,
+                            valores=snapshot, usuario=st.session_state.get('usuario_nome'),
+                        )
+                    except Exception as e2:
+                        st.warning(f'Publicado localmente, mas houve um problema ao salvar de forma permanente: {e2}')
                     st.success('✅ On Track de Clientes publicado na Gerência.')
                 except Exception as e:
                     st.error(f'Erro ao publicar: {e}')
+
+
+# =============================================================================
+# TAB 3 — Top 50 Clientes
+# =============================================================================
+with tab_top50:
+    st.header('🏆 Top 50 Clientes')
+
+    clientes_data_50 = st.session_state.get('clientes_on_track')
+    historico_data_50 = st.session_state.get('historico_vc')
+
+    if not clientes_data_50:
+        st.info(
+            'Gere o relatório do mês na aba **📋 Relatório Semanal** primeiro '
+            '(ou selecione um período de referência que já tenha relatório gerado).'
+        )
+    else:
+        periodo_ref_50 = periodo.periodo_ref('mensal', ref_date.date())
+        slug_ant_50 = periodo.periodo_anterior('mensal', periodo_ref_50)
+
+        ordenar_por = st.selectbox(
+            'Ordenar por',
+            ['Faturamento', 'Volume', 'Margem (MC R$)', 'Rentabilidade (MC %)', 'Atingimento da meta'],
+            key='top50_sort',
+        )
+
+        reg_ant_50 = ds.load_current(MODULO, 'mensal', slug_ant_50)
+        clientes_ant_50 = reg_ant_50['valores'].get('clientes_data', {}) if reg_ant_50 else {}
+
+        linhas_50 = []
+        for vendedor, clientes in clientes_data_50.items():
+            for cliente, dados in clientes.items():
+                fat = dados.get('fat', 0)
+                vol = dados.get('vol', 0)
+                mc_rs = dados.get('mc_rs', 0)
+                mc_pct = dados.get('mc_pct', 0)
+                meta = _get_meta_fat(historico_data_50, vendedor, cliente) or 0
+
+                fat_ant = None
+                cli_ant = (clientes_ant_50.get(vendedor) or {})
+                if cliente in cli_ant:
+                    fat_ant = cli_ant[cliente].get('fat')
+                else:
+                    cli_norm = _normalize(cliente)
+                    for k, v in cli_ant.items():
+                        if _normalize(k) == cli_norm:
+                            fat_ant = v.get('fat')
+                            break
+                comp = comparativo.calcular(fat, fat_ant)
+
+                if meta:
+                    pct_atg = fat / meta
+                    r_ot = on_track.calcular(meta, fat, 'mensal', periodo_ref_50)
+                    status_txt = f"{r_ot['emoji']} {r_ot['label']}"
+                else:
+                    pct_atg = None
+                    status_txt = '—'
+
+                linhas_50.append({
+                    'Vendedor': vendedor, 'Cliente': cliente,
+                    '_fat': fat, '_vol': vol, '_mc_rs': mc_rs, '_mc_pct': mc_pct,
+                    '_pct_atg': pct_atg or 0, 'Faturamento': _brl(fat),
+                    'Volume (cx)': f'{vol:,.0f}', 'Margem (MC R$)': _brl(mc_rs),
+                    'Rentabilidade': f'{mc_pct:.1f}%',
+                    'Comparativo': comparativo.formatar_variacao(comp),
+                    '% Atingido': f'{pct_atg*100:.1f}%' if pct_atg is not None else '—',
+                    'On Track': status_txt,
+                })
+
+        sort_key_map = {
+            'Faturamento': '_fat', 'Volume': '_vol', 'Margem (MC R$)': '_mc_rs',
+            'Rentabilidade (MC %)': '_mc_pct', 'Atingimento da meta': '_pct_atg',
+        }
+        linhas_50.sort(key=lambda r: r[sort_key_map[ordenar_por]], reverse=True)
+        top50 = linhas_50[:50]
+        for i, r in enumerate(top50, start=1):
+            r['Ranking'] = i
+
+        st.caption(f'{len(linhas_50)} cliente(s) no total — mostrando os {len(top50)} principais por {ordenar_por.lower()}.')
+
+        df_top50 = pd.DataFrame(top50)[[
+            'Ranking', 'Vendedor', 'Cliente', 'Faturamento', 'Volume (cx)',
+            'Margem (MC R$)', 'Rentabilidade', 'Comparativo', '% Atingido', 'On Track',
+        ]]
+        st.dataframe(df_top50, use_container_width=True, hide_index=True)
+
+        csv_top50 = df_top50.to_csv(index=False, sep=';').encode('utf-8-sig')
+        st.download_button(
+            '⬇️ Exportar Top 50 (CSV)', data=csv_top50,
+            file_name=f'top50_clientes_{lbl_atual.replace("/","")}.csv',
+            mime='text/csv',
+        )
+
+
+# =============================================================================
+# TAB 4 — Clientes por Vendedor
+# =============================================================================
+with tab_por_vend:
+    st.header('👤 Clientes por Vendedor')
+
+    clientes_data_pv = st.session_state.get('clientes_on_track')
+    historico_data_pv = st.session_state.get('historico_vc')
+
+    if not clientes_data_pv:
+        st.info(
+            'Gere o relatório do mês na aba **📋 Relatório Semanal** primeiro '
+            '(ou selecione um período de referência que já tenha relatório gerado).'
+        )
+    else:
+        vendedor_sel_pv = st.selectbox(
+            'Selecionar vendedor', sorted(clientes_data_pv.keys()), key='pv_vendedor_sel',
+        )
+
+        periodo_ref_pv = periodo.periodo_ref('mensal', ref_date.date())
+        slug_ant_pv = periodo.periodo_anterior('mensal', periodo_ref_pv)
+        reg_ant_pv = ds.load_current(MODULO, 'mensal', slug_ant_pv)
+        clientes_ant_pv_vend = ((reg_ant_pv['valores'].get('clientes_data', {}) if reg_ant_pv else {})
+                                 .get(vendedor_sel_pv, {}))
+
+        clientes_vendedor = clientes_data_pv.get(vendedor_sel_pv, {})
+        fat_total_vendedor = sum(d.get('fat', 0) for d in clientes_vendedor.values()) or 1e-9
+
+        linhas_pv = []
+        for cliente, dados in clientes_vendedor.items():
+            fat = dados.get('fat', 0)
+            vol = dados.get('vol', 0)
+            mc_rs = dados.get('mc_rs', 0)
+            mc_pct = dados.get('mc_pct', 0)
+            meta = _get_meta_fat(historico_data_pv, vendedor_sel_pv, cliente) or 0
+            participacao = fat / fat_total_vendedor
+
+            fat_ant = None
+            if cliente in clientes_ant_pv_vend:
+                fat_ant = clientes_ant_pv_vend[cliente].get('fat')
+            else:
+                cli_norm = _normalize(cliente)
+                for k, v in clientes_ant_pv_vend.items():
+                    if _normalize(k) == cli_norm:
+                        fat_ant = v.get('fat')
+                        break
+            comp = comparativo.calcular(fat, fat_ant)
+
+            if meta:
+                r_ot = on_track.calcular(meta, fat, 'mensal', periodo_ref_pv)
+                status_txt = f"{r_ot['emoji']} {r_ot['label']}"
+            else:
+                status_txt = '—'
+
+            linhas_pv.append({
+                '_fat': fat,
+                'Cliente': cliente, 'Faturamento': _brl(fat), 'Volume (cx)': f'{vol:,.0f}',
+                'Margem (MC R$)': _brl(mc_rs), 'Rentabilidade': f'{mc_pct:.1f}%',
+                'Comparativo': comparativo.formatar_variacao(comp),
+                'Participação no vendedor': f'{participacao*100:.1f}%',
+                'On Track': status_txt,
+            })
+
+        linhas_pv.sort(key=lambda r: r['_fat'], reverse=True)
+
+        st.caption(f'{len(linhas_pv)} cliente(s) de **{vendedor_sel_pv}** em {lbl_atual} — '
+                   f'faturamento total: {_brl(fat_total_vendedor)}')
+
+        df_pv = pd.DataFrame(linhas_pv)[[
+            'Cliente', 'Faturamento', 'Volume (cx)', 'Margem (MC R$)', 'Rentabilidade',
+            'Comparativo', 'Participação no vendedor', 'On Track',
+        ]]
+        st.dataframe(df_pv, use_container_width=True, hide_index=True)
+
+        csv_pv = df_pv.to_csv(index=False, sep=';').encode('utf-8-sig')
+        st.download_button(
+            f'⬇️ Exportar clientes de {vendedor_sel_pv} (CSV)', data=csv_pv,
+            file_name=f'clientes_{vendedor_sel_pv}_{lbl_atual.replace("/","")}.csv',
+            mime='text/csv',
+        )
