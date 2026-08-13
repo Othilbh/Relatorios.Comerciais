@@ -1285,18 +1285,19 @@ def _render_indicador_mg(titulo, unidade_fmt, meta, realizado, ot, completude_ms
 
 
 def _render_metas_gerais():
-    st.header('🌐 Metas Gerais da Empresa')
+    st.header('🌐 Meta Geral')
     st.caption(
         'Painel consolidado — Faturamento, Volume, Margem e Quebra da empresa inteira. '
-        'O "Realizado" é somado automaticamente a partir dos módulos Metas Semanais, '
-        'Vendedor-Cliente e Quebras (não precisa digitar de novo aqui).'
+        'Independente das Metas Semanais. O "Realizado" é somado automaticamente a partir '
+        'dos módulos Vendedor-Cliente e Quebras (não precisa digitar de novo aqui).'
     )
 
+    tipos_mg = [t for t in periodo_mod.TIPOS_PERIODO if t != 'semanal']
     col_tipo, col_periodo = st.columns([1, 2])
     with col_tipo:
         tipo_mg = st.selectbox(
-            'Tipo de período', periodo_mod.TIPOS_PERIODO,
-            format_func=periodo_mod.rotulo_tipo, index=1, key='mg_tipo',
+            'Tipo de período', tipos_mg,
+            format_func=periodo_mod.rotulo_tipo, index=0, key='mg_tipo',
         )
     with col_periodo:
         opcoes_periodo = periodo_mod.listar_periodos(tipo_mg, n=16)
@@ -1305,156 +1306,165 @@ def _render_metas_gerais():
             format_func=lambda r: periodo_mod.rotulo(tipo_mg, r), index=0, key='mg_periodo',
         )
 
-    # ── Configuração de meta (única entrada manual desta tela) ─────────────
-    meta_atual = mg.carregar_meta(tipo_mg, ref_mg) or {}
-    with st.expander(f'🎯 Definir/editar meta — {periodo_mod.rotulo(tipo_mg, ref_mg)}'):
-        with st.form(key='mg_form_meta'):
-            mc1, mc2 = st.columns(2)
-            with mc1:
-                meta_fat = st.number_input('Meta Faturamento (R$)', min_value=0.0,
-                                            value=float(meta_atual.get('faturamento') or 0.0), step=1000.0)
-                meta_vol = st.number_input('Meta Volume (CX)', min_value=0.0,
-                                            value=float(meta_atual.get('volume') or 0.0), step=10.0)
-            with mc2:
-                meta_marg = st.number_input('Meta Margem (%)', min_value=0.0,
-                                             value=float(meta_atual.get('margem_pct') or 0.0), step=1.0)
-                meta_qbr = st.number_input('Teto de Quebra (CX)', min_value=0.0,
-                                            value=float(meta_atual.get('quebra_max_cx') or 0.0), step=10.0)
-            if st.form_submit_button('💾 Salvar meta', type='primary'):
-                mg.salvar_meta(tipo_mg, ref_mg, meta_fat, meta_vol, meta_marg, meta_qbr,
-                                usuario=st.session_state.get('usuario_nome'))
-                st.success('Meta salva.')
-                st.rerun()
-
     # ── Realizado (agregado automaticamente) ────────────────────────────────
     rv = mg.realizado_vendas(tipo_mg, ref_mg)
     rq = mg.realizado_quebra(tipo_mg, ref_mg)
-    pct_tempo_mg = periodo_mod.pct_tempo_decorrido(tipo_mg, ref_mg)
-
-    _completude_msgs = {
-        'sem_dado': f'⚪ Sem dado publicado ainda para {periodo_mod.rotulo(tipo_mg, ref_mg)} (fonte: {rv.get("origem","-")}).',
-        'parcial':  f'🟡 Dado parcial: {len(rv.get("meses_com_dado", []))}/{len(rv.get("meses_total", []))} mês(es) do período têm publicação.',
-        'completo': None,
-    }
-
-    st.subheader('Indicadores da Empresa')
-    ic1, ic2, ic3, ic4 = st.columns(4)
-    with ic1:
-        ot_fat = on_track.calcular(meta_atual.get('faturamento') or 0, rv.get('faturamento') or 0,
-                                    tipo_mg, ref_mg, pct_tempo_decorrido=pct_tempo_mg)
-        _render_indicador_mg('Faturamento', lambda x: f'R$ {x:,.0f}',
-                              meta_atual.get('faturamento'), rv.get('faturamento'), ot_fat,
-                              _completude_msgs.get(rv['completude']))
-    with ic2:
-        ot_vol = on_track.calcular(meta_atual.get('volume') or 0, rv.get('volume') or 0,
-                                    tipo_mg, ref_mg, pct_tempo_decorrido=pct_tempo_mg)
-        _render_indicador_mg('Volume (CX)', lambda x: f'{x:,.0f} cx',
-                              meta_atual.get('volume'), rv.get('volume'), ot_vol)
-    with ic3:
-        ot_marg = on_track.calcular(meta_atual.get('margem_pct') or 0, rv.get('margem_pct') or 0,
-                                     tipo_mg, ref_mg, pct_tempo_decorrido=pct_tempo_mg)
-        _render_indicador_mg('Margem (%)', lambda x: f'{x:.2f}%',
-                              meta_atual.get('margem_pct'), rv.get('margem_pct'), ot_marg)
-    with ic4:
-        ot_qbr = mg.status_quebra(meta_atual.get('quebra_max_cx'), rq.get('total_cx'), tipo_mg, ref_mg)
-        _render_indicador_mg('Quebra (CX)', lambda x: f'{x:,.0f} cx',
-                              meta_atual.get('quebra_max_cx'), rq.get('total_cx'), ot_qbr,
-                              _completude_msgs.get(rq['completude']))
-
-    # ── Comparativo vs período anterior ──────────────────────────────────────
-    st.subheader('📊 Comparativo vs período anterior')
     ref_ant_mg = periodo_mod.periodo_anterior(tipo_mg, ref_mg)
     rv_ant = mg.realizado_vendas(tipo_mg, ref_ant_mg)
     rq_ant = mg.realizado_quebra(tipo_mg, ref_ant_mg)
-    if rv.get('faturamento') is not None and rv_ant.get('faturamento') is not None:
-        cc1, cc2, cc3, cc4 = st.columns(4)
-        for _col, _lab, _atual, _ant, _fmt, _menor_melhor in [
-            (cc1, 'Faturamento', rv.get('faturamento'), rv_ant.get('faturamento'), lambda x: f'R$ {x:,.0f}', False),
-            (cc2, 'Volume (CX)', rv.get('volume'), rv_ant.get('volume'), lambda x: f'{x:,.0f}', False),
-            (cc3, 'Margem (%)', rv.get('margem_pct'), rv_ant.get('margem_pct'), lambda x: f'{x:.2f}%', False),
-            (cc4, 'Quebra (CX)', rq.get('total_cx'), rq_ant.get('total_cx'), lambda x: f'{x:,.0f}', True),
-        ]:
-            if _atual is None:
-                continue
-            _comp = comparativo.calcular(_atual, _ant, menor_e_melhor=_menor_melhor)
-            _col.metric(_lab, _fmt(_atual), delta=comparativo.formatar_variacao(_comp))
-        st.caption(f'Base de comparação: {periodo_mod.rotulo(tipo_mg, ref_ant_mg)}')
-    else:
-        st.info('Sem dado suficiente no período anterior para comparar.')
 
-    # ── Evolução ──────────────────────────────────────────────────────────────
-    st.subheader('📈 Evolução')
-    hist_refs = list(reversed(periodo_mod.listar_periodos(tipo_mg, n=8, ate=ref_mg)))
-    evol_rows = []
-    for r in hist_refs:
-        rv_h = mg.realizado_vendas(tipo_mg, r)
-        rq_h = mg.realizado_quebra(tipo_mg, r)
-        evol_rows.append({
-            'Período': periodo_mod.rotulo(tipo_mg, r),
-            'Faturamento': rv_h.get('faturamento') or 0,
-            'Quebra (CX)': rq_h.get('total_cx') or 0,
-        })
-    if evol_rows:
-        import pandas as _pd
-        df_evol = _pd.DataFrame(evol_rows).set_index('Período')
-        ev1, ev2 = st.columns(2)
-        with ev1:
-            st.caption('Faturamento (R$)')
-            st.bar_chart(df_evol[['Faturamento']], color='#2D6A4F')
-        with ev2:
-            st.caption('Quebra (CX)')
-            st.bar_chart(df_evol[['Quebra (CX)']], color='#C00000')
+    tab_empresa, tab_vendedor = st.tabs(['🏢 Empresa', '👤 Vendedor'])
 
-    # ── Ranking de vendedores ─────────────────────────────────────────────────
-    st.divider()
-    st.subheader('🏆 Ranking de Vendedores')
-    vendedores_mg = rv.get('vendedores') or {}
-    if not vendedores_mg:
-        st.info('Sem dado de vendedores para este período ainda.')
-    else:
-        ordenar_por = st.selectbox('Ordenar por', ['Faturamento', 'Volume (CX)', 'Margem %'],
-                                    key='mg_rank_ordenar')
-        fat_total_emp = sum(v.get('fat', 0) or 0 for v in vendedores_mg.values())
-        rows_rank = []
-        for nome, v in vendedores_mg.items():
-            rows_rank.append({
-                'Vendedor': nome,
-                'Faturamento': v.get('fat', 0) or 0,
-                'Volume (CX)': v.get('vol', 0) or 0,
-                'Margem %': v.get('mc_pct', 0) or 0,
-                'Participação': (v.get('fat', 0) or 0) / fat_total_emp * 100 if fat_total_emp else 0,
+    # =========================================================================
+    # ABA EMPRESA — consolidado (equivalente à aba "GERAL" do Vendedor-Cliente)
+    # =========================================================================
+    with tab_empresa:
+        meta_atual = mg.carregar_meta(tipo_mg, ref_mg) or {}
+        with st.expander(f'🎯 Definir/editar meta — {periodo_mod.rotulo(tipo_mg, ref_mg)}'):
+            with st.form(key='mg_form_meta'):
+                mc1, mc2 = st.columns(2)
+                with mc1:
+                    meta_fat = st.number_input('Meta Faturamento (R$)', min_value=0.0,
+                                                value=float(meta_atual.get('faturamento') or 0.0), step=1000.0)
+                    meta_vol = st.number_input('Meta Volume (CX)', min_value=0.0,
+                                                value=float(meta_atual.get('volume') or 0.0), step=10.0)
+                with mc2:
+                    meta_marg = st.number_input('Meta Margem (%)', min_value=0.0,
+                                                 value=float(meta_atual.get('margem_pct') or 0.0), step=1.0)
+                    meta_qbr = st.number_input('Teto de Quebra (CX)', min_value=0.0,
+                                                value=float(meta_atual.get('quebra_max_cx') or 0.0), step=10.0)
+                if st.form_submit_button('💾 Salvar meta', type='primary'):
+                    mg.salvar_meta(tipo_mg, ref_mg, meta_fat, meta_vol, meta_marg, meta_qbr,
+                                    usuario=st.session_state.get('usuario_nome'))
+                    st.success('Meta salva.')
+                    st.rerun()
+
+        pct_tempo_mg = periodo_mod.pct_tempo_decorrido(tipo_mg, ref_mg)
+        _completude_msgs = {
+            'sem_dado': f'⚪ Sem dado publicado ainda para {periodo_mod.rotulo(tipo_mg, ref_mg)} (fonte: {rv.get("origem","-")}).',
+            'parcial':  f'🟡 Dado parcial: {len(rv.get("meses_com_dado", []))}/{len(rv.get("meses_total", []))} mês(es) do período têm publicação.',
+            'completo': None,
+        }
+
+        st.subheader('Indicadores da Empresa')
+        ic1, ic2, ic3, ic4 = st.columns(4)
+        with ic1:
+            ot_fat = on_track.calcular(meta_atual.get('faturamento') or 0, rv.get('faturamento') or 0,
+                                        tipo_mg, ref_mg, pct_tempo_decorrido=pct_tempo_mg)
+            _render_indicador_mg('Faturamento', lambda x: f'R$ {x:,.0f}',
+                                  meta_atual.get('faturamento'), rv.get('faturamento'), ot_fat,
+                                  _completude_msgs.get(rv['completude']))
+        with ic2:
+            ot_vol = on_track.calcular(meta_atual.get('volume') or 0, rv.get('volume') or 0,
+                                        tipo_mg, ref_mg, pct_tempo_decorrido=pct_tempo_mg)
+            _render_indicador_mg('Volume (CX)', lambda x: f'{x:,.0f} cx',
+                                  meta_atual.get('volume'), rv.get('volume'), ot_vol)
+        with ic3:
+            ot_marg = on_track.calcular(meta_atual.get('margem_pct') or 0, rv.get('margem_pct') or 0,
+                                         tipo_mg, ref_mg, pct_tempo_decorrido=pct_tempo_mg)
+            _render_indicador_mg('Margem (%)', lambda x: f'{x:.2f}%',
+                                  meta_atual.get('margem_pct'), rv.get('margem_pct'), ot_marg)
+        with ic4:
+            ot_qbr = mg.status_quebra(meta_atual.get('quebra_max_cx'), rq.get('total_cx'), tipo_mg, ref_mg)
+            _render_indicador_mg('Quebra (CX)', lambda x: f'{x:,.0f} cx',
+                                  meta_atual.get('quebra_max_cx'), rq.get('total_cx'), ot_qbr,
+                                  _completude_msgs.get(rq['completude']))
+
+        # ── Comparativo vs período anterior ──────────────────────────────────
+        st.subheader('📊 Comparativo vs período anterior')
+        if rv.get('faturamento') is not None and rv_ant.get('faturamento') is not None:
+            cc1, cc2, cc3, cc4 = st.columns(4)
+            for _col, _lab, _atual, _ant, _fmt, _menor_melhor in [
+                (cc1, 'Faturamento', rv.get('faturamento'), rv_ant.get('faturamento'), lambda x: f'R$ {x:,.0f}', False),
+                (cc2, 'Volume (CX)', rv.get('volume'), rv_ant.get('volume'), lambda x: f'{x:,.0f}', False),
+                (cc3, 'Margem (%)', rv.get('margem_pct'), rv_ant.get('margem_pct'), lambda x: f'{x:.2f}%', False),
+                (cc4, 'Quebra (CX)', rq.get('total_cx'), rq_ant.get('total_cx'), lambda x: f'{x:,.0f}', True),
+            ]:
+                if _atual is None:
+                    continue
+                _comp = comparativo.calcular(_atual, _ant, menor_e_melhor=_menor_melhor)
+                _col.metric(_lab, _fmt(_atual), delta=comparativo.formatar_variacao(_comp))
+            st.caption(f'Base de comparação: {periodo_mod.rotulo(tipo_mg, ref_ant_mg)}')
+        else:
+            st.info('Sem dado suficiente no período anterior para comparar.')
+
+        # ── Evolução ──────────────────────────────────────────────────────────
+        st.subheader('📈 Evolução')
+        hist_refs = list(reversed(periodo_mod.listar_periodos(tipo_mg, n=8, ate=ref_mg)))
+        evol_rows = []
+        for r in hist_refs:
+            rv_h = mg.realizado_vendas(tipo_mg, r)
+            rq_h = mg.realizado_quebra(tipo_mg, r)
+            evol_rows.append({
+                'Período': periodo_mod.rotulo(tipo_mg, r),
+                'Faturamento': rv_h.get('faturamento') or 0,
+                'Quebra (CX)': rq_h.get('total_cx') or 0,
             })
-        chave_ord = {'Faturamento': 'Faturamento', 'Volume (CX)': 'Volume (CX)', 'Margem %': 'Margem %'}[ordenar_por]
-        rows_rank.sort(key=lambda r: r[chave_ord], reverse=True)
-        for i, r in enumerate(rows_rank, start=1):
-            r['#'] = i
-        df_rank = pd.DataFrame(rows_rank)[['#', 'Vendedor', 'Faturamento', 'Volume (CX)', 'Margem %', 'Participação']]
-        styled_rank = df_rank.style.format({
-            'Faturamento': 'R$ {:,.2f}', 'Volume (CX)': '{:,.3f}',
-            'Margem %': '{:.2f}%', 'Participação': '{:.1f}%',
-        })
-        st.dataframe(styled_rank, use_container_width=True, hide_index=True)
+        if evol_rows:
+            import pandas as _pd
+            df_evol = _pd.DataFrame(evol_rows).set_index('Período')
+            ev1, ev2 = st.columns(2)
+            with ev1:
+                st.caption('Faturamento (R$)')
+                st.bar_chart(df_evol[['Faturamento']], color='#2D6A4F')
+            with ev2:
+                st.caption('Quebra (CX)')
+                st.bar_chart(df_evol[['Quebra (CX)']], color='#C00000')
 
-        # Drill-down individual
-        st.subheader('🔎 Detalhe por vendedor')
-        vend_sel_mg = st.selectbox('Selecionar vendedor', sorted(vendedores_mg.keys()), key='mg_vend_sel')
-        v_sel = vendedores_mg.get(vend_sel_mg, {})
-        vend_ant = (rv_ant.get('vendedores') or {}).get(vend_sel_mg, {})
-        dc1, dc2, dc3, dc4 = st.columns(4)
-        dc1.metric('Faturamento', f"R$ {v_sel.get('fat', 0):,.2f}")
-        dc2.metric('Volume (CX)', f"{v_sel.get('vol', 0):,.3f}")
-        dc3.metric('Margem %', f"{v_sel.get('mc_pct', 0):.2f}%")
-        dc4.metric('Participação na empresa',
-                   f"{(v_sel.get('fat', 0) / fat_total_emp * 100) if fat_total_emp else 0:.1f}%")
-        if vend_ant:
-            st.caption('Comparativo vs período anterior')
-            comp_fat_v = comparativo.calcular(v_sel.get('fat', 0), vend_ant.get('fat'))
-            comp_vol_v = comparativo.calcular(v_sel.get('vol', 0), vend_ant.get('vol'))
-            dcc1, dcc2 = st.columns(2)
-            dcc1.metric('Faturamento', f"R$ {v_sel.get('fat', 0):,.2f}",
-                        delta=comparativo.formatar_variacao(comp_fat_v))
-            dcc2.metric('Volume (CX)', f"{v_sel.get('vol', 0):,.3f}",
-                        delta=comparativo.formatar_variacao(comp_vol_v))
+    # =========================================================================
+    # ABA VENDEDOR — ranking + detalhe individual (equivalente às abas por
+    # vendedor do Vendedor-Cliente)
+    # =========================================================================
+    with tab_vendedor:
+        vendedores_mg = rv.get('vendedores') or {}
+        if not vendedores_mg:
+            st.info('Sem dado de vendedores para este período ainda.')
+        else:
+            st.subheader('🏆 Ranking de Vendedores')
+            ordenar_por = st.selectbox('Ordenar por', ['Faturamento', 'Volume (CX)', 'Margem %'],
+                                        key='mg_rank_ordenar')
+            fat_total_emp = sum(v.get('fat', 0) or 0 for v in vendedores_mg.values())
+            rows_rank = []
+            for nome, v in vendedores_mg.items():
+                rows_rank.append({
+                    'Vendedor': nome,
+                    'Faturamento': v.get('fat', 0) or 0,
+                    'Volume (CX)': v.get('vol', 0) or 0,
+                    'Margem %': v.get('mc_pct', 0) or 0,
+                    'Participação': (v.get('fat', 0) or 0) / fat_total_emp * 100 if fat_total_emp else 0,
+                })
+            chave_ord = {'Faturamento': 'Faturamento', 'Volume (CX)': 'Volume (CX)', 'Margem %': 'Margem %'}[ordenar_por]
+            rows_rank.sort(key=lambda r: r[chave_ord], reverse=True)
+            for i, r in enumerate(rows_rank, start=1):
+                r['#'] = i
+            df_rank = pd.DataFrame(rows_rank)[['#', 'Vendedor', 'Faturamento', 'Volume (CX)', 'Margem %', 'Participação']]
+            styled_rank = df_rank.style.format({
+                'Faturamento': 'R$ {:,.2f}', 'Volume (CX)': '{:,.3f}',
+                'Margem %': '{:.2f}%', 'Participação': '{:.1f}%',
+            })
+            st.dataframe(styled_rank, use_container_width=True, hide_index=True)
+
+            # Drill-down individual
+            st.divider()
+            st.subheader('🔎 Detalhe por vendedor')
+            vend_sel_mg = st.selectbox('Selecionar vendedor', sorted(vendedores_mg.keys()), key='mg_vend_sel')
+            v_sel = vendedores_mg.get(vend_sel_mg, {})
+            vend_ant = (rv_ant.get('vendedores') or {}).get(vend_sel_mg, {})
+            dc1, dc2, dc3, dc4 = st.columns(4)
+            dc1.metric('Faturamento', f"R$ {v_sel.get('fat', 0):,.2f}")
+            dc2.metric('Volume (CX)', f"{v_sel.get('vol', 0):,.3f}")
+            dc3.metric('Margem %', f"{v_sel.get('mc_pct', 0):.2f}%")
+            dc4.metric('Participação na empresa',
+                       f"{(v_sel.get('fat', 0) / fat_total_emp * 100) if fat_total_emp else 0:.1f}%")
+            if vend_ant:
+                st.caption('Comparativo vs período anterior')
+                comp_fat_v = comparativo.calcular(v_sel.get('fat', 0), vend_ant.get('fat'))
+                comp_vol_v = comparativo.calcular(v_sel.get('vol', 0), vend_ant.get('vol'))
+                dcc1, dcc2 = st.columns(2)
+                dcc1.metric('Faturamento', f"R$ {v_sel.get('fat', 0):,.2f}",
+                            delta=comparativo.formatar_variacao(comp_fat_v))
+                dcc2.metric('Volume (CX)', f"{v_sel.get('vol', 0):,.3f}",
+                            delta=comparativo.formatar_variacao(comp_vol_v))
 
 
 # ── Auth ──────────────────────────────────────────────────────────────────────
@@ -1478,7 +1488,7 @@ st.divider()
 
 # ── Grupos de abas ───────────────────────────────────────────────────────────
 grp_vendas, grp_metas, grp_metas_gerais, grp_clientes, grp_quebras, grp_prevperdas = st.tabs([
-    '📊 Vendas',
+    '📊 Dashboards',
     '🎯 Metas Semanais',
     '🌐 Metas Gerais',
     '👥 Clientes',
