@@ -1,14 +1,18 @@
 """Gera o dashboard HTML gerencial 'dashboard_gerencial_othil_DDMMAAAA.html'.
 
-Dois indicadores:
-  MC R$  = Faturamento - Custo_PDF  (valor monetario do prejuizo/lucro)
-  Resultado Real % = MC% + 15pp  (= Resultado%_PDF + 15pp de despesa adm)
+Três indicadores:
+  MC R$              = Faturamento - Custo_PDF  (valor monetario do prejuizo/lucro)
+  Margem de Contribuição % (MC %) = MC R$ / Custo_PDF x 100  (margem pura, sem adm.)
+  MC com Adm %       = MC% + % administrativo do PRODUTO (tabela margem_produto.py;
+                        antes era um "+15pp" fixo e igual pra todo produto -- agora
+                        cada produto tem seu proprio percentual)
 
   Filtro de Alertas: MC % < -15%  (inclui todos os itens com margem ruim)
 """
 import json
 import os
 from categorias import map_categoria
+from margem_produto import pct_admin, PADRAO_PCT
 
 _CHARTJS_PATH = os.path.join(os.path.dirname(__file__), 'chart_umd.js')
 with open(_CHARTJS_PATH, encoding='utf-8') as _f:
@@ -20,11 +24,23 @@ VERMELHO_BG, VERMELHO_FG = '#FADADD', '#7A1F2B'
 HEADER_BG,   HEADER_FG   = '#2D6A4F', '#FFFFFF'
 
 
-def _calc(faturamento, custo_pdf):
-    """(mc_rs, mc_pct, resultado_real_pct)"""
-    mc_rs  = faturamento - custo_pdf
-    mc_pct = mc_rs / custo_pdf * 100 if custo_pdf else 0.0
-    return round(mc_rs, 2), round(mc_pct, 2), round(mc_pct + 15, 2)
+def _agg(itens):
+    """Agrega uma lista de itens em (mc_rs, mc_pct, resultado_real_pct).
+
+    mc_pct            = Margem de Contribuição % (MC %) pura -- MC R$/Custo x100.
+    resultado_real_pct = MC com Adm % -- soma o % administrativo de CADA
+    produto (tabela margem_produto.py), ponderado pelo custo de cada item,
+    em vez do antigo "+15pp" fixo e igual pra todo produto. Com um único
+    item, ou quando todos os itens têm o mesmo %, o resultado é idêntico ao
+    cálculo anterior (mc_pct + %)."""
+    fat_total   = sum(it['faturamento'] for it in itens)
+    custo_total = sum(it['custo_total'] for it in itens)
+    adm_rs_total = sum(it['custo_total'] * pct_admin(it['produto'])[0] / 100 for it in itens)
+
+    mc_rs  = fat_total - custo_total
+    mc_pct = mc_rs / custo_total * 100 if custo_total else 0.0
+    adm_pp = adm_rs_total / custo_total * 100 if custo_total else PADRAO_PCT
+    return round(mc_rs, 2), round(mc_pct, 2), round(mc_pct + adm_pp, 2)
 
 
 def _status(resultado_real_pct):
@@ -36,11 +52,14 @@ def _status(resultado_real_pct):
 def _montar_dados(parsed):
     itens = parsed['itens']
 
-    fat_total    = sum(it['faturamento'] for it in itens)
-    custo_total  = sum(it['custo_total'] for it in itens)
-    caixas_total = sum(it['qtd']         for it in itens)
-    mc_rs_total, mc_pct_total, res_real_total = _calc(fat_total, custo_total)
+    caixas_total = sum(it['qtd'] for it in itens)
+    mc_rs_total, mc_pct_total, res_real_total = _agg(itens)
     clientes_distintos = len(set(it['cliente_codigo'] for it in itens))
+
+    # ---- produtos sem % cadastrado na tabela margem_produto.py ----------
+    produtos_sem_pct = sorted({
+        it['produto'] for it in itens if not pct_admin(it['produto'])[1]
+    })
 
     # ---- ranking de vendedores -----------------------------------------
     por_vendedor = {}
@@ -53,14 +72,13 @@ def _montar_dados(parsed):
     ranking = []
     for vname, d in por_vendedor.items():
         fat    = sum(it['faturamento'] for it in d['itens'])
-        custo  = sum(it['custo_total'] for it in d['itens'])
         caixas = sum(it['qtd']         for it in d['itens'])
-        mc_rs, _, res_real = _calc(fat, custo)
+        mc_rs, mc_pct, res_real = _agg(d['itens'])
         status, bg, fg = _status(res_real)
         ranking.append({
             'vendedor': vname, 'clientes': len(d['clientes']),
             'caixas': round(caixas, 3), 'faturamento': round(fat, 2),
-            'mc_rs': mc_rs, 'resultado_real_pct': res_real,
+            'mc_rs': mc_rs, 'mc_pct': mc_pct, 'resultado_real_pct': res_real,
             'status': status, 'bg': bg, 'fg': fg,
         })
     ranking.sort(key=lambda r: -r['faturamento'])
@@ -70,42 +88,41 @@ def _montar_dados(parsed):
     por_categoria = {}
     for it in itens:
         cat = map_categoria(it['produto'])
-        d = por_categoria.setdefault(cat, {'fat': 0.0, 'custo': 0.0})
-        d['fat']   += it['faturamento']
-        d['custo'] += it['custo_total']
+        por_categoria.setdefault(cat, []).append(it)
     categorias_lista = []
-    for cat, d in sorted(por_categoria.items(), key=lambda x: -x[1]['fat']):
-        mc_rs_cat, _, res_real_cat = _calc(d['fat'], d['custo'])
+    for cat, itens_cat in sorted(por_categoria.items(),
+                                  key=lambda x: -sum(i['faturamento'] for i in x[1])):
+        fat_cat = sum(i['faturamento'] for i in itens_cat)
+        mc_rs_cat, mc_pct_cat, res_real_cat = _agg(itens_cat)
         categorias_lista.append({
-            'categoria': cat, 'faturamento': round(d['fat'], 2),
-            'mc_rs': mc_rs_cat, 'resultado_real_pct': res_real_cat,
+            'categoria': cat, 'faturamento': round(fat_cat, 2),
+            'mc_rs': mc_rs_cat, 'mc_pct': mc_pct_cat, 'resultado_real_pct': res_real_cat,
         })
 
     # ---- top 10 clientes -----------------------------------------------
     por_cliente = {}
     for it in itens:
         cod = it['cliente_codigo']
-        d = por_cliente.setdefault(cod, {'nome': it['cliente_nome'], 'fat': 0.0, 'custo': 0.0})
-        d['fat']   += it['faturamento']
-        d['custo'] += it['custo_total']
+        d = por_cliente.setdefault(cod, {'nome': it['cliente_nome'], 'itens': []})
+        d['itens'].append(it)
     top_clientes = []
-    for cod, d in sorted(por_cliente.items(), key=lambda x: -x[1]['fat'])[:10]:
-        mc_rs_cli, _, res_real_cli = _calc(d['fat'], d['custo'])
+    for cod, d in sorted(por_cliente.items(),
+                          key=lambda x: -sum(i['faturamento'] for i in x[1]['itens']))[:10]:
+        fat_cli = sum(i['faturamento'] for i in d['itens'])
+        mc_rs_cli, mc_pct_cli, res_real_cli = _agg(d['itens'])
         top_clientes.append({
             'cliente': d['nome'], 'codigo': cod,
-            'faturamento': round(d['fat'], 2),
-            'mc_rs': mc_rs_cli, 'resultado_real_pct': res_real_cli,
+            'faturamento': round(fat_cli, 2),
+            'mc_rs': mc_rs_cli, 'mc_pct': mc_pct_cli, 'resultado_real_pct': res_real_cli,
         })
 
     # ---- alertas: MC % < -15% ------------------------------------------
     alertas = []
-    alertas_fat    = 0.0
-    alertas_mc_rs  = 0.0
-    alertas_custo  = 0.0
-    alertas_caixas = 0.0
-    for it in itens:
-        mc_rs_it, mc_pct_it, res_real_it = _calc(it['faturamento'], it['custo_total'])
+    itens_alertas_idx = set()
+    for idx, it in enumerate(itens):
+        mc_rs_it, mc_pct_it, res_real_it = _agg([it])
         if mc_pct_it < -15:
+            itens_alertas_idx.add(idx)
             qtd = it['qtd']
             venda_unit = it['faturamento'] / qtd if qtd else 0.0
             status, bg, fg = _status(res_real_it)
@@ -117,21 +134,21 @@ def _montar_dados(parsed):
                 'custo_unit':     round(it['custo_unit'], 2),
                 'venda_unit':     round(venda_unit, 2),
                 'mc_rs':          round(mc_rs_it, 2),
+                'mc_pct':         round(mc_pct_it, 2),
                 'resultado_real': round(res_real_it, 2),
                 'status': status, 'bg': bg, 'fg': fg,
             })
-            alertas_fat    += it['faturamento']
-            alertas_mc_rs  += mc_rs_it
-            alertas_custo  += it['custo_total']
-            alertas_caixas += qtd
     alertas.sort(key=lambda a: a['resultado_real'])
 
     # ---- impacto -------------------------------------------------------
+    itens_com_alerta = [itens[i] for i in itens_alertas_idx]
+    itens_sem_alerta = [itens[i] for i in range(len(itens)) if i not in itens_alertas_idx]
+    fat_total     = sum(it['faturamento'] for it in itens)
+    alertas_fat   = sum(it['faturamento'] for it in itens_com_alerta)
+    alertas_mc_rs = sum(_agg([it])[0] for it in itens_com_alerta)
+    alertas_caixas = sum(it['qtd'] for it in itens_com_alerta)
     pct_fat_alertas = alertas_fat / fat_total * 100 if fat_total else 0.0
-    custo_sem = custo_total - alertas_custo
-    mc_rs_sem = mc_rs_total - alertas_mc_rs
-    mc_pct_sem = mc_rs_sem / custo_sem * 100 if custo_sem else 0.0
-    res_real_sem = mc_pct_sem + 15
+    _mc_rs_sem, _mc_pct_sem, res_real_sem = _agg(itens_sem_alerta)
     impacto_pp = res_real_sem - res_real_total
 
     impacto = {
@@ -151,6 +168,7 @@ def _montar_dados(parsed):
         'kpis': {
             'faturamento':        round(fat_total, 2),
             'mc_rs':              mc_rs_total,
+            'mc_pct':             mc_pct_total,
             'resultado_real_pct': res_real_total,
             'caixas':             round(caixas_total, 3),
             'clientes':           clientes_distintos,
@@ -161,6 +179,7 @@ def _montar_dados(parsed):
         'top_clientes': top_clientes,
         'alertas':      alertas,
         'impacto':      impacto,
+        'produtos_sem_pct': produtos_sem_pct,
     }
 
 
@@ -185,7 +204,7 @@ _HTML_TEMPLATE = (
   header h1 { margin: 0; font-size: 20px; }
   header p  { margin: 4px 0 0; font-size: 12px; opacity: 0.9; }
   main { padding: 20px 24px 40px; max-width: 1400px; margin: 0 auto; }
-  .kpis { display: grid; grid-template-columns: repeat(6, 1fr); gap: 10px; margin-bottom: 24px; }
+  .kpis { display: grid; grid-template-columns: repeat(7, 1fr); gap: 10px; margin-bottom: 24px; }
   .kpi  { background: #fff; border-radius: 8px; padding: 12px 10px; text-align: center;
     box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
   .kpi .label { font-size: 10px; color: #666; text-transform: uppercase; letter-spacing: .03em; }
@@ -260,11 +279,19 @@ _HTML_TEMPLATE = (
   <h1>Relatorio Diario de Vendas OTHIL -- Dashboard Gerencial</h1>
   <p>Dia: __DATA_EMISSAO__ &nbsp;|&nbsp; Periodo: __PERIODO__
      &nbsp;|&nbsp;
-     <small>MC R$ = Fat - Custo &nbsp;|&nbsp; Resultado Real % = (MC R$ / Custo x 100) + 15pp</small></p>
+     <small>MC R$ = Fat - Custo &nbsp;|&nbsp; MC % = Margem de Contribuição (MC R$ / Custo x 100)
+     &nbsp;|&nbsp; MC com Adm % = MC % + % administrativo do produto</small></p>
 </header>
 <main>
 
   <div class="kpis" id="kpis"></div>
+
+  <section id="secaoSemPct" style="display:none;">
+    <div class="impacto-note" style="background:__AMARELO_BG__;color:__AMARELO_FG__;border-left-color:#D4AC0D;">
+      ⚠️ <strong><span id="qtdSemPct"></span> produto(s) sem % cadastrado</strong> na tabela de Margem de
+      Contribuição — usando o padrão de __PADRAO_PCT__% até serem cadastrados: <span id="listaSemPct"></span>
+    </div>
+  </section>
 
   <section>
     <h2>Faturamento por vendedor</h2>
@@ -275,7 +302,7 @@ _HTML_TEMPLATE = (
           <thead><tr>
             <th>Vendedor</th><th class="num">Clientes</th><th class="num">Caixas</th>
             <th class="num">Faturamento R$</th><th class="num">MC R$</th>
-            <th class="num">Resultado Real %</th><th>Status</th>
+            <th class="num">MC %</th><th class="num">MC com Adm %</th><th>Status</th>
           </tr></thead>
           <tbody></tbody>
         </table>
@@ -292,7 +319,7 @@ _HTML_TEMPLATE = (
           <table id="tabelaCategorias">
             <thead><tr>
               <th>Categoria</th><th class="num">Faturamento R$</th>
-              <th class="num">MC R$</th><th class="num">Resultado Real %</th>
+              <th class="num">MC R$</th><th class="num">MC %</th><th class="num">MC com Adm %</th>
             </tr></thead>
             <tbody></tbody>
           </table>
@@ -305,7 +332,7 @@ _HTML_TEMPLATE = (
           <table id="tabelaClientes">
             <thead><tr>
               <th>Cliente</th><th class="num">Faturamento R$</th>
-              <th class="num">MC R$</th><th class="num">Resultado Real %</th>
+              <th class="num">MC R$</th><th class="num">MC %</th><th class="num">MC com Adm %</th>
             </tr></thead>
             <tbody></tbody>
           </table>
@@ -322,7 +349,7 @@ _HTML_TEMPLATE = (
           <th>Vendedor</th><th>Cliente</th><th>Produto</th>
           <th class="num">Qtd</th>
           <th class="num">Custo Unit.</th><th class="num">Venda Unit.</th>
-          <th class="num">MC R$</th><th class="num">Resultado Real %</th><th>Situacao</th>
+          <th class="num">MC R$</th><th class="num">MC %</th><th class="num">MC com Adm %</th><th>Situacao</th>
         </tr></thead>
         <tbody></tbody>
       </table>
@@ -338,7 +365,8 @@ _HTML_TEMPLATE = (
 </main>
 <button class="btn-print" onclick="window.print()">Imprimir / Salvar PDF</button>
 <footer>Gerado automaticamente -- PDF Lucratividade por Vendedor-Cliente no Previsao (Mercatus).
-MC R$ = Faturamento - Custo &nbsp;|&nbsp; Resultado Real % = MC% + 15pp.</footer>
+MC R$ = Faturamento - Custo &nbsp;|&nbsp; MC % = Margem de Contribuição &nbsp;|&nbsp;
+MC com Adm % = MC % + % administrativo do produto (tabela por produto).</footer>
 
 <script>
 const DADOS = __DADOS_JSON__;
@@ -356,16 +384,25 @@ function resColor(pct) {
 function montarKpis() {
   const k = DADOS.kpis;
   const cards = [
-    ['Faturamento',       fmtMoney(k.faturamento)],
-    ['MC R$',             fmtMoney(k.mc_rs)],
-    ['Resultado Real %',  fmtPct(k.resultado_real_pct)],
-    ['Caixas',            fmtQty(k.caixas)],
-    ['Clientes',          k.clientes],
-    ['Vendedores Ativos', k.vendedores_ativos],
+    ['Faturamento',              fmtMoney(k.faturamento)],
+    ['MC R$',                    fmtMoney(k.mc_rs)],
+    ['Margem de Contribuição %', fmtPct(k.mc_pct)],
+    ['MC com Adm %',             fmtPct(k.resultado_real_pct)],
+    ['Caixas',                   fmtQty(k.caixas)],
+    ['Clientes',                 k.clientes],
+    ['Vendedores Ativos',        k.vendedores_ativos],
   ];
   document.getElementById('kpis').innerHTML = cards.map(([label, value]) =>
     '<div class="kpi"><div class="label">' + label + '</div><div class="value">' + value + '</div></div>'
   ).join('');
+}
+
+function montarSemPct() {
+  const lista = DADOS.produtos_sem_pct || [];
+  if (!lista.length) return;
+  document.getElementById('secaoSemPct').style.display = '';
+  document.getElementById('qtdSemPct').textContent = lista.length;
+  document.getElementById('listaSemPct').textContent = lista.join(', ');
 }
 
 function montarRanking() {
@@ -379,6 +416,7 @@ function montarRanking() {
       '<td class="num">' + fmtQty(r.caixas) + '</td>' +
       '<td class="num">' + fmtMoney(r.faturamento) + '</td>' +
       '<td class="num" style="color:' + (mcNeg?'__VERMELHO_FG__':'inherit') + ';font-weight:' + (mcNeg?'bold':'normal') + ';">' + fmtMoney(r.mc_rs) + '</td>' +
+      '<td class="num">' + fmtPct(r.mc_pct) + '</td>' +
       '<td class="num" style="background:' + cRes.bg + ';color:' + cRes.fg + ';font-weight:bold;">' + fmtPct(r.resultado_real_pct) + '</td>' +
       '<td><span class="badge" style="background:' + r.bg + ';color:' + r.fg + ';">' + r.status + '</span></td>' +
       '</tr>';
@@ -426,6 +464,7 @@ function montarCategorias() {
       '<td>' + c.categoria + '</td>' +
       '<td class="num">' + fmtMoney(c.faturamento) + '</td>' +
       '<td class="num" style="color:' + (mcNeg?'__VERMELHO_FG__':'inherit') + ';font-weight:' + (mcNeg?'bold':'normal') + ';">' + fmtMoney(c.mc_rs) + '</td>' +
+      '<td class="num">' + fmtPct(c.mc_pct) + '</td>' +
       '<td class="num" style="background:' + cRes.bg + ';color:' + cRes.fg + ';font-weight:bold;">' + fmtPct(c.resultado_real_pct) + '</td>' +
       '</tr>';
   }).join('');
@@ -444,7 +483,7 @@ function montarClientes() {
         plugins: { legend:{display:false},
           tooltip: { callbacks: { afterLabel: ctx => {
             const c = DADOS.top_clientes[ctx.dataIndex];
-            return 'MC: ' + fmtMoney(c.mc_rs) + ' | Res. Real: ' + fmtPct(c.resultado_real_pct);
+            return 'MC: ' + fmtMoney(c.mc_rs) + ' | MC com Adm: ' + fmtPct(c.resultado_real_pct);
           }}}},
         scales: { x:{ beginAtZero:true, ticks:{ callback: v=>'R$'+v.toLocaleString('pt-BR') } } } },
     });
@@ -458,6 +497,7 @@ function montarClientes() {
       '<td class="wrap">' + c.cliente + '</td>' +
       '<td class="num">' + fmtMoney(c.faturamento) + '</td>' +
       '<td class="num" style="color:' + (mcNeg?'__VERMELHO_FG__':'inherit') + ';font-weight:' + (mcNeg?'bold':'normal') + ';">' + fmtMoney(c.mc_rs) + '</td>' +
+      '<td class="num">' + fmtPct(c.mc_pct) + '</td>' +
       '<td class="num" style="background:' + cRes.bg + ';color:' + cRes.fg + ';font-weight:bold;">' + fmtPct(c.resultado_real_pct) + '</td>' +
       '</tr>';
   }).join('');
@@ -476,6 +516,7 @@ function montarAlertas() {
       '<td class="num">' + fmtMoney(a.custo_unit) + '</td>' +
       '<td class="num">' + fmtMoney(a.venda_unit) + '</td>' +
       '<td class="num" style="color:__VERMELHO_FG__;font-weight:bold;">' + fmtMoney(a.mc_rs) + '</td>' +
+      '<td class="num">' + fmtPct(a.mc_pct) + '</td>' +
       '<td class="num" style="background:' + cRes.bg + ';color:' + cRes.fg + ';font-weight:bold;">' + fmtPct(a.resultado_real) + '</td>' +
       '<td><span class="badge" style="background:' + a.bg + ';color:' + a.fg + ';">' + a.status + '</span></td>' +
       '</tr>';
@@ -499,7 +540,7 @@ function montarImpacto() {
     { label:'MC R$ acumulada',            value: fmtMoney(imp.mc_rs_alertas),
       bg: mcNeg?'__VERMELHO_BG__':'__VERDE_BG__',
       fg: mcNeg?'__VERMELHO_FG__':'__VERDE_FG__' },
-    { label:'Impacto no Res. Real',       value: (imp.impacto_pp>0?'+':'') + fmtSimple(imp.impacto_pp) + ' pp',
+    { label:'Impacto no MC com Adm',      value: (imp.impacto_pp>0?'+':'') + fmtSimple(imp.impacto_pp) + ' pp',
       bg:'__AMARELO_BG__',  fg:'__AMARELO_FG__' },
   ];
   document.getElementById('impactoCards').innerHTML = cards.map(c =>
@@ -513,13 +554,13 @@ function montarImpacto() {
     '<strong>Analise:</strong> As ' + imp.n_alertas + ' vendas com MC % abaixo de -15% representam ' +
     '<strong>' + fmtSimple(imp.pct_fat_alertas) + '</strong> do faturamento (' + fmtMoney(imp.fat_alertas) + ') ' +
     'e acumulam MC de <strong>' + fmtMoney(imp.mc_rs_alertas) + '</strong>. ' +
-    'Sem essas vendas, o Resultado Real ' + dir + ' de ' +
+    'Sem essas vendas, o MC com Adm ' + dir + ' de ' +
     '<strong>' + fmtPct(imp.res_real_total) + '</strong> para ' +
     '<strong>' + fmtPct(imp.res_real_sem_alertas) + '</strong> ' +
     '(impacto de <strong>' + (imp.impacto_pp>0?'+':'') + fmtSimple(imp.impacto_pp) + ' pp</strong>).';
 }
 
-[montarKpis, montarRanking, montarCategorias, montarClientes, montarAlertas, montarImpacto].forEach(fn => {
+[montarKpis, montarSemPct, montarRanking, montarCategorias, montarClientes, montarAlertas, montarImpacto].forEach(fn => {
   try { fn(); } catch(e) { console.error('Erro:', e); }
 });
 </script>
@@ -551,6 +592,7 @@ def gerar_dashboard(parsed, output_path, tipo='diario'):
             .replace('__AMARELO_BG__',   AMARELO_BG) .replace('__AMARELO_FG__',  AMARELO_FG)
             .replace('__VERMELHO_BG__',  VERMELHO_BG).replace('__VERMELHO_FG__', VERMELHO_FG)
             .replace('__HEADER_BG__',    HEADER_BG)  .replace('__HEADER_FG__',   HEADER_FG)
+            .replace('__PADRAO_PCT__',   f'{PADRAO_PCT:g}')
             .replace('__DADOS_JSON__',   json.dumps(dados, ensure_ascii=False)))
     with open(output_path, 'w', encoding='utf-8') as f:
         f.write(html)
