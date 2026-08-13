@@ -114,8 +114,12 @@ def _col(descricao: str) -> str:
     if re.search(r'\b(ARGENTINA|CHILENA|PINK LADY|GRAN.?SMITH|GRANNY.?SMITH)\b', d):
         return 'MACA ARGENTINA'
 
-    # Peras — captura WILLIAMS, WILLIAM, WILLIANS, WILLAMS, WILL (abrev.), PACKHAM
-    if re.search(r'\bWILL(IANS?|AMS?|IAM)?S?\b|\bPACKHAMS?\b', d) and 'BANANA' not in d:
+    # Peras — Packham (com ou sem H, com ou sem 'S) tem grupo proprio, separado
+    # de Williams
+    if re.search(r"\bPACKH?AM'?S?\b", d) and 'BANANA' not in d:
+        return 'PERA PACKHAM'
+    # Peras Williams — captura WILLIAMS, WILLIAM, WILLIANS, WILLAMS, WILL (abrev.)
+    if re.search(r'\bWILL(IANS?|AMS?|IAM)?S?\b', d) and 'BANANA' not in d:
         return 'PERA WILLIAMS'
     if re.search(r'\bPORTUGUESA\b', d) and 'UVA' not in d:
         return 'PERA PORTUGUESA'
@@ -192,6 +196,7 @@ _DISPLAY = {
     'MACA FUJI':            'MACA FUJI',
     'MACA ARGENTINA':       'MACA ARGENTINA',
     'PERA WILLIAMS':        'PERA WILLIAMS',
+    'PERA PACKHAM':         'PERA PACKHAM',
     'PERA PORTUGUESA':      'PERA PORTUGUESA',
     'FORELLE / ERCOLINE':   'FORELLE / ERCOLINE',
     'UVA THOMPSON':         'UVA THOMPSON',
