@@ -19,6 +19,13 @@ from parsers_vendedor import parse_totais_vendedor
 from calc import compute_metas, VENDEDORES_PADRAO, parse_codigos_input, map_vendedor, codigo_matches
 from pdfgen import generate_relatorio_vendedor, generate_dashboard, generate_resumo_geral
 import storage
+import periodo
+import comparativo
+import on_track
+import data_store as ds
+
+MODULO = 'metas_semanais_fechamento'
+MODULO_ONTRACK = 'metas_semanais_ontrack'
 
 CONFIG_PATH = 'config_semanal.json'
 _FECHAMENTOS_DIR  = os.path.join(os.path.dirname(__file__), '..', 'gerencia_data', 'fechamentos')
@@ -69,23 +76,28 @@ def save_config(cfg, show_feedback=True):
 # ---------------------------------------------------------------------------
 
 def _slug_semana(data: datetime.date) -> str:
-    iso = data.isocalendar()
-    return f"{iso[0]}-W{iso[1]:02d}"
+    """periodo_ref padrão (semana ISO) da semana que contém `data`."""
+    return periodo.periodo_ref('semanal', data)
 
 
 def _label_semana(slug: str) -> str:
     try:
-        year, week = slug.split('-W')
-        return f"Semana {int(week):02d} / {year}"
+        return periodo.rotulo('semanal', slug)
     except Exception:
         return slug
 
 
-def _salvar_fechamento(resultados: list, totais_rs: dict, periodo: str, slug: str):
+def _salvar_fechamento(resultados: list, totais_rs: dict, periodo_txt: str, slug: str,
+                        usuario: str = None):
+    """Salva o fechamento da semana. Grava local (compatibilidade com a
+    leitura já existente na página de Gerência) E na camada central de
+    persistência (data_store — sobrevive a restart do Streamlit Cloud e
+    mantém histórico versionado: fechar a mesma semana de novo não apaga
+    o fechamento anterior, ele fica disponível em 'histórico de versões')."""
     os.makedirs(_FECHAMENTOS_DIR, exist_ok=True)
     payload = {
         'slug': slug,
-        'periodo': periodo,
+        'periodo': periodo_txt,
         'gerado_em': datetime.datetime.now().isoformat(),
         'produtos': resultados,
         'totais_rs': totais_rs,
@@ -94,20 +106,55 @@ def _salvar_fechamento(resultados: list, totais_rs: dict, periodo: str, slug: st
     with open(path, 'w', encoding='utf-8') as f:
         json.dump(payload, f, ensure_ascii=False, indent=2)
 
+    try:
+        ds.save_record(
+            modulo=MODULO, tipo_periodo='semanal', periodo_ref=slug,
+            valores={'periodo': periodo_txt, 'produtos': resultados, 'totais_rs': totais_rs},
+            usuario=usuario,
+        )
+    except Exception as e:
+        st.warning(
+            f'O fechamento foi salvo localmente, mas houve um problema ao salvar '
+            f'de forma permanente (histórico pode não sobreviver a um restart do '
+            f'app): {e}'
+        )
+
 
 def _listar_fechamentos():
+    """Lista os fechamentos salvos, mais recente primeiro. A fonte
+    principal é a persistência real (data_store), que sobrevive a um
+    restart do app; arquivos locais antigos (salvos antes desta migração,
+    ou se a gravação remota falhar) entram como complemento."""
+    items = {}
+    try:
+        for slug in ds.list_periodos(MODULO, 'semanal'):
+            registro = ds.load_current(MODULO, 'semanal', slug)
+            if registro:
+                items[slug] = {
+                    'periodo': registro['valores'].get('periodo', ''),
+                    'gerado_em': registro.get('atualizado_em', ''),
+                    'produtos': registro['valores'].get('produtos', []),
+                    'totais_rs': registro['valores'].get('totais_rs', {}),
+                    'usuario': registro.get('usuario'),
+                    'versao': registro.get('versao'),
+                }
+    except Exception:
+        pass
+
     os.makedirs(_FECHAMENTOS_DIR, exist_ok=True)
-    items = []
-    for fname in sorted(os.listdir(_FECHAMENTOS_DIR), reverse=True):
+    for fname in os.listdir(_FECHAMENTOS_DIR):
         if not fname.endswith('.json'):
+            continue
+        slug = fname.replace('.json', '')
+        if slug in items:
             continue
         try:
             with open(os.path.join(_FECHAMENTOS_DIR, fname), 'r', encoding='utf-8') as f:
-                data = json.load(f)
-            items.append((fname.replace('.json', ''), data))
+                items[slug] = json.load(f)
         except Exception:
             pass
-    return items
+
+    return sorted(items.items(), key=lambda kv: kv[0], reverse=True)
 
 
 # ---------------------------------------------------------------------------
@@ -150,23 +197,26 @@ def _diagnostico_codigos(vendas_rows: list, produtos_config: list) -> list:
 # On Track helpers
 # ---------------------------------------------------------------------------
 
+_STATUS_COR = {
+    on_track.STATUS_VERDE:    '#2D6A4F',
+    on_track.STATUS_ATENCAO:  '#B8860B',
+    on_track.STATUS_FORA:     '#C00000',
+    on_track.STATUS_SEM_META: '#6c757d',
+}
+
+
 def _on_track_status(atingido: float, dia: int, total_dias: int = 5):
-    """Retorna (emoji, label, hex_color)."""
-    if dia <= 0:
-        if atingido >= 0.80:
-            return '🟢', 'On Track', '#2D6A4F'
-        elif atingido >= 0.50:
-            return '🟡', 'Atenção', '#B8860B'
-        else:
-            return '🔴', 'Atrasado', '#C00000'
-    expected = dia / total_dias
-    ratio = atingido / expected if expected > 0 else 0
-    if ratio >= 0.85:
-        return '🟢', 'On Track', '#2D6A4F'
-    elif ratio >= 0.55:
-        return '🟡', 'Atenção', '#B8860B'
-    else:
-        return '🔴', 'Atrasado', '#C00000'
+    """Retorna (emoji, label, hex_color) usando a lógica CENTRAL de On Track
+    (on_track.py — a mesma usada por todos os módulos do app), com o tempo
+    decorrido calculado em dias úteis da semana comercial (1..total_dias),
+    que é a convenção já usada aqui (em vez de dias corridos do calendário).
+    `atingido` já vem como fração (vendido/meta) calculada pelo chamador."""
+    pct_tempo = (dia / total_dias) if total_dias else 0.0
+    r = on_track.calcular(
+        meta=1.0, realizado=atingido, tipo_periodo='semanal',
+        periodo_ref='(dias uteis)', pct_tempo_decorrido=pct_tempo,
+    )
+    return r['emoji'], r['label'], _STATUS_COR[r['status']]
 
 
 # ---------------------------------------------------------------------------
@@ -449,12 +499,65 @@ def _render_resumo_geral_inline(resultados: list, totais_rs: dict, dia: int = 5)
     st.dataframe(pd.DataFrame([tot]), use_container_width=True, hide_index=True)
 
 
+def _render_comparativo_semanal(resultados: list, totais_rs: dict, slug_atual: str):
+    """Comparativo padrão (componente central comparativo.py): semana atual
+    × semana anterior, e semana atual × mesma semana no ano anterior —
+    usando o histórico real salvo em data_store (sobrevive a restart do app,
+    diferente do que estava em session_state antes)."""
+    st.subheader('📊 Comparativo')
+
+    total_vend_atual = sum(l['vendido'] for r in resultados for l in r['linhas'])
+    fat_atual = totais_rs.get('total_geral', {}).get('fat')
+
+    def _totais_do_registro(registro):
+        if not registro:
+            return None, None
+        prods = registro['valores'].get('produtos', [])
+        vend = sum(l['vendido'] for r in prods for l in r.get('linhas', []))
+        fat = registro['valores'].get('totais_rs', {}).get('total_geral', {}).get('fat')
+        return vend, fat
+
+    slug_ant = periodo.periodo_anterior('semanal', slug_atual)
+    slug_ano_ant = periodo.periodo_ano_anterior('semanal', slug_atual)
+
+    reg_ant = ds.load_current(MODULO, 'semanal', slug_ant)
+    reg_ano_ant = ds.load_current(MODULO, 'semanal', slug_ano_ant)
+    vend_ant, fat_ant = _totais_do_registro(reg_ant)
+    vend_ano_ant, fat_ano_ant = _totais_do_registro(reg_ano_ant)
+
+    col1, col2 = st.columns(2)
+    with col1:
+        st.markdown(f'**Semana atual × {periodo.rotulo("semanal", slug_ant)}**')
+        if vend_ant is None:
+            st.caption('Ainda não há fechamento salvo da semana anterior para comparar.')
+        else:
+            comp_v = comparativo.calcular(total_vend_atual, vend_ant)
+            st.metric('Vendido (cx)', f'{total_vend_atual:,.0f}',
+                       delta=f"{comparativo.formatar_variacao(comp_v)} vs semana anterior")
+            if fat_atual is not None and fat_ant is not None:
+                comp_f = comparativo.calcular(fat_atual, fat_ant)
+                st.metric('Faturamento', f'R$ {fat_atual:,.2f}',
+                           delta=f"{comparativo.formatar_variacao(comp_f)} vs semana anterior")
+    with col2:
+        st.markdown(f'**Semana atual × {periodo.rotulo("semanal", slug_ano_ant)} (ano anterior)**')
+        if vend_ano_ant is None:
+            st.caption('Ainda não há fechamento salvo da mesma semana no ano anterior.')
+        else:
+            comp_v2 = comparativo.calcular(total_vend_atual, vend_ano_ant)
+            st.metric('Vendido (cx)', f'{total_vend_atual:,.0f}',
+                       delta=f"{comparativo.formatar_variacao(comp_v2)} vs ano anterior")
+            if fat_atual is not None and fat_ano_ant is not None:
+                comp_f2 = comparativo.calcular(fat_atual, fat_ano_ant)
+                st.metric('Faturamento', f'R$ {fat_atual:,.2f}',
+                           delta=f"{comparativo.formatar_variacao(comp_f2)} vs ano anterior")
+
+
 def _render_fechamento_semanal():
     st.header('📅 Fechamento Semanal')
 
     resultados = st.session_state.get('resultados')
     cfg_atual  = st.session_state.get('config', {})
-    periodo    = cfg_atual.get('periodo', '')
+    periodo_texto = cfg_atual.get('periodo', '')
 
     # ── Fechar semana atual ──────────────────────────────────────────────
     if resultados:
@@ -462,7 +565,7 @@ def _render_fechamento_semanal():
         label_atual = _label_semana(slug_atual)
 
         st.subheader(f'Fechar: {label_atual}')
-        st.caption(f'Período configurado: **{periodo or "(não informado)"}**')
+        st.caption(f'Período configurado: **{periodo_texto or "(não informado)"}**')
 
         # Dia da semana (para o On Track inline)
         dia_fech = st.slider(
@@ -478,9 +581,13 @@ def _render_fechamento_semanal():
         _render_resumo_geral_inline(resultados, totais_rs, dia_fech)
 
         st.divider()
+        _render_comparativo_semanal(resultados, totais_rs, slug_atual)
+
+        st.divider()
         if st.button('💾 Fechar Semana e Salvar no Histórico', type='primary', key='btn_fechar'):
             try:
-                _salvar_fechamento(resultados, totais_rs, periodo, slug_atual)
+                _salvar_fechamento(resultados, totais_rs, periodo_texto, slug_atual,
+                                    usuario=st.session_state.get('usuario_nome'))
                 st.success(f'✅ {label_atual} salvo no histórico da Gerência.')
                 st.rerun()
             except Exception as e:
@@ -506,7 +613,29 @@ def _render_fechamento_semanal():
     dados = historico[idx][1]
 
     gerado = dados.get('gerado_em', '')[:16].replace('T', ' ')
-    st.caption(f"Período: {dados.get('periodo', '-')}  |  Salvo em: {gerado}")
+    usuario_reg = dados.get('usuario')
+    versao_reg = dados.get('versao')
+    extra = []
+    if usuario_reg:
+        extra.append(f'por {usuario_reg}')
+    if versao_reg:
+        extra.append(f'versão {versao_reg}')
+    sufixo = f"  ({', '.join(extra)})" if extra else ''
+    st.caption(f"Período: {dados.get('periodo', '-')}  |  Salvo em: {gerado}{sufixo}")
+
+    slug_sel = slugs[idx]
+    versoes_antigas = ds.load_history(MODULO, 'semanal', slug_sel)
+    if versoes_antigas:
+        with st.expander(f'🕓 Ver {len(versoes_antigas)} versão(ões) anterior(es) desta semana'):
+            for v in reversed(versoes_antigas):
+                v_prods = v.get('valores', {}).get('produtos', [])
+                v_meta = sum(l['meta'] for r in v_prods for l in r.get('linhas', []))
+                v_vend = sum(l['vendido'] for r in v_prods for l in r.get('linhas', []))
+                v_quando = (v.get('atualizado_em') or '')[:16].replace('T', ' ')
+                st.markdown(
+                    f"- **v{v.get('versao')}** — {v_quando} por {v.get('usuario', 'não identificado')} "
+                    f"— Meta {v_meta:,.0f} cx, Vendido {v_vend:,.0f} cx"
+                )
 
     prods      = dados.get('produtos', [])
     h_meta     = sum(l['meta']    for r in prods for l in r.get('linhas', []))
@@ -553,13 +682,20 @@ cfg = st.session_state.config
 
 if not storage.is_configured():
     st.info(
-        '⚠️ Persistência permanente ainda não configurada: a configuração desta '
-        'semana só fica salva enquanto o app não reiniciar/dormir. Para manter os '
-        'dados disponíveis a semana toda, configure o GITHUB_TOKEN nos Secrets do '
-        'Streamlit Cloud (instruções no topo do arquivo storage.py).'
+        '⚠️ Persistência permanente ainda não configurada: a configuração e o '
+        'histórico deste módulo só ficam salvos enquanto o app não '
+        'reiniciar/dormir. Para manter os dados disponíveis permanentemente '
+        '(inclusive entre restarts do Streamlit Cloud), configure o GITHUB_TOKEN '
+        'nos Secrets do Streamlit Cloud (instruções no topo do arquivo storage.py).'
     )
 
-st.title('Metas Semanais e Responsáveis')
+st.title('Metas Semanais')
+st.caption('Metas semanais por vendedor e configuração de responsáveis/percentuais.')
+
+with st.expander('👤 Seu nome (fica registrado no histórico de quem salvou cada alteração)'):
+    st.session_state['usuario_nome'] = st.text_input(
+        'Seu nome', value=st.session_state.get('usuario_nome', 'Ingrid'), key='usuario_nome_input',
+    )
 
 # ---------------------------------------------------------------------------
 # Tabs
@@ -669,7 +805,7 @@ with tab_cfg:
 
     _pc1, _pc2 = st.columns(2)
     with _pc1:
-        periodo = st.text_input(
+        periodo_texto = st.text_input(
             'Período (ex.: 22/06/2026 a 26/06/2026)',
             value=cfg.get('periodo', ''),
         )
@@ -678,7 +814,7 @@ with tab_cfg:
             'Data de emissão (ex.: 29/06/2026)',
             value=datetime.date.today().strftime('%d/%m/%Y'),
         )
-    cfg['periodo'] = periodo
+    cfg['periodo'] = periodo_texto
 
     if st.button('▶️ Calcular metas', type='primary'):
         if not vendas_file:
@@ -742,6 +878,7 @@ with tab_cfg:
                     _r['prioridade'] = _prio_map.get(_r['produto'], 'Normal')
                 st.session_state['estoque_rows']    = estoque_rows
                 st.session_state['vendas_rows']     = vendas_rows
+                st.session_state['vendas_bytes']    = vendas_bytes
                 st.session_state['resultados']      = resultados
                 st.session_state['produtos_config'] = produtos_config
                 save_config(cfg, show_feedback=False)
@@ -796,6 +933,29 @@ with tab_cfg:
                 else:
                     st.caption('— nenhuma linha encontrada')
 
+        # Diagnóstico RAW: mostra exatamente o que o pdftotext extrai do PDF
+        vendas_bytes_diag = st.session_state.get('vendas_bytes')
+        if vendas_bytes_diag:
+            with st.expander('🔬 Diagnóstico RAW pdftotext (para depuração)'):
+                try:
+                    from parsers_diario import extract_text as _extract_text
+                    raw_text = _extract_text(io.BytesIO(vendas_bytes_diag))
+                    raw_lines = raw_text.split('\n')
+                    for p in produtos_config_diag:
+                        codigos_busca = [c.rstrip('*') for c in p['codigos']]
+                        linhas_encontradas = [
+                            l for l in raw_lines
+                            if any(cod in l for cod in codigos_busca)
+                        ]
+                        st.markdown(f"**{p['nome']}** — {len(linhas_encontradas)} linha(s) no pdftotext:")
+                        if linhas_encontradas:
+                            for l in linhas_encontradas:
+                                st.code(repr(l))
+                        else:
+                            st.caption('— código não encontrado no texto extraído pelo pdftotext')
+                except Exception as e:
+                    st.error(f'Erro ao extrair texto: {e}')
+
         # ── Publicar para Gerência ────────────────────────────────────────
         st.divider()
         pub_col, _ = st.columns([2, 4])
@@ -813,12 +973,19 @@ with tab_cfg:
                     # Arquivo atual (compatibilidade)
                     with open(_ONTRACK_PUB_FILE, 'w', encoding='utf-8') as f:
                         json.dump(snapshot, f, ensure_ascii=False, indent=2)
-                    # Histórico por semana ISO
-                    iso = datetime.date.today().isocalendar()
-                    slug_sem = f'{iso[0]}-W{iso[1]:02d}'
+                    # Histórico por semana ISO (arquivo local — compatibilidade)
+                    slug_sem = periodo.periodo_atual('semanal')
                     hist_path = os.path.join(_ONTRACK_META_DIR, f'{slug_sem}.json')
                     with open(hist_path, 'w', encoding='utf-8') as f:
                         json.dump(snapshot, f, ensure_ascii=False, indent=2)
+                    # Persistência real e versionada (sobrevive a restart do app)
+                    try:
+                        ds.save_record(
+                            modulo=MODULO_ONTRACK, tipo_periodo='semanal', periodo_ref=slug_sem,
+                            valores=snapshot, usuario=st.session_state.get('usuario_nome'),
+                        )
+                    except Exception as e2:
+                        st.warning(f'Publicado localmente, mas houve um problema ao salvar de forma permanente: {e2}')
                     st.success('✅ On Track publicado — disponível na aba Gerência.')
                 except Exception as e:
                     st.error(f'Erro ao publicar: {e}')
@@ -880,14 +1047,14 @@ with tab_cfg:
                 mime='application/pdf',
             )
         with pcol2:
-            pdf_bytes = generate_dashboard(periodo, resultados, cfg['vendedor_pcts'])
+            pdf_bytes = generate_dashboard(periodo_texto, resultados, cfg['vendedor_pcts'])
             st.download_button(
                 '⬇️ Dashboard', data=pdf_bytes,
                 file_name=f'Dashboard_{datetime.date.today().strftime("%d%m%Y")}.pdf',
                 mime='application/pdf',
             )
         with pcol3:
-            pdf_bytes = generate_resumo_geral(periodo, data_emissao, resultados, cfg['vendedor_pcts'])
+            pdf_bytes = generate_resumo_geral(periodo_texto, data_emissao, resultados, cfg['vendedor_pcts'])
             st.download_button(
                 '⬇️ Resumo Geral', data=pdf_bytes,
                 file_name=f'Resumo_Geral_{datetime.date.today().strftime("%d%m%Y")}.pdf',
