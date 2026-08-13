@@ -1,22 +1,23 @@
-"""Metas Gerais — painel consolidado da EMPRESA (Faturamento / Volume /
+"""Meta Geral — painel consolidado da EMPRESA (Faturamento / Volume /
 Margem / Quebra), com Meta / Realizado / % Atingimento / On Track /
 Comparativo / Evolução / Projeção, mais ranking de vendedores com
 drill-down individual.
+
+Meta Geral é um conceito INDEPENDENTE de Metas Semanais (metas semanais são
+metas operacionais por produto; Meta Geral é o alvo financeiro da empresa
+em mensal/trimestral/semestral/anual — não existe versão semanal aqui, e
+nada deste módulo lê dado de metas_semanais_fechamento).
 
 O "Realizado" NÃO é digitado nesta tela — é agregado automaticamente dos
 módulos que já publicam esses números (evita divergência entre painéis e
 trabalho duplicado de digitação):
 
   Faturamento / Volume (CX) / Margem %:
-    - semanal:                    Metas Semanais (metas_semanais_fechamento)
-                                   -> totais_rs.total_geral / totais_rs.vendedores
-    - mensal/trimestral/semestral/anual:
-                                   Vendedor-Cliente (vendedor_cliente, mensal)
-                                   -> totais_dict (por vendedor), somado mês a
-                                   mês quando o período cobre mais de um mês
+    Vendedor-Cliente (vendedor_cliente, mensal) -> totais_dict (por
+    vendedor), somado mês a mês quando o período cobre mais de um mês.
 
   Quebra (CX quebradas):
-    - semanal / mensal:           Quebra (quebra) -> total_cx
+    - mensal:                     Quebra (quebra) -> total_cx
     - trimestral/semestral/anual: soma dos registros mensais de Quebra que
                                    caem dentro do período
 
@@ -30,7 +31,6 @@ import data_store as ds
 
 MODULO_META = 'metas_gerais_config'
 
-MOD_METAS_SEMANAIS = 'metas_semanais_fechamento'
 MOD_VENDEDOR_CLIENTE = 'vendedor_cliente'
 MOD_QUEBRA = 'quebra'
 
@@ -75,22 +75,10 @@ def _meses_do_periodo(tipo_periodo: str, periodo_ref: str) -> list:
 
 def realizado_vendas(tipo_periodo: str, periodo_ref: str) -> dict:
     """{faturamento, volume, margem_pct, vendedores: {nome: {fat,vol,custo,mc_rs,mc_pct}},
-    completude: 'completo'|'parcial'|'sem_dado', origem}."""
-    if tipo_periodo == 'semanal':
-        reg = ds.load_current(MOD_METAS_SEMANAIS, 'semanal', periodo_ref)
-        if not reg:
-            return {'faturamento': None, 'volume': None, 'margem_pct': None,
-                     'vendedores': {}, 'completude': 'sem_dado', 'origem': 'Metas Semanais'}
-        totais_rs = reg['valores'].get('totais_rs', {}) or {}
-        tg = totais_rs.get('total_geral', {}) or {}
-        vend = totais_rs.get('vendedores', {}) or {}
-        return {
-            'faturamento': tg.get('fat'), 'volume': tg.get('vol'), 'margem_pct': tg.get('mc_pct'),
-            'vendedores': vend, 'completude': 'completo' if tg else 'sem_dado',
-            'origem': 'Metas Semanais (semana fechada)',
-        }
+    completude: 'completo'|'parcial'|'sem_dado', origem}.
 
-    # mensal / trimestral / semestral / anual -> agrega por mês via Vendedor-Cliente
+    Meta Geral é independente de Metas Semanais — cobre apenas mensal,
+    trimestral, semestral e anual, agregando por mês via Vendedor-Cliente."""
     meses = _meses_do_periodo(tipo_periodo, periodo_ref)
     fat = vol = custo = 0.0
     vend_agg = {}
@@ -137,7 +125,7 @@ def realizado_vendas(tipo_periodo: str, periodo_ref: str) -> dict:
 
 def realizado_quebra(tipo_periodo: str, periodo_ref: str) -> dict:
     """{total_cx, completude, meses_com_dado?, meses_total?}."""
-    if tipo_periodo in ('semanal', 'mensal'):
+    if tipo_periodo == 'mensal':
         reg = ds.load_current(MOD_QUEBRA, tipo_periodo, periodo_ref)
         if reg and reg['valores'].get('total_cx') is not None:
             return {'total_cx': reg['valores'].get('total_cx', 0), 'completude': 'completo'}
