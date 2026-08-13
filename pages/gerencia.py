@@ -20,6 +20,7 @@ import metas_gerais as mg
 MOD_FECHAMENTO = 'metas_semanais_fechamento'
 MOD_ONTRACK_METAS = 'metas_semanais_ontrack'
 MOD_QUEBRA = 'quebra'
+MOD_ONTRACK_CLI = 'vendedor_cliente_ontrack'
 MOD_PREVPERDAS = 'prevencao_perdas'
 MOD_RECORRENCIA = 'recorrencia'
 TIPO_RECORRENCIA = 'livre'
@@ -318,11 +319,14 @@ def _render_quebra_comparativo():
             'Δ (B − A)': cx_b - cx_a,
         })
 
-    df_grp = pd.DataFrame(rows).sort_values('Δ (B − A)', ascending=False)
-    df_grp[label_a]     = df_grp[label_a].map(lambda x: f"{x:,.0f}")
-    df_grp[label_b]     = df_grp[label_b].map(lambda x: f"{x:,.0f}")
-    df_grp['Δ (B − A)'] = df_grp['Δ (B − A)'].map(lambda x: f"{x:+,.0f}")
-    st.dataframe(df_grp, use_container_width=True, hide_index=True)
+    if not rows:
+        st.info('Nenhum grupo de produto registrado nesses dois períodos.')
+    else:
+        df_grp = pd.DataFrame(rows).sort_values('Δ (B − A)', ascending=False)
+        df_grp[label_a]     = df_grp[label_a].map(lambda x: f"{x:,.0f}")
+        df_grp[label_b]     = df_grp[label_b].map(lambda x: f"{x:,.0f}")
+        df_grp['Δ (B − A)'] = df_grp['Δ (B − A)'].map(lambda x: f"{x:+,.0f}")
+        st.dataframe(df_grp, use_container_width=True, hide_index=True)
 
 
 def _render_quebra_secao(tipo: str, titulo: str, emoji: str):
@@ -372,6 +376,18 @@ def _render_quebra_secao(tipo: str, titulo: str, emoji: str):
     if categorias:
         top = categorias[0]
         col2.metric(f'Maior: {top["categoria"]}', f"{top['cx']:,.0f} cx")
+
+    # ── Comparativo automático vs período anterior salvo (menor é melhor)
+    if idx + 1 < len(historico):
+        dados_ant = historico[idx + 1][1]
+        total_ant = dados_ant.get('total_cx', 0)
+        comp_auto = comparativo.calcular(total, total_ant, menor_e_melhor=True)
+        st.metric(
+            f'📊 vs período anterior ({_qbr_label(slugs[idx + 1], tipo)})',
+            f"{total:,.0f} cx",
+            delta=comparativo.formatar_variacao(comp_auto, casas=1),
+            delta_color='inverse',
+        )
 
     if categorias:
         df_cat = pd.DataFrame(categorias).set_index('categoria')
@@ -453,6 +469,26 @@ def _listar_ontrack_metas_hist():
     return sorted(items.items(), key=lambda kv: kv[0], reverse=True)
 
 
+def _listar_ontrack_clientes_hist():
+    """Histórico de publicações de On Track Vendedor×Cliente — lê da
+    persistência real (data_store) primeiro; arquivos locais (dir antigo)
+    entram como complemento/fallback. Antes desta correção, esta tela só
+    lia o diretório local — e o diretório local é apagado a cada restart
+    do Streamlit Cloud, então o histórico "desaparecia" nesse caso."""
+    items = {}
+    try:
+        for slug in ds.list_periodos(MOD_ONTRACK_CLI, 'mensal'):
+            registro = ds.load_current(MOD_ONTRACK_CLI, 'mensal', slug)
+            if registro:
+                items[slug] = registro['valores']
+    except Exception:
+        pass
+    for slug, data in _listar_ontrack_hist(_ONTRACK_CLI_DIR):
+        if slug not in items:
+            items[slug] = data
+    return sorted(items.items(), key=lambda kv: kv[0], reverse=True)
+
+
 def _render_ontrack_publicado():
     st.header('📊 On Track Atual')
 
@@ -477,7 +513,8 @@ def _render_ontrack_publicado():
             index=0,
             key='ger_ot_meta_sel',
         )
-        snap = historico_ot[labels_ot.index(escolha_ot)][1]
+        idx_ot = labels_ot.index(escolha_ot)
+        snap = historico_ot[idx_ot][1]
 
     pub_em     = snap.get('publicado_em', '')[:16].replace('T', ' ')
     periodo    = snap.get('periodo', '—')
@@ -515,6 +552,24 @@ def _render_ontrack_publicado():
         r1.metric('Faturamento', f"R$ {tg.get('fat', 0):,.2f}")
         r2.metric('MC R$',       f"R$ {tg.get('mc_rs', 0):,.2f}")
         r3.metric('MC %',        f"{tg.get('mc_pct', 0):.2f}%")
+
+    # ── Comparativo vs semana anterior salva ────────────────────────────────
+    if historico_ot and idx_ot + 1 < len(historico_ot):
+        snap_ant_ot = historico_ot[idx_ot + 1][1]
+        totais_rs_ant = snap_ant_ot.get('totais_rs', {})
+        tg_ant = totais_rs_ant.get('total_geral', {})
+        vend_ant_total = sum(l['vendido'] for r in snap_ant_ot.get('resultados', [])
+                              for l in r.get('linhas', []))
+        st.subheader('📊 Comparativo vs semana anterior')
+        cc1, cc2, cc3 = st.columns(3)
+        comp_vend = comparativo.calcular(total_vend, vend_ant_total)
+        cc1.metric('Vendido (cx)', f'{total_vend:,.0f}', delta=comparativo.formatar_variacao(comp_vend))
+        if tg and tg_ant:
+            comp_fat = comparativo.calcular(tg.get('fat', 0), tg_ant.get('fat'))
+            comp_mc  = comparativo.calcular(tg.get('mc_rs', 0), tg_ant.get('mc_rs'))
+            cc2.metric('Faturamento', f"R$ {tg.get('fat', 0):,.2f}", delta=comparativo.formatar_variacao(comp_fat))
+            cc3.metric('MC R$', f"R$ {tg.get('mc_rs', 0):,.2f}", delta=comparativo.formatar_variacao(comp_mc))
+        st.caption(f'Base de comparação: {_label_fech(historico_ot[idx_ot + 1][0])}')
 
     st.divider()
 
@@ -769,7 +824,8 @@ def _render_fechamentos_semanais():
 def _render_ontrack_clientes():
     st.header('👥 On Track Vendedor × Cliente')
 
-    historico_cli = _listar_ontrack_hist(_ONTRACK_CLI_DIR)
+    historico_cli = _listar_ontrack_clientes_hist()
+    idx_cli = None
 
     if not historico_cli:
         # backward compat: tentar arquivo único
@@ -789,7 +845,8 @@ def _render_ontrack_clientes():
             index=0,
             key='ger_ot_cli_sel',
         )
-        snap = historico_cli[labels_cli.index(escolha_cli)][1]
+        idx_cli = labels_cli.index(escolha_cli)
+        snap = historico_cli[idx_cli][1]
 
     pub_em         = snap.get('publicado_em', '')[:16].replace('T', ' ')
     periodo        = snap.get('periodo', '—')
@@ -874,6 +931,20 @@ def _render_ontrack_clientes():
       <div style="font-size:10px; color:#999; margin-top:2px;">▲ Ritmo esperado: {exp_w:.0f}%  |  {days_remaining} dias restantes</div>
     </div>
     """, unsafe_allow_html=True)
+
+    # ── Comparativo vs mês anterior salvo ────────────────────────────────
+    if idx_cli is not None and idx_cli + 1 < len(historico_cli):
+        snap_ant_cli = historico_cli[idx_cli + 1][1]
+        totais_ant_cli = snap_ant_cli.get('totais', {})
+        st.subheader('📊 Comparativo vs mês anterior')
+        pc1, pc2 = st.columns(2)
+        comp_fat_cli = comparativo.calcular(tot_fat, totais_ant_cli.get('fat'))
+        pc1.metric('Faturamento', _brl(tot_fat), delta=comparativo.formatar_variacao(comp_fat_cli))
+        if totais_ant_cli.get('meta'):
+            pct_ant_cli = (totais_ant_cli.get('fat', 0) / totais_ant_cli['meta']) if totais_ant_cli['meta'] else 0
+            comp_pct_cli = comparativo.calcular(tot_pct, pct_ant_cli)
+            pc2.metric('% Atingido', f'{tot_pct*100:.1f}%', delta=comparativo.formatar_variacao(comp_pct_cli))
+        st.caption(f'Base de comparação: {_label_slug(historico_cli[idx_cli + 1][0], "mensal")}')
 
     st.divider()
 
@@ -1188,7 +1259,8 @@ def _render_prevperdas_secao(tipo, titulo):
 
     escolha = st.selectbox(f'{len(historico)} publicação(ões):', labels, index=0,
                             key=f'ger_pp_sel_{tipo}')
-    snap = historico[labels.index(escolha)][1]
+    idx_pp = labels.index(escolha)
+    snap = historico[idx_pp][1]
 
     resumo = snap.get('resumo', {})
     emissao = snap.get('emissao', '-')
@@ -1210,6 +1282,19 @@ def _render_prevperdas_secao(tipo, titulo):
     vr_fmt = f"R$ {vr:,.0f}".replace(',', 'X').replace('.', ',').replace('X', '.')
     c5.metric("💰 Valor em Risco",    vr_fmt)
     c6.metric("📅 Estoque ≥ 30 dias", resumo.get('estoque_30d', 0))
+
+    # ── Comparativo vs publicação anterior (menor é melhor — menos risco) ──
+    if idx_pp + 1 < len(historico):
+        resumo_ant = historico[idx_pp + 1][1].get('resumo', {})
+        st.subheader('📊 Comparativo vs publicação anterior')
+        pp1, pp2, pp3 = st.columns(3)
+        comp_total_pp = comparativo.calcular(resumo.get('total', 0), resumo_ant.get('total'), menor_e_melhor=True)
+        comp_crit_pp  = comparativo.calcular(resumo.get('criticos', 0), resumo_ant.get('criticos'), menor_e_melhor=True)
+        comp_vr_pp    = comparativo.calcular(vr, resumo_ant.get('valor_risco'), menor_e_melhor=True)
+        pp1.metric('📦 Total', resumo.get('total', 0), delta=comparativo.formatar_variacao(comp_total_pp, casas=1))
+        pp2.metric('🔴 Críticos', resumo.get('criticos', 0), delta=comparativo.formatar_variacao(comp_crit_pp, casas=1))
+        pp3.metric('💰 Valor em Risco', vr_fmt, delta=comparativo.formatar_variacao(comp_vr_pp, casas=1))
+        st.caption('Base de comparação: publicação anterior')
 
     st.divider()
 
