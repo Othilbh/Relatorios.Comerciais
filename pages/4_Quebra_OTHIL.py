@@ -9,6 +9,10 @@ import streamlit as st
 import pandas as pd
 
 from parser_quebra import parse_quebra
+import comparativo
+import data_store as ds
+
+MODULO = 'quebra'
 
 _QUEBRA_DIR = os.path.join(os.path.dirname(__file__), '..', 'gerencia_data', 'quebra')
 
@@ -45,33 +49,54 @@ def _label_slug(slug: str, tipo: str) -> str:
     return slug
 
 
-def _salvar(dados: dict, tipo: str, slug: str):
+def _salvar(dados: dict, tipo: str, slug: str, usuario: str = None):
     dados['slug'] = slug
     dados['tipo'] = tipo
     dados['gerado_em'] = datetime.datetime.now().isoformat()
     path = os.path.join(_dir_tipo(tipo), f"{slug}.json")
     with open(path, 'w', encoding='utf-8') as f:
         json.dump(dados, f, ensure_ascii=False, indent=2)
+    # Persistência real e versionada (sobrevive a restart do Streamlit Cloud;
+    # antes só existia em gerencia_data/, que é apagado a cada restart)
+    try:
+        ds.save_record(modulo=MODULO, tipo_periodo=tipo, periodo_ref=slug,
+                        valores=dados, usuario=usuario)
+    except Exception as e:
+        st.warning(f'Salvo localmente, mas houve um problema ao salvar de forma permanente: {e}')
 
 
 def _listar(tipo: str) -> list[tuple[str, dict]]:
+    """Lista os períodos salvos, mais recente primeiro. Lê da persistência
+    real (data_store) primeiro; arquivos locais entram como complemento
+    (períodos salvos antes desta migração, ou se a gravação remota falhar)."""
+    items = {}
+    try:
+        for slug in ds.list_periodos(MODULO, tipo):
+            registro = ds.load_current(MODULO, tipo, slug)
+            if registro:
+                items[slug] = registro['valores']
+    except Exception:
+        pass
+
     d = _dir_tipo(tipo)
-    items = []
-    for fname in sorted(os.listdir(d), reverse=True):
+    for fname in os.listdir(d):
         if not fname.endswith('.json'):
+            continue
+        slug = fname.replace('.json', '')
+        if slug in items:
             continue
         try:
             with open(os.path.join(d, fname), 'r', encoding='utf-8') as f:
-                meta = json.load(f)
-            items.append((fname.replace('.json', ''), meta))
+                items[slug] = json.load(f)
         except Exception:
             pass
-    return items
+
+    return sorted(items.items(), key=lambda kv: kv[0], reverse=True)
 
 
 # ── Dashboard ─────────────────────────────────────────────────────────────────
 
-def _render_dashboard(dados: dict, tipo: str, slug: str):
+def _render_dashboard(dados: dict, tipo: str, slug: str, dados_ant: dict = None, label_ant: str = None):
     total = dados.get('total_cx', 0)
     periodo = dados.get('periodo', '-')
     emissao = dados.get('emissao', '-')
@@ -87,6 +112,17 @@ def _render_dashboard(dados: dict, tipo: str, slug: str):
         col2.metric(
             f'Maior Categoria: {top_cat["categoria"]}',
             f"{top_cat['cx']:,.0f} cx"
+        )
+
+    # ── Comparativo automático vs período anterior salvo (menor é melhor)
+    if dados_ant is not None:
+        total_ant = dados_ant.get('total_cx', 0)
+        comp_auto = comparativo.calcular(total, total_ant, menor_e_melhor=True)
+        st.metric(
+            f'📊 vs período anterior ({label_ant})',
+            f"{total:,.0f} cx",
+            delta=comparativo.formatar_variacao(comp_auto, casas=1),
+            delta_color='inverse',
         )
 
     # Filtro por categoria
@@ -123,10 +159,17 @@ def _render_dashboard(dados: dict, tipo: str, slug: str):
     elif cats_sel:
         st.info('Nenhum grupo encontrado para a seleção.')
 
-    # Download JSON
+    # Download JSON — respeita o filtro de categoria aplicado na tela (antes
+    # a exportação sempre baixava os dados completos, ignorando o filtro)
+    dados_export = dict(dados)
+    dados_export['grupos'] = grupos_filtrados
+    dados_export['categorias'] = [{'categoria': c, 'cx': v} for c, v in categorias_filtradas]
+    dados_export['total_cx'] = sum(g['cx'] for g in grupos_filtrados)
+    dados_export['filtro_categorias_aplicado'] = cats_sel
+    dados_export['gerado_em_exportacao'] = datetime.datetime.now().isoformat(timespec='seconds')
     st.download_button(
-        f'⬇️ Baixar dados ({_label_slug(slug, tipo)})',
-        data=json.dumps(dados, ensure_ascii=False, indent=2).encode('utf-8'),
+        f'⬇️ Baixar dados filtrados ({_label_slug(slug, tipo)})',
+        data=json.dumps(dados_export, ensure_ascii=False, indent=2).encode('utf-8'),
         file_name=f'quebra_{tipo}_{slug}_OTHIL.json',
         mime='application/json',
         key=f'dl_{tipo}_{slug}',
@@ -155,7 +198,7 @@ def _render_tab(tipo: str, label_tipo: str):
                     try:
                         dados = parse_quebra(pdf_up)
                         slug = _slug_semanal(data_ref) if tipo == 'semanal' else _slug_mensal(data_ref)
-                        _salvar(dados, tipo, slug)
+                        _salvar(dados, tipo, slug, usuario=st.session_state.get('usuario_nome'))
                         st.success(
                             f"✅ Salvo! {_label_slug(slug, tipo)} — "
                             f"{dados['total_cx']:,.0f} CX quebradas  |  "
@@ -205,8 +248,10 @@ def _render_tab(tipo: str, label_tipo: str):
     idx = st.session_state[idx_key]
     slug_sel = slugs[idx]
     dados_sel = historico[idx][1]
+    dados_ant = historico[idx + 1][1] if idx + 1 < len(historico) else None
+    label_ant = _label_slug(slugs[idx + 1], tipo) if idx + 1 < len(historico) else None
 
-    _render_dashboard(dados_sel, tipo, slug_sel)
+    _render_dashboard(dados_sel, tipo, slug_sel, dados_ant=dados_ant, label_ant=label_ant)
 
 
 # ── Comparativo ───────────────────────────────────────────────────────────────
@@ -251,19 +296,19 @@ def _render_comparativo():
 
     st.divider()
 
-    # ── KPIs totais ───────────────────────────────────────────────────────
+    # ── KPIs totais (componente central comparativo.py — Quebra é um
+    # indicador onde MENOR é melhor) ───────────────────────────────────────
     total_a = dados_a.get('total_cx', 0)
     total_b = dados_b.get('total_cx', 0)
-    delta   = total_b - total_a
-    delta_pct = (delta / total_a * 100) if total_a else 0
+    comp = comparativo.calcular(total_b, total_a, menor_e_melhor=True)
 
     c1, c2, c3 = st.columns(3)
     c1.metric(f'Total CX — {label_a}', f"{total_a:,.0f} cx")
     c2.metric(f'Total CX — {label_b}', f"{total_b:,.0f} cx")
     c3.metric(
         'Variação (B − A)',
-        f"{delta:+,.0f} cx",
-        delta=f"{delta_pct:+.1f}%",
+        f"{comp['diferenca_absoluta']:+,.0f} cx",
+        delta=comparativo.formatar_variacao(comp, casas=1),
         delta_color='inverse',   # vermelho = mais quebra = ruim
     )
 
@@ -321,18 +366,26 @@ def _render_comparativo():
             'Δ (B − A)':   dif,
         })
 
-    df_grp = pd.DataFrame(rows).sort_values('Δ (B − A)', ascending=False)
-    df_grp_fmt = df_grp.copy()
-    df_grp_fmt[label_a]     = df_grp_fmt[label_a].map(lambda x: f"{x:,.0f}")
-    df_grp_fmt[label_b]     = df_grp_fmt[label_b].map(lambda x: f"{x:,.0f}")
-    df_grp_fmt['Δ (B − A)'] = df_grp_fmt['Δ (B − A)'].map(lambda x: f"{x:+,.0f}")
-    st.dataframe(df_grp_fmt, use_container_width=True, hide_index=True)
+    if not rows:
+        st.info('Nenhum grupo de produto registrado nesses dois períodos.')
+    else:
+        df_grp = pd.DataFrame(rows).sort_values('Δ (B − A)', ascending=False)
+        df_grp_fmt = df_grp.copy()
+        df_grp_fmt[label_a]     = df_grp_fmt[label_a].map(lambda x: f"{x:,.0f}")
+        df_grp_fmt[label_b]     = df_grp_fmt[label_b].map(lambda x: f"{x:,.0f}")
+        df_grp_fmt['Δ (B − A)'] = df_grp_fmt['Δ (B − A)'].map(lambda x: f"{x:+,.0f}")
+        st.dataframe(df_grp_fmt, use_container_width=True, hide_index=True)
 
 
 # ── Page ──────────────────────────────────────────────────────────────────────
 
 st.title('📦 Quebras')
 st.caption('Upload do relatório Resumo do Estoque filtrado por classificação QUEBRA.')
+
+with st.expander('👤 Seu nome (fica registrado no histórico de quem salvou cada relatório)'):
+    st.session_state['usuario_nome'] = st.text_input(
+        'Seu nome', value=st.session_state.get('usuario_nome', 'Ingrid'), key='usuario_nome_input_qbr',
+    )
 
 tab_s, tab_m, tab_comp = st.tabs(['📅 Semanal', '🗓️ Mensal', '🔀 Comparativo'])
 
