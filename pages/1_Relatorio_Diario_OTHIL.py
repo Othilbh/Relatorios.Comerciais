@@ -187,7 +187,17 @@ def _render_tab(tipo, label_tipo):
         with st.spinner(f'Lendo PDF {label_tipo.lower()}...'):
             try:
                 resultado = parse_relatorio_diario(pdf_file)
-                st.session_state[f'resultado_{key}'] = resultado
+                if not resultado.get('itens'):
+                    st.error(
+                        'Nenhum item foi encontrado neste PDF — o dashboard não foi gerado. '
+                        'Confira se o arquivo enviado é o relatório '
+                        '**"Lucratividade por Vendedor-Cliente no Previsão"** (ele precisa ter '
+                        'as linhas "Cliente:" para cada cliente). Outros relatórios parecidos, '
+                        'como "Vendedor-Faturamento no Previsão" ou "Vendedor no Previsão", têm '
+                        'layout diferente e não são reconhecidos aqui.'
+                    )
+                else:
+                    st.session_state[f'resultado_{key}'] = resultado
             except Exception as e:
                 st.error(f'Não foi possível ler o PDF: {e}')
 
@@ -364,6 +374,16 @@ with tab_d:
         with st.spinner('Lendo e validando o PDF...'):
             try:
                 resultado = parse_relatorio_diario(pdf_file)
+                if not resultado.get('itens'):
+                    st.error(
+                        'Nenhum item foi encontrado neste PDF — o dashboard não foi gerado. '
+                        'Confira se o arquivo enviado é o relatório '
+                        '**"Lucratividade por Vendedor-Cliente no Previsão"** (ele precisa ter '
+                        'as linhas "Cliente:" para cada cliente). Outros relatórios parecidos, '
+                        'como "Vendedor-Faturamento no Previsão" ou "Vendedor no Previsão", têm '
+                        'layout diferente e não são reconhecidos aqui.'
+                    )
+                    resultado = None
             except Exception as e:
                 st.error(f'Não foi possível ler o PDF enviado: {e}')
                 resultado = None
