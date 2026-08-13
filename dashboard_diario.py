@@ -56,11 +56,6 @@ def _montar_dados(parsed):
     mc_rs_total, mc_pct_total, res_real_total = _agg(itens)
     clientes_distintos = len(set(it['cliente_codigo'] for it in itens))
 
-    # ---- produtos sem % cadastrado na tabela margem_produto.py ----------
-    produtos_sem_pct = sorted({
-        it['produto'] for it in itens if not pct_admin(it['produto'])[1]
-    })
-
     # ---- ranking de vendedores -----------------------------------------
     por_vendedor = {}
     for it in itens:
@@ -179,7 +174,6 @@ def _montar_dados(parsed):
         'top_clientes': top_clientes,
         'alertas':      alertas,
         'impacto':      impacto,
-        'produtos_sem_pct': produtos_sem_pct,
     }
 
 
@@ -286,13 +280,6 @@ _HTML_TEMPLATE = (
 
   <div class="kpis" id="kpis"></div>
 
-  <section id="secaoSemPct" style="display:none;">
-    <div class="impacto-note" style="background:__AMARELO_BG__;color:__AMARELO_FG__;border-left-color:#D4AC0D;">
-      ⚠️ <strong><span id="qtdSemPct"></span> produto(s) sem % cadastrado</strong> na tabela de Margem de
-      Contribuição — usando o padrão de __PADRAO_PCT__% até serem cadastrados: <span id="listaSemPct"></span>
-    </div>
-  </section>
-
   <section>
     <h2>Faturamento por vendedor</h2>
     <div class="grid2">
@@ -395,14 +382,6 @@ function montarKpis() {
   document.getElementById('kpis').innerHTML = cards.map(([label, value]) =>
     '<div class="kpi"><div class="label">' + label + '</div><div class="value">' + value + '</div></div>'
   ).join('');
-}
-
-function montarSemPct() {
-  const lista = DADOS.produtos_sem_pct || [];
-  if (!lista.length) return;
-  document.getElementById('secaoSemPct').style.display = '';
-  document.getElementById('qtdSemPct').textContent = lista.length;
-  document.getElementById('listaSemPct').textContent = lista.join(', ');
 }
 
 function montarRanking() {
@@ -560,7 +539,7 @@ function montarImpacto() {
     '(impacto de <strong>' + (imp.impacto_pp>0?'+':'') + fmtSimple(imp.impacto_pp) + ' pp</strong>).';
 }
 
-[montarKpis, montarSemPct, montarRanking, montarCategorias, montarClientes, montarAlertas, montarImpacto].forEach(fn => {
+[montarKpis, montarRanking, montarCategorias, montarClientes, montarAlertas, montarImpacto].forEach(fn => {
   try { fn(); } catch(e) { console.error('Erro:', e); }
 });
 </script>
@@ -592,7 +571,6 @@ def gerar_dashboard(parsed, output_path, tipo='diario'):
             .replace('__AMARELO_BG__',   AMARELO_BG) .replace('__AMARELO_FG__',  AMARELO_FG)
             .replace('__VERMELHO_BG__',  VERMELHO_BG).replace('__VERMELHO_FG__', VERMELHO_FG)
             .replace('__HEADER_BG__',    HEADER_BG)  .replace('__HEADER_FG__',   HEADER_FG)
-            .replace('__PADRAO_PCT__',   f'{PADRAO_PCT:g}')
             .replace('__DADOS_JSON__',   json.dumps(dados, ensure_ascii=False)))
     with open(output_path, 'w', encoding='utf-8') as f:
         f.write(html)
