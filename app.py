@@ -62,7 +62,7 @@ pg = st.navigation(
             st.Page("pages/home.py", title="Início", icon="🏠", default=True),
         ],
         "Módulos": [
-            st.Page("pages/metas_semanais.py", title="Metas Semanais e Responsáveis", icon="🎯"),
+            st.Page("pages/metas_semanais.py", title="Metas Semanais", icon="🎯"),
             st.Page("pages/1_Relatorio_Diario_OTHIL.py", title="Relatório Diário", icon="📊"),
             st.Page("pages/2_Recorrencia_OTHIL.py", title="Recorrência", icon="🔄"),
             st.Page("pages/3_Vendedor_Cliente_OTHIL.py", title="Vendedor-Cliente", icon="👥"),
