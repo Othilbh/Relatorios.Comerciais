@@ -32,14 +32,13 @@ VENDEDORES_PADRAO = {
     'Reginaldo': 22,
     'Luciano': 7,
     'Juliana': 7,
-    'Luca': 7,
+    'Claudia': 7,
 }
 
 # Aliases para reconciliar os nomes "crus" que aparecem nos PDFs de
 # estoque/vendas com os 8 nomes de exibição usados nas Metas Semanais.
-# Nomes que não casam com nenhum alias (ex.: "JEAN CARLOS", "NAYARA")
-# são ignorados (não fazem parte das 8 metas).
-# O match usa o alias mais longo para "LUCIANO" não cair em "LUCA".
+# Nomes que não casam com nenhum alias (ex.: "LUCA - VENDEDOR",
+# "JEAN CARLOS", "NAYARA") são ignorados (não fazem parte das 8 metas).
 VENDOR_ALIASES = {
     'Reginaldo': ['REGINALDO'],
     'Roni': ['RONI'],
@@ -47,23 +46,18 @@ VENDOR_ALIASES = {
     'Dora': ['DORA'],
     'Farley': ['FARLEY'],
     'Luciano': ['LUCIANO'],
+    'Claudia': ['CLAUDIA'],
     'Juliana': ['JULIANA'],
-    'Luca': ['LUCA - VENDEDOR', 'LUCA'],
 }
 
 
 def map_vendedor(raw: str):
-    """Casa nome bruto do PDF com o nome de exibição.
-    Prefere o alias mais longo (ex.: LUCIANO vence LUCA)."""
     raw_u = (raw or '').upper()
-    best = None
-    best_len = -1
     for display, aliases in VENDOR_ALIASES.items():
         for a in aliases:
-            if a in raw_u and len(a) > best_len:
-                best = display
-                best_len = len(a)
-    return best
+            if a in raw_u:
+                return display
+    return None
 
 
 def round_up(x: float) -> int:
