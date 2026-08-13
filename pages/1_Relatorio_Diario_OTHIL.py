@@ -11,10 +11,14 @@ import tempfile
 
 import streamlit as st
 import streamlit.components.v1 as components
+import sys, pathlib
+sys.path.insert(0, str(pathlib.Path(__file__).parent.parent))
 
 from parsers_diario import parse_relatorio_diario, ValidationError
 from xlsx_diario import gerar_xlsx
 from dashboard_diario import gerar_dashboard
+import comparativo
+import data_store as ds
 
 try:
     from gsheets_upload import upload_xlsx_as_sheet
@@ -23,6 +27,7 @@ except Exception:
     _GSHEETS_OK = False
 
 _GERENCIA_DIR = os.path.join(os.path.dirname(__file__), '..', 'gerencia_data')
+MODULO = 'relatorio_diario'
 
 
 # ── Helpers de storage ───────────────────────────────────────────────────────
@@ -33,7 +38,8 @@ def _dir_tipo(tipo):
     return d
 
 
-def _salvar_dashboard(html_text, tipo, slug, periodo, emissao):
+def _salvar_dashboard(html_text, tipo, slug, periodo, emissao, resumo=None,
+                       itens_fonte=None, usuario=None):
     try:
         d = _dir_tipo(tipo)
         with open(os.path.join(d, f'{slug}.html'), 'w', encoding='utf-8') as f:
@@ -46,24 +52,78 @@ def _salvar_dashboard(html_text, tipo, slug, periodo, emissao):
             }, f, ensure_ascii=False)
     except Exception:
         pass
+    # Persistência real (data_store) — sobrevive a reinício do app. Guarda o
+    # resumo (para histórico/comparativo) e os itens de origem (para
+    # regenerar o dashboard visual mesmo que o cache local em disco tenha
+    # sido perdido, ex.: após redeploy/hibernação no Streamlit Cloud).
+    try:
+        ds.save_record(
+            modulo=MODULO, tipo_periodo=tipo, periodo_ref=slug,
+            valores={
+                'periodo': periodo, 'emissao': emissao,
+                'resumo': resumo or {}, 'itens': itens_fonte or [],
+            },
+            usuario=usuario,
+        )
+    except Exception:
+        pass
 
 
 def _listar_dashboards(tipo):
-    """Retorna lista de (slug, meta) ordenada do mais recente para o mais antigo."""
+    """Retorna lista de (slug, meta) ordenada do mais recente para o mais
+    antigo. Mescla a persistência real (data_store) com o cache local em
+    disco: quando o HTML local não existir mais (reinício do app), o
+    dashboard é regenerado a partir dos itens salvos no data_store."""
     d = _dir_tipo(tipo)
-    items = []
+    items = {}
+
+    try:
+        for slug in ds.list_periodos(MODULO, tipo):
+            registro = ds.load_current(MODULO, tipo, slug)
+            if not registro:
+                continue
+            valores = registro['valores']
+            meta = {
+                'slug': slug, 'tipo': tipo,
+                'periodo': valores.get('periodo'), 'emissao': valores.get('emissao'),
+                'gerado_em': registro.get('atualizado_em', ''),
+                'resumo': valores.get('resumo', {}),
+            }
+            html_path = os.path.join(d, f'{slug}.html')
+            if not os.path.exists(html_path) and valores.get('itens'):
+                # Self-healing: regenera o HTML localmente a partir dos itens
+                # persistidos, para que o dashboard volte a ficar disponível
+                # sem precisar reenviar o PDF.
+                try:
+                    with tempfile.NamedTemporaryFile(suffix='.html', delete=False,
+                                                     mode='w', encoding='utf-8') as tmp:
+                        pass
+                    gerar_dashboard({'itens': valores['itens'], 'periodo': valores.get('periodo'),
+                                     'data_emissao': valores.get('emissao')}, tmp.name, tipo=tipo)
+                    with open(tmp.name, 'r', encoding='utf-8') as f_html:
+                        html_regen = f_html.read()
+                    with open(html_path, 'w', encoding='utf-8') as f_out:
+                        f_out.write(html_regen)
+                except Exception:
+                    pass
+            items[slug] = meta
+    except Exception:
+        pass
+
     for fname in os.listdir(d):
         if fname.endswith('.json'):
             try:
                 with open(os.path.join(d, fname), 'r', encoding='utf-8') as f:
                     meta = json.load(f)
                 slug = meta.get('slug') or fname.replace('.json', '')
+                if slug in items:
+                    continue
                 if os.path.exists(os.path.join(d, f'{slug}.html')):
-                    items.append((slug, meta))
+                    items[slug] = meta
             except Exception:
                 pass
-    items.sort(key=lambda x: x[0], reverse=True)
-    return items
+
+    return sorted(items.items(), key=lambda kv: kv[0], reverse=True)
 
 
 def _slug_diario(resultado):
@@ -169,7 +229,14 @@ def _render_tab(tipo, label_tipo):
                 gerar_dashboard(resultado, tmp.name, tipo=tipo)
                 html_text = open(tmp.name, 'r', encoding='utf-8').read()
             slug = _slug_periodo(resultado, tipo)
-            _salvar_dashboard(html_text, tipo, slug, periodo, emissao)
+            resumo_tab = {
+                'faturamento': round(fat_total, 2), 'mc_rs': round(mc_rs, 2),
+                'mc_pct': round(mc_pct, 2), 'caixas': round(caixas_tot, 3),
+                'clientes': clientes,
+            }
+            _salvar_dashboard(html_text, tipo, slug, periodo, emissao,
+                               resumo=resumo_tab, itens_fonte=itens,
+                               usuario=st.session_state.get('usuario_nome'))
             st.session_state[f'html_{key}']   = html_text
             st.session_state[f'slug_{key}']   = slug
             st.success(f'Dashboard salvo — {_label_slug(slug, tipo)}')
@@ -227,18 +294,48 @@ def _render_tab(tipo, label_tipo):
         gerado  = meta_h.get('gerado_em', '')[:16].replace('T', ' ')
         st.caption(f'Período: {meta_h.get("periodo","-")}  |  Gerado em: {gerado}')
 
-        html_path = os.path.join(_dir_tipo(tipo), f'{slug_h}.html')
-        with open(html_path, 'r', encoding='utf-8') as f:
-            html_hist = f.read()
+        resumo_h = meta_h.get('resumo') or {}
+        if resumo_h:
+            r1, r2, r3, r4, r5 = st.columns(5)
+            r1.metric('Faturamento', f"R$ {resumo_h.get('faturamento', 0):,.2f}")
+            r2.metric('MC R$',       f"R$ {resumo_h.get('mc_rs', 0):,.2f}")
+            r3.metric('MC %',        f"{resumo_h.get('mc_pct', 0):.2f}%")
+            r4.metric('Caixas',      f"{resumo_h.get('caixas', 0):,.3f}")
+            r5.metric('Clientes',    resumo_h.get('clientes', '-'))
 
-        components.html(html_hist, height=1400, scrolling=True)
-        st.download_button(
-            f'⬇️ Baixar {_label_slug(slug_h, tipo)}',
-            data=html_hist.encode('utf-8'),
-            file_name=f'dashboard_{tipo}_{slug_h}_OTHIL.html',
-            mime='text/html',
-            key=f'dl_hist_{key}',
-        )
+        # Comparativo vs período anterior salvo
+        if idx + 1 < len(dashboards):
+            resumo_ant = dashboards[idx + 1][1].get('resumo') or {}
+            if resumo_h and resumo_ant:
+                st.subheader('📊 Comparativo vs período anterior')
+                cc1, cc2, cc3, cc4 = st.columns(4)
+                for _col, _lab, _chave, _fmt in [
+                    (cc1, 'Faturamento', 'faturamento', lambda x: f'R$ {x:,.2f}'),
+                    (cc2, 'MC R$',       'mc_rs',       lambda x: f'R$ {x:,.2f}'),
+                    (cc3, 'Caixas',      'caixas',      lambda x: f'{x:,.3f}'),
+                    (cc4, 'Clientes',    'clientes',    lambda x: f'{x:,.0f}'),
+                ]:
+                    _comp = comparativo.calcular(resumo_h.get(_chave, 0), resumo_ant.get(_chave))
+                    _col.metric(_lab, _fmt(resumo_h.get(_chave, 0)),
+                                delta=comparativo.formatar_variacao(_comp))
+                st.caption(f'Base de comparação: {_label_slug(slugs[idx + 1], tipo)}')
+
+        html_path = os.path.join(_dir_tipo(tipo), f'{slug_h}.html')
+        if os.path.exists(html_path):
+            with open(html_path, 'r', encoding='utf-8') as f:
+                html_hist = f.read()
+
+            components.html(html_hist, height=1400, scrolling=True)
+            st.download_button(
+                f'⬇️ Baixar {_label_slug(slug_h, tipo)}',
+                data=html_hist.encode('utf-8'),
+                file_name=f'dashboard_{tipo}_{slug_h}_OTHIL.html',
+                mime='text/html',
+                key=f'dl_hist_{key}',
+            )
+        else:
+            st.info('Visual do dashboard não disponível para reexibir agora — os números acima '
+                    'ficaram salvos. Reenvie o PDF desse período para gerar o visual novamente.')
     else:
         st.info(f'Nenhum dashboard {label_tipo.lower()} salvo ainda. '
                 f'Gere o primeiro acima.')
@@ -247,6 +344,11 @@ def _render_tab(tipo, label_tipo):
 # ── Página principal ─────────────────────────────────────────────────────────
 
 st.title('OTHIL — Dashboard de Vendas')
+
+with st.expander('👤 Seu nome (fica registrado no histórico de quem gerou cada dashboard)'):
+    st.session_state['usuario_nome'] = st.text_input(
+        'Seu nome', value=st.session_state.get('usuario_nome', 'Ingrid'), key='usuario_nome_input_diario',
+    )
 
 tab_d, tab_s, tab_m = st.tabs(['📅 Diário', '📆 Semanal', '🗓️ Mensal'])
 
@@ -342,10 +444,17 @@ with tab_d:
                     gerar_dashboard(resultado, tmp.name, tipo='diario')
                     html_text = open(tmp.name, 'r', encoding='utf-8').read()
                 slug_d = _slug_diario(resultado)
+                resumo_d = {
+                    'faturamento': round(faturamento, 2), 'mc_rs': round(mc_rs, 2),
+                    'mc_pct': round(mc_pct, 2), 'caixas': round(caixas, 3),
+                    'clientes': clientes, 'vendedores': vendedores,
+                }
                 _salvar_dashboard(
                     html_text, 'diario', slug_d,
                     resultado.get('periodo') or '-',
                     resultado.get('data_emissao') or '-',
+                    resumo=resumo_d, itens_fonte=itens,
+                    usuario=st.session_state.get('usuario_nome'),
                 )
                 st.session_state['html_text'] = html_text
                 st.session_state['html_nome'] = f'dashboard_gerencial_othil_{data_fmt_html}.html'
@@ -366,6 +475,7 @@ with tab_d:
         st.header('4. Histórico Diário')
         dashboards_d = _listar_dashboards('diario')
         if dashboards_d:
+            slugs_d = [s for s, _ in dashboards_d]
             opcoes = {
                 f"{m.get('emissao', s)}  —  {m.get('periodo','-')}": s
                 for s, m in dashboards_d
@@ -376,20 +486,51 @@ with tab_d:
                 key='sel_hist_diario',
             )
             slug_sel = opcoes[escolha]
+            idx_d = slugs_d.index(slug_sel)
             meta_sel = next(m for ss, m in dashboards_d if ss == slug_sel)
             gerado = meta_sel.get('gerado_em', '')[:16].replace('T', ' ')
             st.caption(f'Gerado em: {gerado}')
+
+            resumo_sel = meta_sel.get('resumo') or {}
+            if resumo_sel:
+                r1, r2, r3, r4, r5, r6 = st.columns(6)
+                r1.metric('Faturamento', f"R$ {resumo_sel.get('faturamento', 0):,.2f}")
+                r2.metric('MC R$',       f"R$ {resumo_sel.get('mc_rs', 0):,.2f}")
+                r3.metric('MC %',        f"{resumo_sel.get('mc_pct', 0):.2f}%")
+                r4.metric('Caixas',      f"{resumo_sel.get('caixas', 0):,.3f}")
+                r5.metric('Clientes',    resumo_sel.get('clientes', '-'))
+                r6.metric('Vendedores',  resumo_sel.get('vendedores', '-'))
+
+            if idx_d + 1 < len(dashboards_d):
+                resumo_ant_d = dashboards_d[idx_d + 1][1].get('resumo') or {}
+                if resumo_sel and resumo_ant_d:
+                    st.subheader('📊 Comparativo vs dia anterior salvo')
+                    cc1, cc2, cc3, cc4 = st.columns(4)
+                    for _col, _lab, _chave, _fmt in [
+                        (cc1, 'Faturamento', 'faturamento', lambda x: f'R$ {x:,.2f}'),
+                        (cc2, 'MC R$',       'mc_rs',       lambda x: f'R$ {x:,.2f}'),
+                        (cc3, 'Caixas',      'caixas',      lambda x: f'{x:,.3f}'),
+                        (cc4, 'Clientes',    'clientes',    lambda x: f'{x:,.0f}'),
+                    ]:
+                        _comp = comparativo.calcular(resumo_sel.get(_chave, 0), resumo_ant_d.get(_chave))
+                        _col.metric(_lab, _fmt(resumo_sel.get(_chave, 0)),
+                                    delta=comparativo.formatar_variacao(_comp))
+
             html_path = os.path.join(_dir_tipo('diario'), f'{slug_sel}.html')
-            with open(html_path, 'r', encoding='utf-8') as f:
-                html_hist = f.read()
-            components.html(html_hist, height=1400, scrolling=True)
-            st.download_button(
-                f'⬇️ Baixar dashboard {slug_sel}',
-                data=html_hist.encode('utf-8'),
-                file_name=f'dashboard_diario_{slug_sel}_OTHIL.html',
-                mime='text/html',
-                key='dl_hist_diario',
-            )
+            if os.path.exists(html_path):
+                with open(html_path, 'r', encoding='utf-8') as f:
+                    html_hist = f.read()
+                components.html(html_hist, height=1400, scrolling=True)
+                st.download_button(
+                    f'⬇️ Baixar dashboard {slug_sel}',
+                    data=html_hist.encode('utf-8'),
+                    file_name=f'dashboard_diario_{slug_sel}_OTHIL.html',
+                    mime='text/html',
+                    key='dl_hist_diario',
+                )
+            else:
+                st.info('Visual do dashboard não disponível para reexibir agora — os números acima '
+                        'ficaram salvos. Reenvie o PDF desse dia para gerar o visual novamente.')
         else:
             st.info('Nenhum dashboard diário salvo ainda.')
     else:
