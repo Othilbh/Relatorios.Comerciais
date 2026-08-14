@@ -1,0 +1,20 @@
+{
+  "current": {
+    "id": "0df41666-21ca-4166-8d23-2bef7c3c8226",
+    "modulo_origem": "metas_gerais_config",
+    "tipo_periodo": "mensal",
+    "periodo_ref": "2026-08",
+    "data_referencia": "2026-08-14",
+    "criado_em": "2026-08-14T13:37:11+00:00",
+    "atualizado_em": "2026-08-14T13:37:11+00:00",
+    "usuario": "Ingrid",
+    "versao": 1,
+    "valores": {
+      "faturamento": 18.0,
+      "volume": 0.0,
+      "margem_pct": 13.0,
+      "quebra_max_cx": 0.0
+    }
+  },
+  "history": []
+}
