@@ -350,6 +350,18 @@ def ler_xlsx_historico(xlsx_bytes, ref_date=None) -> bytes:
                 try: return float(v) if v is not None else 0.0
                 except (TypeError, ValueError): return 0.0
 
+            def _safe_margem(v, padrao=0.15):
+                # Colunas de MARGEM % no xlsx às vezes têm um traço ('—', '-')
+                # em vez de número quando a Ingrid deixa a célula sem
+                # preencher -- não pode estourar o processamento do
+                # histórico por causa disso, só cair no padrão.
+                if v is None:
+                    return padrao
+                try:
+                    return float(v)
+                except (TypeError, ValueError):
+                    return padrao
+
             vol_aa = _safe(row[1])
             fat_aa = _safe(row[2])
             res_aa = _xlsx_margem_para_resultado_real(row[3])
@@ -359,7 +371,7 @@ def ler_xlsx_historico(xlsx_bytes, ref_date=None) -> bytes:
 
             m_vol = _safe(row[7]) if len(row) > 7 else 0.0
             m_fat = _safe(row[8]) if len(row) > 8 else 0.0
-            m_mrg = float(row[9]) if (len(row) > 9 and row[9] is not None) else 0.15
+            m_mrg = _safe_margem(row[9]) if len(row) > 9 else 0.15
 
             if cli.upper() == 'TOTAL':
                 total_aa = {'vol': round(vol_aa), 'fat': round(fat_aa, 2),
