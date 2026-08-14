@@ -10,7 +10,12 @@ Regras de negócio (validadas contra os relatórios reais da Ingrid):
                                 (quem efetivamente vendeu) — não pelo
                                 "Complemento" (vendedor responsável) do
                                 relatório de Estoque.
-  Falta(vendedor, produto)   = Meta − Vendido
+  Falta(vendedor, produto)   = max(Meta − Vendido, 0)
+                                (nunca negativo -- quando já ultrapassou a
+                                meta não "falta" nada; ver soma_falta() para
+                                agregações que não deixam produtos/vendedores
+                                que bateram a meta abaterem o que falta em
+                                outros)
   % Atingido                 = Vendido / Meta
 
 'Estoque(produto)' é digitado manualmente pela Ingrid no app (não é mais
@@ -81,6 +86,16 @@ def codigo_matches(codigo_norm: str, entry: str) -> bool:
     return codigo_norm == normalize_codigo(entry)
 
 
+def soma_falta(linhas) -> float:
+    """Soma 'Falta' (Meta − Vendido, travado em 0 por linha) de uma lista de
+    linhas com chaves 'meta'/'vendido' -- usada para agregar totais (por
+    vendedor, por produto, geral). Importante somar já travado em 0 por
+    linha, e não travar só o total: senão um produto/vendedor que já
+    ultrapassou a meta (que sozinho teria Falta negativa) abateria o que
+    ainda falta em outro produto/vendedor, subestimando o total real."""
+    return sum(max(l['meta'] - l['vendido'], 0.0) for l in linhas)
+
+
 def parse_codigos_input(text: str) -> list[str]:
     """Converte o texto digitado (separado por vírgula e/ou linha) em uma
     lista de entradas de código."""
@@ -129,7 +144,10 @@ def compute_metas(vendas_rows, produtos_config, vendedor_pcts):
         for vend, pct in vendedor_pcts.items():
             meta = round_up(pct / 100 * estoque_total)
             vendido = vendido_por_vendedor.get(vend, 0.0)
-            falta = meta - vendido
+            # 'Falta' nunca é negativo -- quando o vendido já ultrapassou a
+            # meta não "falta" nada, então trava em 0 em vez de mostrar um
+            # número negativo (que passa a impressão de meta não batida).
+            falta = max(meta - vendido, 0.0)
             atingido = (vendido / meta) if meta else 0.0
             linhas.append({
                 'vendedor': vend,
