@@ -1,0 +1,270 @@
+{
+  "current": {
+    "id": "7bec01ab-8d69-4746-9107-7c48798a08fa",
+    "modulo_origem": "quebra",
+    "tipo_periodo": "semanal",
+    "periodo_ref": "2026-W33",
+    "data_referencia": "2026-08-14",
+    "criado_em": "2026-08-14T18:09:48+00:00",
+    "atualizado_em": "2026-08-14T18:09:48+00:00",
+    "usuario": "Ingrid",
+    "versao": 1,
+    "valores": {
+      "periodo": "01/08/2026 a 14/08/2026",
+      "emissao": "",
+      "total_cx": 831.0,
+      "grupos": [
+        {
+          "grupo": "MAMAO FORMOSO",
+          "codigo": "1.1.04.01.004.002",
+          "categoria": "Mamão",
+          "cx": 227.0
+        },
+        {
+          "grupo": "CAQUI JUND",
+          "codigo": "1.1.03.04.002.001.001",
+          "categoria": "Caqui",
+          "cx": 172.0
+        },
+        {
+          "grupo": "FUJI POMERANA",
+          "codigo": "1.1.02.02.001.002.172",
+          "categoria": "Maçã Fuji",
+          "cx": 101.0
+        },
+        {
+          "grupo": "MAMAO HAVAI",
+          "codigo": "1.1.04.01.004.003",
+          "categoria": "Mamão",
+          "cx": 70.0
+        },
+        {
+          "grupo": "TANGERINA IMP",
+          "codigo": "1.1.04.02.010.006.001",
+          "categoria": "Citros",
+          "cx": 53.0
+        },
+        {
+          "grupo": "FUJI HOSHI",
+          "codigo": "1.1.02.02.001.002.173",
+          "categoria": "Maçã Fuji",
+          "cx": 39.0
+        },
+        {
+          "grupo": "MACA PINK FRUSAN",
+          "codigo": "1.1.02.01.001.002.013",
+          "categoria": "Outros",
+          "cx": 31.0
+        },
+        {
+          "grupo": "MELAO GAIA",
+          "codigo": "1.1.04.02.002.001.006",
+          "categoria": "Melão",
+          "cx": 20.0
+        },
+        {
+          "grupo": "PERA IMP 1/2 FORELLE",
+          "codigo": "1.1.01.01.002.005.027",
+          "categoria": "Pera Forelle/Ercoline",
+          "cx": 17.0
+        },
+        {
+          "grupo": "MELANCIA MAGALI",
+          "codigo": "1.1.04.01.007.001.010",
+          "categoria": "Melancia",
+          "cx": 13.0
+        },
+        {
+          "grupo": "FUJI EXPRESSA",
+          "codigo": "1.1.02.02.001.002.089",
+          "categoria": "Maçã Fuji",
+          "cx": 11.0
+        },
+        {
+          "grupo": "GALA SANT CAROL",
+          "codigo": "1.1.02.02.001.001.196",
+          "categoria": "Maçã Gala",
+          "cx": 10.0
+        },
+        {
+          "grupo": "GALA POMERANA",
+          "codigo": "1.1.02.02.001.001.227",
+          "categoria": "Maçã Gala",
+          "cx": 10.0
+        },
+        {
+          "grupo": "GALA DADIVA",
+          "codigo": "1.1.02.02.001.001.226",
+          "categoria": "Maçã Gala",
+          "cx": 7.0
+        },
+        {
+          "grupo": "PESSEGO IMP VILLA",
+          "codigo": "1.1.04.01.001.001.064",
+          "categoria": "Caroço",
+          "cx": 7.0
+        },
+        {
+          "grupo": "MELAO REI",
+          "codigo": "1.1.04.02.002.001.009",
+          "categoria": "Melão",
+          "cx": 7.0
+        },
+        {
+          "grupo": "PACKMANS JOSELIA",
+          "codigo": "1.1.01.01.001.002.046",
+          "categoria": "Outros",
+          "cx": 6.0
+        },
+        {
+          "grupo": "LARANJA SERRA D AGUA",
+          "codigo": "1.1.04.02.010.001.001",
+          "categoria": "Citros",
+          "cx": 5.0
+        },
+        {
+          "grupo": "NECTARINA IMP TANY",
+          "codigo": "1.1.04.01.003.001.001",
+          "categoria": "Caroço",
+          "cx": 4.0
+        },
+        {
+          "grupo": "PORTUGUESA 1/2 SABOR",
+          "codigo": "1.1.01.01.002.005.003",
+          "categoria": "Uva",
+          "cx": 3.0
+        },
+        {
+          "grupo": "MELAO CEPI",
+          "codigo": "1.1.04.02.002.001.005",
+          "categoria": "Melão",
+          "cx": 3.0
+        },
+        {
+          "grupo": "GRAN SMITH EL TORREON",
+          "codigo": "1.1.02.01.001.003.061",
+          "categoria": "Maçã Importada",
+          "cx": 2.0
+        },
+        {
+          "grupo": "FUJI AZALEIA",
+          "codigo": "1.1.02.02.001.002.145",
+          "categoria": "Maçã Fuji",
+          "cx": 2.0
+        },
+        {
+          "grupo": "PESSEGO IMP FRUITS PONENT",
+          "codigo": "1.1.04.01.001.001.054",
+          "categoria": "Caroço",
+          "cx": 2.0
+        },
+        {
+          "grupo": "AMEIXA TANY RONI/AFANAIS",
+          "codigo": "1.1.04.01.002.001.001",
+          "categoria": "Caroço",
+          "cx": 2.0
+        },
+        {
+          "grupo": "PERA WILL DOLE",
+          "codigo": "1.1.01.01.001.001.100",
+          "categoria": "Pera Williams",
+          "cx": 1.0
+        },
+        {
+          "grupo": "ARGENTINA BREVI",
+          "codigo": "1.1.02.01.001.001.030",
+          "categoria": "Maçã Importada",
+          "cx": 1.0
+        },
+        {
+          "grupo": "MACA GRAN SMITH FRUSAN",
+          "codigo": "1.1.02.01.001.003.017",
+          "categoria": "Maçã Importada",
+          "cx": 1.0
+        },
+        {
+          "grupo": "GRAN SMITH BREVI",
+          "codigo": "1.1.02.01.001.003.081",
+          "categoria": "Maçã Importada",
+          "cx": 1.0
+        },
+        {
+          "grupo": "GALA FRUTIMAR",
+          "codigo": "1.1.02.02.001.001.105",
+          "categoria": "Maçã Gala",
+          "cx": 1.0
+        },
+        {
+          "grupo": "CUMB THOMPSON PETRO",
+          "codigo": "1.1.03.06.001.001.008",
+          "categoria": "Uva",
+          "cx": 1.0
+        },
+        {
+          "grupo": "NECTARINA IMP FRUMAEX",
+          "codigo": "1.1.04.01.003.001.016",
+          "categoria": "Caroço",
+          "cx": 1.0
+        }
+      ],
+      "categorias": [
+        {
+          "categoria": "Mamão",
+          "cx": 297.0
+        },
+        {
+          "categoria": "Caqui",
+          "cx": 172.0
+        },
+        {
+          "categoria": "Maçã Fuji",
+          "cx": 153.0
+        },
+        {
+          "categoria": "Citros",
+          "cx": 58.0
+        },
+        {
+          "categoria": "Outros",
+          "cx": 37.0
+        },
+        {
+          "categoria": "Melão",
+          "cx": 30.0
+        },
+        {
+          "categoria": "Maçã Gala",
+          "cx": 28.0
+        },
+        {
+          "categoria": "Pera Forelle/Ercoline",
+          "cx": 17.0
+        },
+        {
+          "categoria": "Caroço",
+          "cx": 16.0
+        },
+        {
+          "categoria": "Melancia",
+          "cx": 13.0
+        },
+        {
+          "categoria": "Maçã Importada",
+          "cx": 5.0
+        },
+        {
+          "categoria": "Uva",
+          "cx": 4.0
+        },
+        {
+          "categoria": "Pera Williams",
+          "cx": 1.0
+        }
+      ],
+      "slug": "2026-W33",
+      "tipo": "semanal",
+      "gerado_em": "2026-08-14T18:09:47.830292"
+    }
+  },
+  "history": []
+}
