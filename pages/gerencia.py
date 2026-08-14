@@ -21,12 +21,14 @@ import metas_gerais as mg
 import rentabilidade as rent
 import produtos as prod
 import resumo_matriz
+from xlsx_vendedor_cliente import VENDOR_TAB, _normalize
 
 MOD_RELATORIO_DIARIO = 'relatorio_diario'
 MOD_FECHAMENTO = 'metas_semanais_fechamento'
 MOD_ONTRACK_METAS = 'metas_semanais_ontrack'
 MOD_QUEBRA = 'quebra'
 MOD_ONTRACK_CLI = 'vendedor_cliente_ontrack'
+MOD_VENDEDOR_CLIENTE = 'vendedor_cliente'
 MOD_PREVPERDAS = 'prevencao_perdas'
 MOD_RECORRENCIA = 'recorrencia'
 TIPO_RECORRENCIA = 'livre'
@@ -1026,6 +1028,241 @@ def _render_ontrack_clientes():
     st.dataframe(pd.DataFrame(df_rows), use_container_width=True, hide_index=True)
 
 
+def _brl_vc(v):
+    v = v or 0.0
+    s = f"{abs(v):,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
+    return f"R$ {'-' if v < 0 else ''}{s}"
+
+
+def _get_meta_fat_vc(historico_data: dict, vend: str, cli_key: str):
+    """Busca meta de faturamento do cliente no histórico salvo -- mesma
+    lógica de pages/3_Vendedor_Cliente_OTHIL.py (não duplica o cálculo,
+    só a leitura, já que a Gerência lê o mesmo registro salvo)."""
+    if not historico_data:
+        return None
+    tab = VENDOR_TAB.get(vend, vend.upper())
+    meta_vend = historico_data.get('meta', {}).get(tab, {})
+    if not meta_vend:
+        return None
+    if cli_key in meta_vend:
+        m = meta_vend[cli_key]
+        return m.get('fat') if m else None
+    cli_norm = _normalize(cli_key)
+    for k, v in meta_vend.items():
+        if _normalize(k) == cli_norm:
+            return v.get('fat') if v else None
+    return None
+
+
+def _meses_vc_disponiveis():
+    """Meses com relatório Vendedor-Cliente salvo (gerado na página
+    Vendedor-Cliente, aba 'Relatório Semanal' -- o registro fica salvo
+    automaticamente a cada geração de Excel, sem precisar de um passo de
+    publicação separado). Mais recente primeiro."""
+    try:
+        return sorted(ds.list_periodos(MOD_VENDEDOR_CLIENTE, 'mensal'), reverse=True)
+    except Exception:
+        return []
+
+
+def _render_top50_clientes_ger():
+    st.header('🏆 Top 50 Clientes')
+    st.caption('Lê o mesmo relatório salvo automaticamente quando você gera o Excel Vendedor-Cliente '
+               '(aba "📋 Relatório Semanal") -- não precisa de nenhuma publicação extra.')
+    try:
+        st.page_link('pages/3_Vendedor_Cliente_OTHIL.py',
+                      label='Abrir módulo completo →', icon='📋')
+    except Exception:
+        pass
+
+    meses_vc = _meses_vc_disponiveis()
+    if not meses_vc:
+        st.info('Nenhum relatório Vendedor-Cliente salvo ainda. Gere o Excel na página '
+                '**Vendedor-Cliente** primeiro.')
+        return
+
+    ref_50 = st.selectbox('Mês', meses_vc, format_func=lambda r: periodo_mod.rotulo('mensal', r),
+                           key='ger_vc_top50_mes')
+    registro_50 = ds.load_current(MOD_VENDEDOR_CLIENTE, 'mensal', ref_50)
+    if not registro_50:
+        st.info('Sem dados para este mês.')
+        return
+    clientes_data_50 = registro_50['valores'].get('clientes_data', {})
+    historico_data_50 = registro_50['valores'].get('historico', {})
+    if not clientes_data_50:
+        st.info('Registro salvo, mas sem dados de clientes.')
+        return
+
+    ordenar_por = st.selectbox(
+        'Ordenar por',
+        ['Faturamento', 'Volume', 'Margem (MC R$)', 'Rentabilidade (MC %)', 'Atingimento da meta'],
+        key='ger_vc_top50_sort',
+    )
+
+    ref_ant_50 = periodo_mod.periodo_anterior('mensal', ref_50)
+    reg_ant_50 = ds.load_current(MOD_VENDEDOR_CLIENTE, 'mensal', ref_ant_50)
+    clientes_ant_50 = reg_ant_50['valores'].get('clientes_data', {}) if reg_ant_50 else {}
+
+    linhas_50 = []
+    for vendedor, clientes in clientes_data_50.items():
+        for cliente, dados in clientes.items():
+            fat = dados.get('fat', 0)
+            vol = dados.get('vol', 0)
+            mc_rs = dados.get('mc_rs', 0)
+            mc_pct = dados.get('mc_pct', 0)
+            meta = _get_meta_fat_vc(historico_data_50, vendedor, cliente) or 0
+
+            fat_ant = None
+            cli_ant = (clientes_ant_50.get(vendedor) or {})
+            if cliente in cli_ant:
+                fat_ant = cli_ant[cliente].get('fat')
+            else:
+                cli_norm = _normalize(cliente)
+                for k, v in cli_ant.items():
+                    if _normalize(k) == cli_norm:
+                        fat_ant = v.get('fat')
+                        break
+            comp = comparativo.calcular(fat, fat_ant)
+
+            if meta:
+                pct_atg = fat / meta
+                r_ot = on_track.calcular(meta, fat, 'mensal', ref_50)
+                status_txt = f"{r_ot['emoji']} {r_ot['label']}"
+            else:
+                pct_atg = None
+                status_txt = '—'
+
+            linhas_50.append({
+                'Vendedor': vendedor, 'Cliente': cliente,
+                '_fat': fat, '_vol': vol, '_mc_rs': mc_rs, '_mc_pct': mc_pct,
+                '_pct_atg': pct_atg or 0, 'Faturamento': _brl_vc(fat),
+                'Volume (cx)': f'{vol:,.0f}', 'Margem (MC R$)': _brl_vc(mc_rs),
+                'Rentabilidade': f'{mc_pct:.1f}%',
+                'Comparativo': comparativo.formatar_variacao(comp),
+                '% Atingido': f'{pct_atg*100:.1f}%' if pct_atg is not None else '—',
+                'On Track': status_txt,
+            })
+
+    if not linhas_50:
+        st.info('Nenhum cliente neste mês.')
+        return
+
+    sort_key_map = {
+        'Faturamento': '_fat', 'Volume': '_vol', 'Margem (MC R$)': '_mc_rs',
+        'Rentabilidade (MC %)': '_mc_pct', 'Atingimento da meta': '_pct_atg',
+    }
+    linhas_50.sort(key=lambda r: r[sort_key_map[ordenar_por]], reverse=True)
+    top50 = linhas_50[:50]
+    for i, r in enumerate(top50, start=1):
+        r['Ranking'] = i
+
+    st.caption(f'{len(linhas_50)} cliente(s) no total — mostrando os {len(top50)} principais '
+               f'por {ordenar_por.lower()}.')
+
+    df_top50 = pd.DataFrame(top50)[[
+        'Ranking', 'Vendedor', 'Cliente', 'Faturamento', 'Volume (cx)',
+        'Margem (MC R$)', 'Rentabilidade', 'Comparativo', '% Atingido', 'On Track',
+    ]]
+    st.dataframe(df_top50, use_container_width=True, hide_index=True)
+
+    csv_top50 = df_top50.to_csv(index=False, sep=';').encode('utf-8-sig')
+    st.download_button(
+        '⬇️ Exportar Top 50 (CSV)', data=csv_top50,
+        file_name=f'top50_clientes_ger_{ref_50}.csv', mime='text/csv', key='ger_vc_top50_csv',
+    )
+
+
+def _render_clientes_por_vendedor_ger():
+    st.header('👤 Clientes por Vendedor')
+    st.caption('Lê o mesmo relatório salvo automaticamente quando você gera o Excel Vendedor-Cliente '
+               '(aba "📋 Relatório Semanal") -- não precisa de nenhuma publicação extra.')
+
+    meses_vc = _meses_vc_disponiveis()
+    if not meses_vc:
+        st.info('Nenhum relatório Vendedor-Cliente salvo ainda. Gere o Excel na página '
+                '**Vendedor-Cliente** primeiro.')
+        return
+
+    ref_pv = st.selectbox('Mês', meses_vc, format_func=lambda r: periodo_mod.rotulo('mensal', r),
+                           key='ger_vc_pv_mes')
+    registro_pv = ds.load_current(MOD_VENDEDOR_CLIENTE, 'mensal', ref_pv)
+    if not registro_pv:
+        st.info('Sem dados para este mês.')
+        return
+    clientes_data_pv = registro_pv['valores'].get('clientes_data', {})
+    historico_data_pv = registro_pv['valores'].get('historico', {})
+    if not clientes_data_pv:
+        st.info('Registro salvo, mas sem dados de clientes.')
+        return
+
+    vendedor_sel_pv = st.selectbox('Selecionar vendedor', sorted(clientes_data_pv.keys()),
+                                    key='ger_vc_pv_vendedor')
+
+    ref_ant_pv = periodo_mod.periodo_anterior('mensal', ref_pv)
+    reg_ant_pv = ds.load_current(MOD_VENDEDOR_CLIENTE, 'mensal', ref_ant_pv)
+    clientes_ant_pv_vend = ((reg_ant_pv['valores'].get('clientes_data', {}) if reg_ant_pv else {})
+                             .get(vendedor_sel_pv, {}))
+
+    clientes_vendedor = clientes_data_pv.get(vendedor_sel_pv, {})
+    fat_total_vendedor = sum(d.get('fat', 0) for d in clientes_vendedor.values()) or 1e-9
+
+    linhas_pv = []
+    for cliente, dados in clientes_vendedor.items():
+        fat = dados.get('fat', 0)
+        vol = dados.get('vol', 0)
+        mc_rs = dados.get('mc_rs', 0)
+        mc_pct = dados.get('mc_pct', 0)
+        meta = _get_meta_fat_vc(historico_data_pv, vendedor_sel_pv, cliente) or 0
+        participacao = fat / fat_total_vendedor
+
+        fat_ant = None
+        if cliente in clientes_ant_pv_vend:
+            fat_ant = clientes_ant_pv_vend[cliente].get('fat')
+        else:
+            cli_norm = _normalize(cliente)
+            for k, v in clientes_ant_pv_vend.items():
+                if _normalize(k) == cli_norm:
+                    fat_ant = v.get('fat')
+                    break
+        comp = comparativo.calcular(fat, fat_ant)
+
+        if meta:
+            r_ot = on_track.calcular(meta, fat, 'mensal', ref_pv)
+            status_txt = f"{r_ot['emoji']} {r_ot['label']}"
+        else:
+            status_txt = '—'
+
+        linhas_pv.append({
+            '_fat': fat,
+            'Cliente': cliente, 'Faturamento': _brl_vc(fat), 'Volume (cx)': f'{vol:,.0f}',
+            'Margem (MC R$)': _brl_vc(mc_rs), 'Rentabilidade': f'{mc_pct:.1f}%',
+            'Comparativo': comparativo.formatar_variacao(comp),
+            'Participação no vendedor': f'{participacao*100:.1f}%',
+            'On Track': status_txt,
+        })
+
+    if not linhas_pv:
+        st.info(f'Nenhum cliente de {vendedor_sel_pv} neste mês.')
+        return
+
+    linhas_pv.sort(key=lambda r: r['_fat'], reverse=True)
+
+    st.caption(f'{len(linhas_pv)} cliente(s) de **{vendedor_sel_pv}** em '
+               f'{periodo_mod.rotulo("mensal", ref_pv)} — faturamento total: {_brl_vc(fat_total_vendedor)}')
+
+    df_pv = pd.DataFrame(linhas_pv)[[
+        'Cliente', 'Faturamento', 'Volume (cx)', 'Margem (MC R$)', 'Rentabilidade',
+        'Comparativo', 'Participação no vendedor', 'On Track',
+    ]]
+    st.dataframe(df_pv, use_container_width=True, hide_index=True)
+
+    csv_pv = df_pv.to_csv(index=False, sep=';').encode('utf-8-sig')
+    st.download_button(
+        f'⬇️ Exportar clientes de {vendedor_sel_pv} (CSV)', data=csv_pv,
+        file_name=f'clientes_{vendedor_sel_pv}_ger_{ref_pv}.csv', mime='text/csv', key='ger_vc_pv_csv',
+    )
+
+
 # ── Prevenção de Perdas ───────────────────────────────────────────────────────
 
 _NIVEL_COR = {
@@ -1680,34 +1917,47 @@ def _render_produtos_resumo():
         return comparativo.calcular(kpi.get(chave), kpi_ant.get(chave)) if kpi_ant else None
 
     c1, c2, c3, c4 = st.columns(4)
-    c1.metric('Produto Líder', kpi.get('produto_lider') or '-')
+    c1.metric('Produtos Trabalhados', kpi.get('skus', 0),
+              delta=comparativo.formatar_variacao(_c('skus')) if kpi_ant else None)
     c2.metric('Faturamento', f"R$ {kpi['faturamento']:,.2f}",
               delta=comparativo.formatar_variacao(_c('faturamento')) if kpi_ant else None)
     c3.metric('Volume (cx)', f"{kpi['volume']:,.3f}",
               delta=comparativo.formatar_variacao(_c('volume')) if kpi_ant else None)
-    c4.metric('SKUs Vendidos', kpi.get('skus', 0),
-              delta=comparativo.formatar_variacao(_c('skus')) if kpi_ant else None)
+    c4.metric('Margem de Contribuição', f"R$ {kpi['margem_rs']:,.2f}",
+              delta=comparativo.formatar_variacao(_c('margem_rs')) if kpi_ant else None)
 
+    c5, c6, c7 = st.columns(3)
+    margem_pp_ger = (kpi['margem_pct'] - kpi_ant['margem_pct']) if kpi_ant else None
+    c5.metric('Margem %', f"{kpi['margem_pct']:.2f}%",
+              delta=(f"{'+' if margem_pp_ger >= 0 else ''}{margem_pp_ger:.2f} p.p."
+                     if margem_pp_ger is not None else None))
+    c6.metric('Grupo Líder', kpi.get('grupo_lider') or '-')
+    c7.metric('Produto Líder', kpi.get('produto_lider') or '-')
+
+    ranking_ger = prod.ranking_com_crescimento(itens_p, itens_ant or None)
+    contagem_ger = prod.contagem_crescimento_queda(ranking_ger)
     dest = prod.destaques(itens_p, itens_ant)
     if dest:
         rcol1, rcol2 = st.columns(2)
         with rcol1:
             if dest.get('maior_crescimento'):
                 mc = dest['maior_crescimento']
-                st.markdown(f"**📈 Maior crescimento:** {mc['chave']} ({mc['crescimento_pct']:.2f}%)")
+                st.markdown(f"**📈 Maior crescimento:** {mc['chave']} ({mc['crescimento_pct']:.2f}%) "
+                            f"— {contagem_ger['crescimento']} produto(s) em crescimento no total.")
             else:
                 st.markdown('**📈 Maior crescimento:** nenhum produto cresceu neste recorte.')
         with rcol2:
             if dest.get('maior_queda'):
                 mq = dest['maior_queda']
-                st.markdown(f"**📉 Maior queda:** {mq['chave']} ({mq['crescimento_pct']:.2f}%)")
+                st.markdown(f"**📉 Maior queda:** {mq['chave']} ({mq['crescimento_pct']:.2f}%) "
+                            f"— {contagem_ger['queda']} produto(s) em queda no total.")
             else:
                 st.markdown('**📉 Maior queda:** nenhum produto caiu neste recorte.')
 
     st.markdown('**🏆 Top 5 Produtos (Faturamento)**')
     top_p = sorted(prod.por_produto(itens_p), key=lambda l: l['faturamento'], reverse=True)[:5]
     st.dataframe(pd.DataFrame([{'Produto': p['chave'], 'Faturamento R$': p['faturamento'],
-                                 'Volume (cx)': p['volume']} for p in top_p]),
+                                 'Margem R$': p['margem_rs'], 'Volume (cx)': p['volume']} for p in top_p]),
                  use_container_width=True, hide_index=True)
 
     alertas = prod.alertas_produtos(itens_p, itens_ant or None)
@@ -1880,7 +2130,15 @@ with grp_recorrencia:
 
 # ── CLIENTES ──────────────────────────────────────────────────────────────────
 with grp_clientes:
-    _render_ontrack_clientes()
+    tab_cli_ot, tab_cli_top50, tab_cli_pv = st.tabs([
+        '📊 On Track por Cliente', '🏆 Top 50 Clientes', '👤 Clientes por Vendedor',
+    ])
+    with tab_cli_ot:
+        _render_ontrack_clientes()
+    with tab_cli_top50:
+        _render_top50_clientes_ger()
+    with tab_cli_pv:
+        _render_clientes_por_vendedor_ger()
     # Ranking de Recorrência mudou para a aba própria '🔄 Recorrência' (mais fácil de
     # achar, e junto ali agora tem os 5 tipos de período + histórico versionado).
 
