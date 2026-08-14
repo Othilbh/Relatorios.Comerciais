@@ -20,6 +20,7 @@ import data_store as ds
 import metas_gerais as mg
 import rentabilidade as rent
 import produtos as prod
+import resumo_matriz
 
 MOD_RELATORIO_DIARIO = 'relatorio_diario'
 MOD_FECHAMENTO = 'metas_semanais_fechamento'
@@ -783,52 +784,10 @@ def _render_fechamentos_semanais():
 
     st.divider()
 
-    # Tabela por produto
-    prows = []
-    for r in prods:
-        pm = sum(l['meta']    for l in r.get('linhas', []))
-        pv = sum(l['vendido'] for l in r.get('linhas', []))
-        pa = pv / pm if pm else 0
-        prows.append({
-            'Produto':     r.get('produto', ''),
-            'Prioridade':  r.get('prioridade', 'Normal'),
-            'Meta (cx)':  f'{pm:,.0f}',
-            'Vendido (cx)': f'{pv:,.0f}',
-            '% Atingido': f'{pa*100:.1f}%',
-        })
-    if prows:
-        st.subheader('Por Produto')
-        st.dataframe(pd.DataFrame(prows), use_container_width=True, hide_index=True)
-
-    # Tabela por vendedor
-    vend_agg = {}
-    for r in prods:
-        for l in r.get('linhas', []):
-            v = l.get('vendedor', '?')
-            if v not in vend_agg:
-                vend_agg[v] = {'meta': 0, 'vendido': 0}
-            vend_agg[v]['meta']    += l.get('meta', 0)
-            vend_agg[v]['vendido'] += l.get('vendido', 0)
-
-    vend_rs = dados.get('totais_rs', {}).get('vendedores', {})
-    vrows = []
-    for v, ag in sorted(vend_agg.items()):
-        meta_v = ag['meta']
-        vend_v = ag['vendido']
-        atg_v  = vend_v / meta_v if meta_v else 0
-        rs = vend_rs.get(v, {})
-        vrows.append({
-            'Vendedor':     v,
-            'Meta (cx)':   f'{meta_v:,.0f}',
-            'Vendido (cx)': f'{vend_v:,.0f}',
-            '% Atingido':  f'{atg_v*100:.1f}%',
-            'Fat R$':      f"R$ {rs['fat']:,.2f}" if rs.get('fat') is not None else '—',
-            'MC R$':       f"R$ {rs['mc_rs']:,.2f}" if rs.get('mc_rs') is not None else '—',
-            'MC %':        f"{rs['mc_pct']:.2f}%" if rs.get('mc_pct') is not None else '—',
-        })
-    if vrows:
-        st.subheader('Por Vendedor')
-        st.dataframe(pd.DataFrame(vrows), use_container_width=True, hide_index=True)
+    # Matriz Produto × Vendedor agrupada por prioridade -- igual ao Resumo
+    # Geral (mesma implementação usada na prévia de Metas Semanais, ver
+    # resumo_matriz.py, pra nunca ficar diferente daqui pra lá)
+    resumo_matriz.render_matriz_produto_vendedor(prods)
 
     # Comparativo entre semanas (se houver mais de 1)
     if len(historico) >= 2:
