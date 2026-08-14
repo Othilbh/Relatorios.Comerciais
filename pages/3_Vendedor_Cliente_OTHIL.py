@@ -48,10 +48,7 @@ MODULO_HIST = 'vendedor_cliente_historico'
 
 st.title('Relatorio Vendedor-Cliente')
 
-with st.expander('👤 Seu nome (fica registrado no histórico de quem gerou/publicou)'):
-    st.session_state['usuario_nome'] = st.text_input(
-        'Seu nome', value=st.session_state.get('usuario_nome', 'Ingrid'), key='usuario_nome_input_vc',
-    )
+st.session_state.setdefault('usuario_nome', 'Ingrid')
 
 MESES = ['Janeiro','Fevereiro','Marco','Abril','Maio','Junho',
          'Julho','Agosto','Setembro','Outubro','Novembro','Dezembro']
