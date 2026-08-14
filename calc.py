@@ -25,6 +25,13 @@ meta.
 """
 import math
 from parsers import normalize_codigo
+# map_vendedor()/VENDOR_ALIASES vêm de parsers_diario -- fonte única. Havia
+# uma segunda cópia (divergente) aqui em calc.py que nunca foi atualizada
+# quando o Luca foi cadastrado como vendedor, então TODAS as vendas dele
+# ficavam silenciosamente de fora do cálculo de Vendido (Meta continuava
+# aparecendo normal, só o Vendido zerava) -- consolidado num só lugar para
+# não poder mais desalinhar.
+from parsers_diario import map_vendedor
 
 # Percentuais fixos (mas editáveis na UI) de cada vendedor sobre o estoque
 # atual de cada produto. Não somam 100% — cada vendedor tem uma meta
@@ -40,29 +47,9 @@ VENDEDORES_PADRAO = {
     'Claudia': 7,
 }
 
-# Aliases para reconciliar os nomes "crus" que aparecem nos PDFs de
-# estoque/vendas com os 8 nomes de exibição usados nas Metas Semanais.
-# Nomes que não casam com nenhum alias (ex.: "LUCA - VENDEDOR",
-# "JEAN CARLOS", "NAYARA") são ignorados (não fazem parte das 8 metas).
-VENDOR_ALIASES = {
-    'Reginaldo': ['REGINALDO'],
-    'Roni': ['RONI'],
-    'Afanais': ['AFANAIS'],
-    'Dora': ['DORA'],
-    'Farley': ['FARLEY'],
-    'Luciano': ['LUCIANO'],
-    'Claudia': ['CLAUDIA'],
-    'Juliana': ['JULIANA'],
-}
-
-
-def map_vendedor(raw: str):
-    raw_u = (raw or '').upper()
-    for display, aliases in VENDOR_ALIASES.items():
-        for a in aliases:
-            if a in raw_u:
-                return display
-    return None
+# map_vendedor()/VENDOR_ALIASES agora vêm de parsers_diario (import no topo
+# do arquivo) -- nomes que não casam com nenhum alias lá são ignorados
+# (não fazem parte das metas rastreadas).
 
 
 def round_up(x: float) -> int:
