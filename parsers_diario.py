@@ -109,6 +109,7 @@ _JUNK_MARKERS = [
     'recursos\\relatorios', '.rtm', 'Parametros:', 'Vendedor(es):',
     'Pessoa(s):', 'Produto(s):', 'Base para Percentual', 'Quebra e Avaria',
     'Considera frete', 'Classificacao :', 'Saidas por Vendas',
+    'Outras Saidas', 'Total das Saidas', 'Custo Unit', 'Resultado Unit',
     'Emissao', 'Emiss',
 ]
 
@@ -123,9 +124,17 @@ def _is_junk_line(line: str) -> bool:
     clientes/páginas e não são produto. Compara sem acento porque o PDF usa
     acentuação (ex.: 'Código Descrição', 'Saídas por Vendas') enquanto
     _JUNK_MARKERS está em ASCII — sem essa normalização essas linhas
-    "vazam" pro nome do produto seguinte."""
+    "vazam" pro nome do produto seguinte.
+
+    Também normaliza espaços internos (colapsa sequências de espaços em um
+    só): o `pdftotext -layout` alinha cabeçalhos largos (ex.: 'Saídas por
+    Vendas') sobre 3 sub-colunas estreitas (Qtd/Unit/Total), inserindo
+    espaços extra entre as palavras do próprio cabeçalho (ex.: 'Saídas
+    por     Vendas'). Sem colapsar, o marcador com espaço único não bate
+    e a linha inteira vaza pro nome do produto seguinte."""
     line_na = _strip_accents(line)
-    if line_na.lstrip().startswith('Codigo Descricao'):
+    line_na = re.sub(r'\s+', ' ', line_na).strip()
+    if line_na.startswith('Codigo Descricao'):
         return True
     stripped = line.strip()
     if not stripped:
