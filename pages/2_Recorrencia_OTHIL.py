@@ -20,6 +20,7 @@ from parsers_diario import parse_relatorio_diario
 from xlsx_recorrencia import gerar_xlsx
 import comparativo
 import data_store as ds
+import periodo
 
 try:
     from gsheets_upload import upload_xlsx_as_sheet
@@ -29,18 +30,14 @@ except Exception:
 
 _GERENCIA_DIR = os.path.join(os.path.dirname(__file__), '..', 'gerencia_data')
 MODULO = 'recorrencia'
-TIPO_PERIODO = 'livre'  # período de duração variável (dia, quinzena, mês, etc.) — não é um dos 5 tipos padrão
+TIPO_PERIODO_LEGADO = 'livre'  # período de texto livre usado antes desta versão -- mantido só
+                               # pra continuar enxergando o histórico salvo daquele jeito
 
 
-def _slug_recorrencia(periodo_str: str, emissao_str: str) -> str:
-    """Slug estável a partir do texto do período (mesmo período reenviado =
-    mesma chave = nova versão no histórico, não uma entrada nova)."""
-    base = (periodo_str or '').strip() or (emissao_str or '').strip()
-    slug = re.sub(r'[^0-9A-Za-z]+', '-', base).strip('-')
-    return slug or datetime.date.today().strftime('%Y-%m-%d')
-
-
-def _salvar_gerencia(data: dict, periodo_str: str = '', emissao_str: str = '', usuario: str = None):
+def _salvar_gerencia(data: dict, tipo_periodo: str, periodo_ref: str, usuario: str = None):
+    """Salva com a MESMA chave estruturada (tipo_periodo, periodo_ref) usada
+    em Rentabilidade/Produtos -- reenviar o PDF do mesmo período gera nova
+    versão no histórico (não sobrescreve nem duplica)."""
     try:
         os.makedirs(_GERENCIA_DIR, exist_ok=True)
         path = os.path.join(_GERENCIA_DIR, 'recorrencia_latest.json')
@@ -49,23 +46,37 @@ def _salvar_gerencia(data: dict, periodo_str: str = '', emissao_str: str = '', u
     except Exception:
         pass
     try:
-        slug = _slug_recorrencia(periodo_str, emissao_str)
         ds.save_record(
-            modulo=MODULO, tipo_periodo=TIPO_PERIODO, periodo_ref=slug,
+            modulo=MODULO, tipo_periodo=tipo_periodo, periodo_ref=periodo_ref,
             valores=data, usuario=usuario,
         )
     except Exception:
         pass
 
 
-def _listar_recorrencias():
-    """Histórico de publicações de Recorrência, mais recente primeiro
-    (ordenado pelo horário real de gravação, já que o período é de texto
-    livre e não segue uma ordenação cronológica lexical confiável)."""
+def _listar_recorrencias(tipo_periodo: str):
+    """Histórico de publicações de Recorrência para um tipo de período
+    (semanal/mensal/trimestral/semestral/anual), mais recente primeiro."""
     itens = []
     try:
-        for slug in ds.list_periodos(MODULO, TIPO_PERIODO):
-            registro = ds.load_current(MODULO, TIPO_PERIODO, slug)
+        for ref in ds.list_periodos(MODULO, tipo_periodo):
+            registro = ds.load_current(MODULO, tipo_periodo, ref)
+            if registro:
+                itens.append((ref, registro['valores'], registro.get('atualizado_em', '')))
+    except Exception:
+        pass
+    itens.sort(key=lambda t: t[0], reverse=True)
+    return itens
+
+
+def _listar_recorrencias_legado():
+    """Publicações salvas ANTES desta versão (chave de texto livre extraída
+    do PDF, sem tipo de período estruturado) -- mantidas visíveis aqui pra
+    não perder o histórico já salvo, mas não recebem novas entradas."""
+    itens = []
+    try:
+        for slug in ds.list_periodos(MODULO, TIPO_PERIODO_LEGADO):
+            registro = ds.load_current(MODULO, TIPO_PERIODO_LEGADO, slug)
             if registro:
                 itens.append((slug, registro['valores'], registro.get('atualizado_em', '')))
     except Exception:
@@ -104,12 +115,30 @@ st.caption(
     'Verde = comprou | Laranja = disponivel no mix mas nao comprou.'
 )
 
-with st.expander('👤 Seu nome (fica registrado no histórico de publicações)'):
-    st.session_state['usuario_nome'] = st.text_input(
-        'Seu nome', value=st.session_state.get('usuario_nome', 'Ingrid'), key='usuario_nome_input_rec',
-    )
+st.session_state.setdefault('usuario_nome', 'Ingrid')
 
-st.header('1. Upload do PDF')
+st.header('1. Período de Referência')
+st.caption(
+    'A que período este PDF pertence? Isso é o que organiza o histórico na '
+    'Gerência (igual em Rentabilidade e Produtos) -- o texto de período que '
+    'vem dentro do próprio PDF continua sendo mostrado como informação, mas '
+    'quem decide onde fica salvo é a seleção abaixo.'
+)
+c_tipo, c_data = st.columns(2)
+with c_tipo:
+    tipo_periodo_rec = st.selectbox(
+        'Tipo de período', periodo.TIPOS_PERIODO, format_func=periodo.rotulo_tipo,
+        index=0, key='rec_tipo_periodo',
+    )
+with c_data:
+    data_ref_rec = st.date_input(
+        'Data dentro do período coberto pelo PDF', value=datetime.date.today(),
+        format='DD/MM/YYYY', key='rec_data_ref',
+    )
+periodo_ref_rec = periodo.periodo_ref(tipo_periodo_rec, data_ref_rec)
+st.caption(f'Vai ser salvo como: **{periodo.rotulo(tipo_periodo_rec, periodo_ref_rec)}**')
+
+st.header('2. Upload do PDF')
 pdf_file = st.file_uploader(
     'Lucratividade por Vendedor-Cliente no Previsao — qualquer periodo (PDF, Mercatus)',
     type='pdf', key='pdf_recorrencia',
@@ -141,8 +170,9 @@ if 'resultado_rec' in st.session_state:
     else:
         st.success('PDF lido com sucesso — todos os totais conferidos.')
 
-    # Resumo
-    periodo = resultado.get('periodo') or '-'
+    # Resumo (texto de período como extraído do próprio PDF -- informativo;
+    # quem decide onde fica salvo é a seleção da seção 1, em periodo_ref_rec)
+    periodo_pdf_texto = resultado.get('periodo') or '-'
     emissao = resultado.get('data_emissao') or '-'
     itens_validos = [it for it in itens if it.get('vendedor') != 'Luca']
     fat_total = sum(it['faturamento'] for it in itens_validos)
@@ -156,8 +186,9 @@ if 'resultado_rec' in st.session_state:
         for it in itens_validos
     ))
 
-    st.header('2. Resumo do periodo')
-    st.caption(f'Periodo: {periodo}  |  Emissao: {emissao}  |  {len(itens_validos)} itens (excluindo Luca)')
+    st.header('3. Resumo do periodo')
+    st.caption(f'Periodo (texto do PDF): {periodo_pdf_texto}  |  Emissao: {emissao}  |  '
+               f'{len(itens_validos)} itens (excluindo Luca)')
     c1, c2, c3, c4, c5, c6 = st.columns(6)
     c1.metric('Faturamento', f'R$ {fat_total:,.2f}')
     c2.metric('MC R$', f'R$ {mc_rs_total:,.2f}')
@@ -169,7 +200,7 @@ if 'resultado_rec' in st.session_state:
     # ------------------------------------------------------------------
     # Dashboard de clientes
     # ------------------------------------------------------------------
-    st.header('3. Dashboard de Clientes')
+    st.header('4. Dashboard de Clientes')
 
     rows = _agregar_clientes(itens_validos)
 
@@ -181,8 +212,10 @@ if 'resultado_rec' in st.session_state:
         # Salva para a página de Gerência (histórico versionado — sobrevive a
         # reinício do app; período repetido = nova versão, não sobrescreve)
         _salvar_gerencia({
-            'periodo': periodo,
+            'periodo': periodo_pdf_texto,
             'emissao': emissao,
+            'tipo_periodo': tipo_periodo_rec,
+            'periodo_ref': periodo_ref_rec,
             'gerado_em': datetime.datetime.now().isoformat(),
             'clientes': rows,
             'totais': {
@@ -193,15 +226,20 @@ if 'resultado_rec' in st.session_state:
                 'n_clientes': clientes,
                 'n_vendedores': vendedores,
             }
-        }, periodo_str=periodo, emissao_str=emissao, usuario=st.session_state.get('usuario_nome'))
+        }, tipo_periodo_rec, periodo_ref_rec, usuario=st.session_state.get('usuario_nome', 'Ingrid'))
+        st.caption(f'✅ Salvo na Gerência como **{periodo.rotulo(tipo_periodo_rec, periodo_ref_rec)}** '
+                   f'({periodo.rotulo_tipo(tipo_periodo_rec)}).')
 
-        # ---- Comparativo vs período anterior publicado ---------------------
-        _hist_rec = _listar_recorrencias()
-        _slug_atual = _slug_recorrencia(periodo, emissao)
-        _anteriores = [(s, v) for s, v, _ in _hist_rec if s != _slug_atual]
-        if _anteriores:
+        # ---- Comparativo vs período anterior publicado (mesmo tipo) --------
+        _ref_ant = periodo.periodo_anterior(tipo_periodo_rec, periodo_ref_rec)
+        _registro_ant = None
+        try:
+            _registro_ant = ds.load_current(MODULO, tipo_periodo_rec, _ref_ant)
+        except Exception:
+            _registro_ant = None
+        if _registro_ant:
             st.subheader('📊 Comparativo vs período anterior publicado')
-            _slug_ant, _val_ant = _anteriores[0]
+            _val_ant = _registro_ant['valores']
             _tot_ant = _val_ant.get('totais', {})
             cc1, cc2, cc3, cc4 = st.columns(4)
             for _col, _label, _atual_v, _chave in [
@@ -214,7 +252,7 @@ if 'resultado_rec' in st.session_state:
                 _fmt = (lambda x: f'R$ {x:,.2f}') if _chave in ('faturamento', 'mc_rs') else \
                        (lambda x: f'{x:,.3f}') if _chave == 'caixas' else (lambda x: f'{x:,.0f}')
                 _col.metric(_label, _fmt(_atual_v), delta=comparativo.formatar_variacao(_comp))
-            st.caption(f'Base de comparação: {_val_ant.get("periodo","-")} '
+            st.caption(f'Base de comparação: {periodo.rotulo(tipo_periodo_rec, _ref_ant)} '
                        f'(emissão {_val_ant.get("emissao","-")})')
 
         # Gráfico — top 30 por faturamento (evita gráfico ilegível)
@@ -240,7 +278,7 @@ if 'resultado_rec' in st.session_state:
     # ------------------------------------------------------------------
     # Gerar Excel
     # ------------------------------------------------------------------
-    st.header('4. Gerar Recorrencia Excel')
+    st.header('5. Gerar Recorrencia Excel')
 
     if st.button('Gerar Recorrencia Excel', type='primary', key='btn_rec'):
         with st.spinner('Montando a matriz...'):
@@ -281,18 +319,22 @@ if 'resultado_rec' in st.session_state:
     # Histórico de Recorrências salvas
     # ------------------------------------------------------------------
     st.divider()
-    st.header('5. Histórico de Recorrências Salvas')
+    st.header('6. Histórico de Recorrências Salvas')
 
-    _hist_todos = _listar_recorrencias()
+    _tipo_h = st.selectbox(
+        'Tipo de período', periodo.TIPOS_PERIODO, format_func=periodo.rotulo_tipo,
+        index=0, key='rec_tipo_hist',
+    )
+    _hist_todos = _listar_recorrencias(_tipo_h)
     if not _hist_todos:
-        st.info('Nenhuma recorrência salva ainda.')
+        st.info(f'Nenhuma recorrência salva ainda como {periodo.rotulo_tipo(_tipo_h)}.')
     else:
-        _labels_h = [f"{v.get('periodo','-')}  —  emissão {v.get('emissao','-')}  "
-                     f"({(ts or '')[:16].replace('T',' ')})" for _, v, ts in _hist_todos]
+        _labels_h = [f"{periodo.rotulo(_tipo_h, ref)}  —  {v.get('periodo','-')}  "
+                     f"({(ts or '')[:16].replace('T',' ')})" for ref, v, ts in _hist_todos]
         _escolha_h = st.selectbox(f'{len(_hist_todos)} publicação(ões):', _labels_h,
                                    index=0, key='sel_hist_rec')
         _idx_h = _labels_h.index(_escolha_h)
-        _slug_h, _val_h, _ts_h = _hist_todos[_idx_h]
+        _ref_h, _val_h, _ts_h = _hist_todos[_idx_h]
         _tot_h = _val_h.get('totais', {})
         hc1, hc2, hc3, hc4, hc5 = st.columns(5)
         hc1.metric('Faturamento', f"R$ {_tot_h.get('faturamento', 0):,.2f}")
@@ -315,7 +357,7 @@ if 'resultado_rec' in st.session_state:
 
         # Versões anteriores desse mesmo período (se o período foi reenviado)
         try:
-            _versoes = ds.load_history(MODULO, TIPO_PERIODO, _slug_h)
+            _versoes = ds.load_history(MODULO, _tipo_h, _ref_h)
         except Exception:
             _versoes = []
         if _versoes:
@@ -326,6 +368,23 @@ if 'resultado_rec' in st.session_state:
                     _t = _v.get('valores', {}).get('totais', {})
                     st.caption(f"v{_v.get('versao','?')} — {_quando} — por {_quem} — "
                                f"Faturamento R$ {_t.get('faturamento', 0):,.2f}")
+
+    _hist_legado = _listar_recorrencias_legado()
+    if _hist_legado:
+        with st.expander(f'📜 Histórico antigo ({len(_hist_legado)} publicação(ões) salvas '
+                          'antes desta atualização, por texto de período livre)'):
+            st.caption(
+                'Estas publicações foram salvas antes de existir a seleção de tipo de '
+                'período acima. Ficam aqui só para consulta -- novas publicações não '
+                'são mais salvas neste formato.'
+            )
+            for _slug_l, _val_l, _ts_l in _hist_legado:
+                _tot_l = _val_l.get('totais', {})
+                _quando_l = (_ts_l or '')[:16].replace('T', ' ')
+                st.caption(
+                    f"{_val_l.get('periodo','-')} — emissão {_val_l.get('emissao','-')} "
+                    f"({_quando_l}) — Faturamento R$ {_tot_l.get('faturamento', 0):,.2f}"
+                )
 
 else:
     st.info('Envie o PDF do periodo desejado para comecar.')
