@@ -6,9 +6,9 @@
     "periodo_ref": "2026-08",
     "data_referencia": "2026-08-14",
     "criado_em": "2026-08-14T12:32:45+00:00",
-    "atualizado_em": "2026-08-14T12:32:45+00:00",
+    "atualizado_em": "2026-08-14T12:33:12+00:00",
     "usuario": "Ingrid",
-    "versao": 1,
+    "versao": 2,
     "valores": {
       "clientes_data": {
         "Afanais": {
@@ -191,5 +191,198 @@
       }
     }
   },
-  "history": []
+  "history": [
+    {
+      "id": "b3edc77b-7214-412b-b166-5c6c9bf958ca",
+      "modulo_origem": "vendedor_cliente",
+      "tipo_periodo": "mensal",
+      "periodo_ref": "2026-08",
+      "data_referencia": "2026-08-14",
+      "criado_em": "2026-08-14T12:32:45+00:00",
+      "atualizado_em": "2026-08-14T12:32:45+00:00",
+      "usuario": "Ingrid",
+      "versao": 1,
+      "valores": {
+        "clientes_data": {
+          "Afanais": {
+            "ADICAO": {
+              "vol": 7255,
+              "fat": 450794.0,
+              "custo": 433280.36,
+              "mc_rs": 17513.64,
+              "mc_pct": 4.04,
+              "resultado_real": 19.04
+            },
+            "ALISSON CARATINGA": {
+              "vol": 1010,
+              "fat": 61215.0,
+              "custo": 63931.82,
+              "mc_rs": -2716.82,
+              "mc_pct": -4.25,
+              "resultado_real": 10.75
+            },
+            "BAIAO E PIRES": {
+              "vol": 105,
+              "fat": 9360.0,
+              "custo": 8885.04,
+              "mc_rs": 474.96,
+              "mc_pct": 5.35,
+              "resultado_real": 20.35
+            },
+            "CATALAO": {
+              "vol": 320,
+              "fat": 22904.0,
+              "custo": 24234.39,
+              "mc_rs": -1330.39,
+              "mc_pct": -5.49,
+              "resultado_real": 9.51
+            },
+            "DARIO": {
+              "vol": 395,
+              "fat": 35383.0,
+              "custo": 35727.57,
+              "mc_rs": -344.57,
+              "mc_pct": -0.96,
+              "resultado_real": 14.04
+            },
+            "HERCULANO": {
+              "vol": 1109,
+              "fat": 53197.0,
+              "custo": 55406.9,
+              "mc_rs": -2209.9,
+              "mc_pct": -3.99,
+              "resultado_real": 11.01
+            },
+            "JOSE PEREIRA DE SOUZA": {
+              "vol": 1063,
+              "fat": 74053.0,
+              "custo": 76637.9,
+              "mc_rs": -2584.9,
+              "mc_pct": -3.37,
+              "resultado_real": 11.63
+            },
+            "MART MINAS": {
+              "vol": 17556,
+              "fat": 1394974.0,
+              "custo": 1324235.86,
+              "mc_rs": 70738.14,
+              "mc_pct": 5.34,
+              "resultado_real": 20.34
+            },
+            "NOVO HORIZONTE": {
+              "vol": 1246,
+              "fat": 79640.0,
+              "custo": 81511.47,
+              "mc_rs": -1871.47,
+              "mc_pct": -2.3,
+              "resultado_real": 12.7
+            },
+            "SO BANANAS": {
+              "vol": 2083,
+              "fat": 157156.0,
+              "custo": 152832.63,
+              "mc_rs": 4323.37,
+              "mc_pct": 2.83,
+              "resultado_real": 17.83
+            },
+            "TONINHO BOY": {
+              "vol": 302,
+              "fat": 30480.0,
+              "custo": 32144.54,
+              "mc_rs": -1664.54,
+              "mc_pct": -5.18,
+              "resultado_real": 9.82
+            },
+            "VERA CRUZ": {
+              "vol": 1175,
+              "fat": 57588.0,
+              "custo": 62809.95,
+              "mc_rs": -5221.95,
+              "mc_pct": -8.31,
+              "resultado_real": 6.69
+            }
+          }
+        },
+        "totais_dict": {
+          "Reginaldo": {
+            "vol": 13693,
+            "fat": 1139220.53,
+            "custo": 1136024.54,
+            "mc_rs": 3195.99,
+            "mc_pct": 0.28,
+            "resultado_real": 15.28
+          },
+          "Roni": {
+            "vol": 23113,
+            "fat": 1550657.54,
+            "custo": 1582143.38,
+            "mc_rs": -31485.84,
+            "mc_pct": -1.99,
+            "resultado_real": 13.01
+          },
+          "Afanais": {
+            "vol": 38950,
+            "fat": 2706221.81,
+            "custo": 2733938.99,
+            "mc_rs": -27717.18,
+            "mc_pct": -1.01,
+            "resultado_real": 13.99
+          },
+          "Dora": {
+            "vol": 5645,
+            "fat": 410817.0,
+            "custo": 408693.64,
+            "mc_rs": 2123.36,
+            "mc_pct": 0.52,
+            "resultado_real": 15.52
+          },
+          "Farley": {
+            "vol": 10937,
+            "fat": 697735.71,
+            "custo": 713424.87,
+            "mc_rs": -15689.16,
+            "mc_pct": -2.2,
+            "resultado_real": 12.8
+          },
+          "Luciano": {
+            "vol": 89,
+            "fat": 7900.0,
+            "custo": 7391.6,
+            "mc_rs": 508.4,
+            "mc_pct": 6.88,
+            "resultado_real": 21.88
+          },
+          "Luca": {
+            "vol": 10160,
+            "fat": 988910.67,
+            "custo": 977590.23,
+            "mc_rs": 11320.44,
+            "mc_pct": 1.16,
+            "resultado_real": 16.16
+          },
+          "Juliana": {
+            "vol": 3739,
+            "fat": 245185.75,
+            "custo": 246149.91,
+            "mc_rs": -964.16,
+            "mc_pct": -0.39,
+            "resultado_real": 14.61
+          }
+        },
+        "historico": {
+          "ref_label": "AGO/2026",
+          "gerado_em": "2026-08-05T14:36:11",
+          "ant_ano": {
+            "label": "ago./2025",
+            "vendedores": {}
+          },
+          "ant_mes": {
+            "label": "jul./2026",
+            "vendedores": {}
+          },
+          "meta": {}
+        }
+      }
+    }
+  ]
 }
