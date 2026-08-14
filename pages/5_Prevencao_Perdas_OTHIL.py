@@ -24,10 +24,7 @@ st.set_page_config(page_title="Prevenção de Perdas", layout="wide")
 st.title("🚨 Prevenção de Perdas — Estoque Parado")
 st.caption("Identifica produtos parados antes que virem prejuízo.")
 
-with st.expander('👤 Seu nome (fica registrado no histórico de quem publicou)'):
-    st.session_state['usuario_nome'] = st.text_input(
-        'Seu nome', value=st.session_state.get('usuario_nome', 'Ingrid'), key='usuario_nome_input_pp',
-    )
+st.session_state.setdefault('usuario_nome', 'Ingrid')
 
 # ── Constantes ────────────────────────────────────────────────────────────────
 _NIVEL = {
