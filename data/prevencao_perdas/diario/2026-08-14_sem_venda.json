@@ -1,0 +1,119 @@
+{
+  "current": {
+    "id": "f0defd06-1f89-409c-918d-cef2994cef0e",
+    "modulo_origem": "prevencao_perdas",
+    "tipo_periodo": "diario",
+    "periodo_ref": "2026-08-14_sem_venda",
+    "data_referencia": "2026-08-14",
+    "criado_em": "2026-08-14T13:43:05+00:00",
+    "atualizado_em": "2026-08-14T13:43:05+00:00",
+    "usuario": "Ingrid",
+    "versao": 1,
+    "valores": {
+      "publicado_em": "2026-08-14T13:43:05.576313",
+      "emissao": "14/08/2026",
+      "periodo": "07/08/2026",
+      "tipo": "sem_venda",
+      "resumo": {
+        "total": 8,
+        "criticos": 3,
+        "alta_prioridade": 3,
+        "atencao": 2,
+        "valor_risco": 62647.149999999994,
+        "sem_venda_7d": 8,
+        "estoque_30d": 3
+      },
+      "produtos": [
+        {
+          "prioridade": "🔴 Crítico",
+          "produto": "FUJI 165 AZALEIA",
+          "responsavel": "DORA",
+          "dias_estoque": 144,
+          "dias_sem_venda": 7,
+          "saldo_cx": 16.0,
+          "qtd_vendida": 0.0,
+          "valor_estoque": 1379.52,
+          "acao": "Promoção urgente / Vender urgente"
+        },
+        {
+          "prioridade": "🔴 Crítico",
+          "produto": "MIRTILO CRUNCH",
+          "responsavel": "DORA",
+          "dias_estoque": 73,
+          "dias_sem_venda": 7,
+          "saldo_cx": 1.0,
+          "qtd_vendida": 0.0,
+          "valor_estoque": 116.6,
+          "acao": "Promoção urgente / Vender urgente"
+        },
+        {
+          "prioridade": "🔴 Crítico",
+          "produto": "MIRTILO DOLE",
+          "responsavel": "RONISTONIS",
+          "dias_estoque": 56,
+          "dias_sem_venda": 7,
+          "saldo_cx": 1.0,
+          "qtd_vendida": 0.0,
+          "valor_estoque": 99.43,
+          "acao": "Promoção urgente / Vender urgente"
+        },
+        {
+          "prioridade": "🟠 Alta Prioridade",
+          "produto": "CUMB THOMPSON COTON RIKARU",
+          "responsavel": "RONISTONIS",
+          "dias_estoque": 2,
+          "dias_sem_venda": 7,
+          "saldo_cx": 220.0,
+          "qtd_vendida": 0.0,
+          "valor_estoque": 28932.2,
+          "acao": "Priorizar venda / Contatar vendedor"
+        },
+        {
+          "prioridade": "🟠 Alta Prioridade",
+          "produto": "CUMB THOMPSON GRANDVALLE",
+          "responsavel": "JULIANA",
+          "dias_estoque": 3,
+          "dias_sem_venda": 7,
+          "saldo_cx": 220.0,
+          "qtd_vendida": 0.0,
+          "valor_estoque": 15947.8,
+          "acao": "Priorizar venda / Contatar vendedor"
+        },
+        {
+          "prioridade": "🟠 Alta Prioridade",
+          "produto": "NECTARINA FRUITS PONENT",
+          "responsavel": "BRANCOLUCIANO",
+          "dias_estoque": 2,
+          "dias_sem_venda": 7,
+          "saldo_cx": 112.0,
+          "qtd_vendida": 0.0,
+          "valor_estoque": 15133.44,
+          "acao": "Priorizar venda / Contatar vendedor"
+        },
+        {
+          "prioridade": "🟡 Atenção",
+          "produto": "CAQUI HOTH 20X1",
+          "responsavel": "RONISTONIS",
+          "dias_estoque": 14,
+          "dias_sem_venda": 7,
+          "saldo_cx": 10.0,
+          "qtd_vendida": 0.0,
+          "valor_estoque": 937.8,
+          "acao": "Monitorar / Ação preventiva"
+        },
+        {
+          "prioridade": "🟡 Atenção",
+          "produto": "GALA 120 FRUTIMAR",
+          "responsavel": "DORA",
+          "dias_estoque": 11,
+          "dias_sem_venda": 7,
+          "saldo_cx": 1.0,
+          "qtd_vendida": 0.0,
+          "valor_estoque": 100.36,
+          "acao": "Monitorar / Ação preventiva"
+        }
+      ]
+    }
+  },
+  "history": []
+}
