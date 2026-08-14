@@ -18,6 +18,7 @@ import comparativo
 import on_track
 import data_store as ds
 import metas_gerais as mg
+import rentabilidade as rent
 
 MOD_RELATORIO_DIARIO = 'relatorio_diario'
 MOD_FECHAMENTO = 'metas_semanais_fechamento'
@@ -1592,6 +1593,90 @@ def _render_metas_gerais():
 if not _check_auth():
     st.stop()
 
+def _render_rentabilidade_resumo():
+    st.header('💰 Rentabilidade e Margens — Resumo')
+    st.caption('Visão consolidada para a Gerência (reaproveita o mesmo motor de cálculo do módulo '
+               'completo -- nenhuma lógica de faturamento/custo/margem foi duplicada aqui).')
+    try:
+        st.page_link('pages/6_Rentabilidade_Margens_OTHIL.py',
+                      label='Abrir módulo completo (filtros, rankings, matriz, histórico) →', icon='💰')
+    except Exception:
+        pass
+
+    itens_base, avisos = rent.carregar_base_consolidada()
+    if not itens_base:
+        st.info('Ainda não há dados suficientes. Faça upload de pelo menos um Relatório Diário, '
+                'Semanal ou Mensal.')
+        return
+    if avisos:
+        st.caption(f'ℹ️ {len(avisos)} registro(s) não incluído(s) no histórico consolidado (evita duplicidade).')
+
+    col_tipo, col_periodo = st.columns([1, 2])
+    with col_tipo:
+        tipo_r = st.selectbox('Período', periodo_mod.TIPOS_PERIODO, format_func=periodo_mod.rotulo_tipo,
+                               index=1, key='ger_rent_tipo')
+    opcoes_r = rent.periodos_disponiveis(itens_base, tipo_r)
+    if not opcoes_r:
+        st.warning('Nenhum dado disponível para esse tipo de período.')
+        return
+    with col_periodo:
+        ref_r = st.selectbox('Referência', opcoes_r, format_func=lambda r: periodo_mod.rotulo(tipo_r, r),
+                              key='ger_rent_periodo')
+
+    itens_p = rent.filtrar_periodo(itens_base, tipo_r, ref_r)
+    if not itens_p:
+        st.info('Sem dados para este período.')
+        return
+    kpi = rent.agregar(itens_p)
+    ref_ant = periodo_mod.periodo_anterior(tipo_r, ref_r)
+    itens_ant = rent.filtrar_periodo(itens_base, tipo_r, ref_ant)
+    kpi_ant = rent.agregar(itens_ant) if itens_ant else None
+
+    def _c(chave):
+        return comparativo.calcular(kpi[chave], kpi_ant[chave]) if kpi_ant else None
+
+    c1, c2, c3, c4 = st.columns(4)
+    c1.metric('Faturamento', f"R$ {kpi['faturamento']:,.2f}",
+              delta=comparativo.formatar_variacao(_c('faturamento')) if kpi_ant else None)
+    c2.metric('Margem R$', f"R$ {kpi['margem_rs']:,.2f}",
+              delta=comparativo.formatar_variacao(_c('margem_rs')) if kpi_ant else None)
+    c3.metric('Margem %', f"{kpi['margem_pct']:.2f}%",
+              delta=comparativo.formatar_variacao(_c('margem_pct')) if kpi_ant else None)
+    c4.metric('Ticket Médio', f"R$ {kpi['ticket_medio']:,.2f}",
+              delta=comparativo.formatar_variacao(_c('ticket_medio')) if kpi_ant else None)
+
+    rcol1, rcol2, rcol3 = st.columns(3)
+    with rcol1:
+        st.markdown('**Top 5 Vendedores (Margem R$)**')
+        top_v = sorted(rent.por_vendedor(itens_p), key=lambda l: l['margem_rs'], reverse=True)[:5]
+        st.dataframe(pd.DataFrame([{'Vendedor': v['chave'], 'Margem R$': v['margem_rs'],
+                                     'Margem %': v['margem_pct']} for v in top_v]),
+                     use_container_width=True, hide_index=True)
+    with rcol2:
+        st.markdown('**Top 5 Clientes (Margem R$)**')
+        top_c = sorted(rent.por_cliente(itens_p), key=lambda l: l['margem_rs'], reverse=True)[:5]
+        st.dataframe(pd.DataFrame([{'Cliente': c['chave'], 'Margem R$': c['margem_rs'],
+                                     'Margem %': c['margem_pct']} for c in top_c]),
+                     use_container_width=True, hide_index=True)
+    with rcol3:
+        st.markdown('**Top 5 Produtos (Margem R$)**')
+        top_p = sorted(rent.por_produto(itens_p), key=lambda l: l['margem_rs'], reverse=True)[:5]
+        st.dataframe(pd.DataFrame([{'Produto': p['chave'], 'Margem R$': p['margem_rs'],
+                                     'Margem %': p['margem_pct']} for p in top_p]),
+                     use_container_width=True, hide_index=True)
+
+    alertas = rent.alertas_gerenciais(itens_p, itens_ant or None)
+    st.markdown('**🚨 Pontos de Atenção**')
+    if not alertas:
+        st.success('Nenhum ponto de atenção identificado.')
+    else:
+        for a in alertas[:5]:
+            icone = '🔴' if a['severidade'] == 'critico' else '🟡'
+            st.markdown(f"{icone} **{a['tipo']}** — {a['detalhe']}")
+        if len(alertas) > 5:
+            st.caption(f'+ {len(alertas) - 5} outro(s) ponto(s) de atenção. Veja o módulo completo para a lista inteira.')
+
+
 # ── Header ────────────────────────────────────────────────────────────────────
 st.markdown("""
 <div style="display:flex; align-items:center; gap:1rem; margin-bottom:1rem;">
@@ -1608,10 +1693,11 @@ if st.button('🔒 Sair', key='_gerencia_logout'):
 st.divider()
 
 # ── Grupos de abas ───────────────────────────────────────────────────────────
-grp_vendas, grp_metas, grp_metas_gerais, grp_clientes, grp_quebras, grp_prevperdas = st.tabs([
+grp_vendas, grp_metas, grp_metas_gerais, grp_rentabilidade, grp_clientes, grp_quebras, grp_prevperdas = st.tabs([
     '📊 Dashboards',
     '🎯 Metas Semanais',
     '🌐 Metas Gerais',
+    '💰 Rentabilidade',
     '👥 Clientes',
     '📦 Quebras',
     '🚨 Prevenção de Perdas',
@@ -1645,6 +1731,10 @@ with grp_metas:
 # ── METAS GERAIS ──────────────────────────────────────────────────────────────
 with grp_metas_gerais:
     _render_metas_gerais()
+
+# ── RENTABILIDADE ─────────────────────────────────────────────────────────────
+with grp_rentabilidade:
+    _render_rentabilidade_resumo()
 
 # ── CLIENTES ──────────────────────────────────────────────────────────────────
 with grp_clientes:
