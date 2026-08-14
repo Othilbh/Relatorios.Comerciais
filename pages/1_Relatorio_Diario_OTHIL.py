@@ -355,10 +355,7 @@ def _render_tab(tipo, label_tipo):
 
 st.title('OTHIL — Dashboard de Vendas')
 
-with st.expander('👤 Seu nome (fica registrado no histórico de quem gerou cada dashboard)'):
-    st.session_state['usuario_nome'] = st.text_input(
-        'Seu nome', value=st.session_state.get('usuario_nome', 'Ingrid'), key='usuario_nome_input_diario',
-    )
+st.session_state.setdefault('usuario_nome', 'Ingrid')
 
 tab_d, tab_s, tab_m = st.tabs(['📅 Diário', '📆 Semanal', '🗓️ Mensal'])
 
