@@ -16,7 +16,7 @@ import pandas as pd
 from parsers import parse_estoque, parse_vendas, normalize_codigo
 from parsers_diario import parse_vendas_pdftotext
 from parsers_vendedor import parse_totais_vendedor
-from calc import compute_metas, VENDEDORES_PADRAO, parse_codigos_input, map_vendedor, codigo_matches
+from calc import compute_metas, VENDEDORES_PADRAO, parse_codigos_input, map_vendedor, codigo_matches, soma_falta
 from pdfgen import generate_relatorio_vendedor, generate_dashboard, generate_resumo_geral
 import storage
 import periodo
@@ -255,7 +255,7 @@ def _render_on_track():
     # ── KPIs Totais ───────────────────────────────────────────────────────
     total_meta   = sum(l['meta']    for r in resultados for l in r['linhas'])
     total_vend   = sum(l['vendido'] for r in resultados for l in r['linhas'])
-    total_falta  = total_meta - total_vend
+    total_falta  = soma_falta([l for r in resultados for l in r['linhas']])
     ating_geral  = total_vend / total_meta if total_meta else 0
     proj_cx      = math.ceil(total_vend / dia_semana * 5) if dia_semana > 0 else 0
     delta_proj   = proj_cx - total_meta
@@ -301,9 +301,10 @@ def _render_on_track():
         for l in r['linhas']:
             v = l['vendedor']
             if v not in vend_agg:
-                vend_agg[v] = {'meta': 0, 'vendido': 0}
+                vend_agg[v] = {'meta': 0, 'vendido': 0, 'linhas': []}
             vend_agg[v]['meta']    += l['meta']
             vend_agg[v]['vendido'] += l['vendido']
+            vend_agg[v]['linhas'].append(l)
 
     vend_rs = totais_rs.get('vendedores', {})
     rows = []
@@ -319,7 +320,7 @@ def _render_on_track():
             'Meta (cx)':    meta_v,
             'Vendido (cx)': vend_v,
             '% Atingido':   atg_v,
-            'Falta (cx)':   meta_v - vend_v,
+            'Falta (cx)':   soma_falta(ag['linhas']),
             'Projeção (cx)': proj_v,
             'Fat R$':       rs.get('fat'),
             'MC R$':        rs.get('mc_rs'),
@@ -402,7 +403,7 @@ def _render_resumo_geral_inline(resultados: list, totais_rs: dict, dia: int = 5)
     c1.metric('Meta total (cx)',    f'{total_meta:,.0f}')
     c2.metric('Vendido (cx)',       f'{total_vend:,.0f}')
     c3.metric('% Atingido',        f'{ating_geral*100:.1f}%')
-    c4.metric('Falta (cx)',        f'{total_meta - total_vend:,.0f}')
+    c4.metric('Falta (cx)',        f"{soma_falta([l for r in resultados for l in r['linhas']]):,.0f}")
     c5.metric('Projeção semana (cx)', f'{proj_cx:,.0f}')
 
     tg = totais_rs.get('total_geral', {})
