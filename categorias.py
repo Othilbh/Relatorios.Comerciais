@@ -14,11 +14,11 @@ import re
 # Termos mais específicos vêm antes dos mais genéricos.
 _REGRAS = [
     ('Maçã Fuji', [r'\bFUJI\b']),
-    ('Maçã Gala', [r'\bGALA\b']),
+    ('Maçã Gala', [r'\bGALA\d*\b']),
     ('Maçã Importada', [r'\bCHILENA\b', r'\bARGENTINA\b', r'\bPINK LADY\b',
                          r'\bGRAN ?SMITH\b', r'\bGRANNY\b']),
     ('Pera Forelle/Ercoline', [r'\bFORELLE\b', r'\bERCOLINE\b']),
-    ('Pera Packham', [r"\bPACKH?AM'?S?\b"]),
+    ('Pera Packham', [r"\bPACKH?AM'?S?\b", r'\bPACKMANS?\b']),
     ('Pera Williams', [r'\bWILL(IAM|IAN|AM)?S?\b', r'\bABATE\b']),
     ('Uva', [r'\bCUMB\b', r'\bTHOMPSON\b', r'\bVITORIA\b', r'\bITALIA\b',
              r'\bBENITAKA\b', r'\bCR[ÍI]NS?ON\b', r'\bNUBIA\b', r'\bJUBILLE\b',
