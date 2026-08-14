@@ -14,7 +14,7 @@ from reportlab.platypus import (SimpleDocTemplate, Table, TableStyle,
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.enums import TA_CENTER
 
-from calc import map_vendedor, VENDEDORES_PADRAO
+from calc import map_vendedor, VENDEDORES_PADRAO, soma_falta
 
 STYLES = getSampleStyleSheet()
 TITLE_STYLE = ParagraphStyle('OthilTitle', parent=STYLES['Heading1'],
@@ -53,7 +53,7 @@ def _fmt_pct(v):
 def _totais(metas_results):
     meta_total = sum(l['meta'] for r in metas_results for l in r['linhas'])
     vendido_total = sum(l['vendido'] for r in metas_results for l in r['linhas'])
-    falta_total = meta_total - vendido_total
+    falta_total = soma_falta([l for r in metas_results for l in r['linhas']])
     pct_total = (vendido_total / meta_total) if meta_total else 0.0
     return meta_total, vendido_total, falta_total, pct_total
 
@@ -61,7 +61,7 @@ def _totais(metas_results):
 def _produto_totais(produto_result):
     meta = sum(l['meta'] for l in produto_result['linhas'])
     vendido = sum(l['vendido'] for l in produto_result['linhas'])
-    falta = meta - vendido
+    falta = soma_falta(produto_result['linhas'])
     pct = (vendido / meta) if meta else 0.0
     return meta, vendido, falta, pct
 
@@ -300,9 +300,10 @@ def _build_dashboard(periodo: str, metas_results: list, vendedor_pcts: dict,
     elems.append(Paragraph("RANKING DE VENDEDORES", sec_style))
     vend_agg = {}
     for v in vendedor_pcts:
-        m = sum(l['meta'] for r in metas_results for l in r['linhas'] if l['vendedor'] == v)
-        ve = sum(l['vendido'] for r in metas_results for l in r['linhas'] if l['vendedor'] == v)
-        vend_agg[v] = (m, ve, m - ve, (ve / m if m else 0.0))
+        linhas_v = [l for r in metas_results for l in r['linhas'] if l['vendedor'] == v]
+        m = sum(l['meta'] for l in linhas_v)
+        ve = sum(l['vendido'] for l in linhas_v)
+        vend_agg[v] = (m, ve, soma_falta(linhas_v), (ve / m if m else 0.0))
     ranking = sorted(vend_agg.items(), key=lambda kv: kv[1][3], reverse=True)
 
     rheader = ['#', 'Vendedor', 'Meta (cx)', 'Vendido (cx)', 'Falta (cx)',
