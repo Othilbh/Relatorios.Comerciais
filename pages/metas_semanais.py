@@ -23,6 +23,7 @@ import periodo
 import comparativo
 import on_track
 import data_store as ds
+import resumo_matriz
 
 MODULO = 'metas_semanais_fechamento'
 MODULO_ONTRACK = 'metas_semanais_ontrack'
@@ -384,8 +385,6 @@ def _render_resumo_geral_inline(resultados: list, totais_rs: dict, dia: int = 5)
     if not resultados:
         return
 
-    vendedores = [l['vendedor'] for l in resultados[0]['linhas']]
-
     # ── On Track KPIs ────────────────────────────────────────────────────
     total_meta  = sum(l['meta']    for r in resultados for l in r['linhas'])
     total_vend  = sum(l['vendido'] for r in resultados for l in r['linhas'])
@@ -450,54 +449,9 @@ def _render_resumo_geral_inline(resultados: list, totais_rs: dict, dia: int = 5)
     st.divider()
 
     # ── Resumo Geral: Matriz Produto × Vendedor ───────────────────────────
-    st.markdown('**Resumo Geral — Matriz Produto × Vendedor**')
-
-    _PRIO_ORDER = {'🚨 Grande Urgência': 0, '🔥 Alta Prioridade': 1, 'Normal': 2}
-    grupos_prio: dict = {}
-    for r in resultados:
-        prio = r.get('prioridade', 'Normal')
-        grupos_prio.setdefault(prio, []).append(r)
-
-    for prio_key in ['🚨 Grande Urgência', '🔥 Alta Prioridade', 'Normal']:
-        grupo = grupos_prio.get(prio_key)
-        if not grupo:
-            continue
-        prio_label = prio_key.replace('🚨 ', '').replace('🔥 ', '')
-        st.markdown(f'*{prio_label}*')
-
-        rows_m = []
-        for r in grupo:
-            row = {'Produto': r['produto'], 'Qtde': f"{r['estoque_total']:.0f}"}
-            p_meta = 0; p_vend = 0
-            for l in r['linhas']:
-                row[l['vendedor']] = f"{l['vendido']:.0f}/{l['meta']:.0f} ({l['atingido']*100:.0f}%)"
-                p_meta += l['meta']; p_vend += l['vendido']
-            row['TOTAL'] = f"{p_vend:.0f}/{p_meta:.0f} ({p_vend/p_meta*100:.0f}%)" if p_meta else '—'
-            rows_m.append(row)
-
-        # Linha de subtotal
-        sub = {'Produto': 'SUBTOTAL', 'Qtde': f"{sum(r['estoque_total'] for r in grupo):.0f}"}
-        for v in vendedores:
-            sv = sum(l['vendido'] for r in grupo for l in r['linhas'] if l['vendedor'] == v)
-            sm = sum(l['meta']    for r in grupo for l in r['linhas'] if l['vendedor'] == v)
-            sub[v] = f"{sv:.0f}/{sm:.0f} ({sv/sm*100:.0f}%)" if sm else '—'
-        gv = sum(l['vendido'] for r in grupo for l in r['linhas'])
-        gm = sum(l['meta']    for r in grupo for l in r['linhas'])
-        sub['TOTAL'] = f"{gv:.0f}/{gm:.0f} ({gv/gm*100:.0f}%)" if gm else '—'
-        rows_m.append(sub)
-
-        st.dataframe(pd.DataFrame(rows_m), use_container_width=True, hide_index=True)
-
-    # Total Geral
-    tot = {'Produto': 'TOTAL GERAL', 'Qtde': f"{sum(r['estoque_total'] for r in resultados):.0f}"}
-    for v in vendedores:
-        tv = sum(l['vendido'] for r in resultados for l in r['linhas'] if l['vendedor'] == v)
-        tm = sum(l['meta']    for r in resultados for l in r['linhas'] if l['vendedor'] == v)
-        tot[v] = f"{tv:.0f}/{tm:.0f} ({tv/tm*100:.0f}%)" if tm else '—'
-    gv_all = sum(l['vendido'] for r in resultados for l in r['linhas'])
-    gm_all = sum(l['meta']    for r in resultados for l in r['linhas'])
-    tot['TOTAL'] = f"{gv_all:.0f}/{gm_all:.0f} ({gv_all/gm_all*100:.0f}%)" if gm_all else '—'
-    st.dataframe(pd.DataFrame([tot]), use_container_width=True, hide_index=True)
+    # (implementação central em resumo_matriz.py -- usada aqui e também na
+    # tela de Fechamentos Semanais da Gerência, pra nunca ficarem diferentes)
+    resumo_matriz.render_matriz_produto_vendedor(resultados)
 
 
 def _render_comparativo_semanal(resultados: list, totais_rs: dict, slug_atual: str):
@@ -655,21 +609,8 @@ def _render_fechamento_semanal():
         f2.metric('MC R$',      f"R$ {tg_h.get('mc_rs', 0):,.2f}")
         f3.metric('MC %',       f"{tg_h.get('mc_pct', 0):.2f}%")
 
-    # Tabela por produto
-    prows = []
-    for r in prods:
-        pm = sum(l['meta']    for l in r.get('linhas', []))
-        pv = sum(l['vendido'] for l in r.get('linhas', []))
-        pa = pv / pm if pm else 0
-        prows.append({
-            'Produto':      r.get('produto', ''),
-            'Prioridade':   r.get('prioridade', 'Normal'),
-            'Meta (cx)':   f'{pm:,.0f}',
-            'Vendido (cx)': f'{pv:,.0f}',
-            '% Atingido':  f'{pa*100:.1f}%',
-        })
-    if prows:
-        st.dataframe(pd.DataFrame(prows), use_container_width=True, hide_index=True)
+    st.divider()
+    resumo_matriz.render_matriz_produto_vendedor(prods)
 
 
 # ---------------------------------------------------------------------------
