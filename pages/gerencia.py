@@ -1722,6 +1722,92 @@ def _render_produtos_resumo():
             st.caption(f'+ {len(alertas) - 5} outro(s) ponto(s) de atenção. Veja o módulo completo para a lista inteira.')
 
 
+def _render_recorrencia_resumo():
+    st.header('🔄 Recorrência de Vendas — Resumo')
+    st.caption('Publicações salvas na página **Recorrência**, organizadas por período '
+               '(semanal/mensal/trimestral/semestral/anual) -- igual Rentabilidade e Produtos.')
+    try:
+        st.page_link('pages/2_Recorrencia_OTHIL.py',
+                      label='Abrir módulo completo (upload de PDF, matriz cliente x produto) →', icon='🔄')
+    except Exception:
+        pass
+
+    col_tipo, col_periodo = st.columns([1, 2])
+    with col_tipo:
+        tipo_rc = st.selectbox('Período', periodo_mod.TIPOS_PERIODO, format_func=periodo_mod.rotulo_tipo,
+                                index=0, key='ger_rec_tipo')
+    try:
+        refs_rc = sorted(ds.list_periodos(MOD_RECORRENCIA, tipo_rc), reverse=True)
+    except Exception:
+        refs_rc = []
+    if not refs_rc:
+        st.info(f'Nenhuma recorrência publicada ainda como {periodo_mod.rotulo_tipo(tipo_rc)}. '
+                'Publique um PDF na página **Recorrência**.')
+    else:
+        with col_periodo:
+            ref_rc = st.selectbox('Referência', refs_rc,
+                                   format_func=lambda r: periodo_mod.rotulo(tipo_rc, r),
+                                   key='ger_rec_periodo')
+
+        registro_rc = ds.load_current(MOD_RECORRENCIA, tipo_rc, ref_rc)
+        if not registro_rc:
+            st.info('Sem dados para este período.')
+        else:
+            val_rc = registro_rc['valores']
+            totais_rc = val_rc.get('totais', {})
+            st.caption(f"Período (texto do PDF): {val_rc.get('periodo','-')}  |  "
+                       f"Emissão: {val_rc.get('emissao','-')}")
+
+            ref_ant_rc = periodo_mod.periodo_anterior(tipo_rc, ref_rc)
+            try:
+                registro_ant_rc = ds.load_current(MOD_RECORRENCIA, tipo_rc, ref_ant_rc)
+            except Exception:
+                registro_ant_rc = None
+            tot_ant_rc = registro_ant_rc['valores'].get('totais', {}) if registro_ant_rc else None
+
+            def _c_rc(chave):
+                return comparativo.calcular(totais_rc.get(chave), tot_ant_rc.get(chave)) if tot_ant_rc else None
+
+            c1, c2, c3, c4, c5 = st.columns(5)
+            c1.metric('Faturamento', f"R$ {totais_rc.get('faturamento', 0):,.2f}",
+                      delta=comparativo.formatar_variacao(_c_rc('faturamento')) if tot_ant_rc else None)
+            c2.metric('MC R$', f"R$ {totais_rc.get('mc_rs', 0):,.2f}",
+                      delta=comparativo.formatar_variacao(_c_rc('mc_rs')) if tot_ant_rc else None)
+            c3.metric('MC %', f"{totais_rc.get('mc_pct', 0):.2f}%")
+            c4.metric('Total CX', f"{totais_rc.get('caixas', 0):,.3f}",
+                      delta=comparativo.formatar_variacao(_c_rc('caixas')) if tot_ant_rc else None)
+            c5.metric('Clientes', totais_rc.get('n_clientes', '-'),
+                      delta=comparativo.formatar_variacao(_c_rc('n_clientes')) if tot_ant_rc else None)
+            if tot_ant_rc:
+                st.caption(f'Base de comparação: {periodo_mod.rotulo(tipo_rc, ref_ant_rc)}')
+
+            clientes_rc = val_rc.get('clientes', [])
+            if clientes_rc:
+                df_rc = pd.DataFrame(clientes_rc)
+                top30_rc = df_rc.head(30).set_index('Cliente')[['Faturamento R$']]
+                st.markdown('**Top 30 clientes — Faturamento (R$)**')
+                st.bar_chart(top30_rc, color='#2D6A4F')
+                with st.expander(f'Todos os clientes ({len(df_rc)})'):
+                    styled_rc = df_rc.style.format({
+                        'Faturamento R$': 'R$ {:,.2f}',
+                        'Caixas': '{:,.3f}',
+                        'MC R$': 'R$ {:,.2f}',
+                        'MC %': '{:.2f}%',
+                    })
+                    st.dataframe(styled_rc, use_container_width=True, hide_index=True)
+
+    _hist_legado_rc = _listar_recorrencias_ger()
+    if _hist_legado_rc:
+        with st.expander(f'📜 Histórico antigo ({len(_hist_legado_rc)} publicação(ões) salvas '
+                          'antes do sistema de período estruturado)'):
+            for _slug_lrc, _val_lrc, _ts_lrc in _hist_legado_rc:
+                _tot_lrc = _val_lrc.get('totais', {})
+                st.caption(
+                    f"{_val_lrc.get('periodo','-')} — emissão {_val_lrc.get('emissao','-')} "
+                    f"— Faturamento R$ {_tot_lrc.get('faturamento', 0):,.2f}"
+                )
+
+
 # ── Header ────────────────────────────────────────────────────────────────────
 st.markdown("""
 <div style="display:flex; align-items:center; gap:1rem; margin-bottom:1rem;">
@@ -1739,13 +1825,14 @@ st.divider()
 
 # ── Grupos de abas ───────────────────────────────────────────────────────────
 (grp_vendas, grp_metas, grp_metas_gerais, grp_rentabilidade, grp_produtos,
- grp_clientes, grp_quebras, grp_prevperdas) = st.tabs([
+ grp_clientes, grp_recorrencia, grp_quebras, grp_prevperdas) = st.tabs([
     '📊 Dashboards',
     '🎯 Metas Semanais',
     '🌐 Metas Gerais',
     '💰 Rentabilidade',
     '📦 Produtos',
     '👥 Clientes',
+    '🔄 Recorrência',
     '📦 Quebras',
     '🚨 Prevenção de Perdas',
 ])
@@ -1787,78 +1874,15 @@ with grp_rentabilidade:
 with grp_produtos:
     _render_produtos_resumo()
 
+# ── RECORRÊNCIA ───────────────────────────────────────────────────────────────
+with grp_recorrencia:
+    _render_recorrencia_resumo()
+
 # ── CLIENTES ──────────────────────────────────────────────────────────────────
 with grp_clientes:
-    tab_ot_cli, tab_rec = st.tabs([
-        '👥 On Track Clientes',
-        '🔄 Ranking Recorrência',
-    ])
-    with tab_ot_cli:
-        _render_ontrack_clientes()
-    with tab_rec:
-        st.header('👥 Ranking de Clientes — Recorrência')
-        _hist_rec_ger = _listar_recorrencias_ger()
-        if not _hist_rec_ger:
-            st.info('Nenhum ranking disponível. Processe um PDF na página **Recorrência** primeiro.')
-        else:
-            _labels_rec = [f"{v.get('periodo','-')}  —  emissão {v.get('emissao','-')}  "
-                           f"({(ts or '')[:16].replace('T',' ')})" for _, v, ts in _hist_rec_ger]
-            _escolha_rec = st.selectbox(f'{len(_hist_rec_ger)} publicação(ões):', _labels_rec,
-                                         index=0, key='ger_rec_sel')
-            _idx_rec = _labels_rec.index(_escolha_rec)
-            rec = _hist_rec_ger[_idx_rec][1]
-
-            periodo_r = rec.get('periodo', '-')
-            emissao_r = rec.get('emissao', '-')
-            gerado_r  = rec.get('gerado_em', '')[:16].replace('T', ' ')
-            totais    = rec.get('totais', {})
-            st.caption(f'Período: {periodo_r}  |  Emissão: {emissao_r}  |  Gerado em: {gerado_r}')
-            if totais:
-                c1, c2, c3, c4, c5 = st.columns(5)
-                c1.metric('Faturamento', f'R$ {totais.get("faturamento", 0):,.2f}')
-                c2.metric('MC R$', f'R$ {totais.get("mc_rs", 0):,.2f}')
-                c3.metric('MC %', f'{totais.get("mc_pct", 0):.2f}%')
-                c4.metric('Total CX', f'{totais.get("caixas", 0):,.3f}')
-                c5.metric('Clientes', totais.get('n_clientes', '-'))
-
-            # Comparativo vs a publicação anterior na lista
-            if _idx_rec + 1 < len(_hist_rec_ger):
-                _val_ant_rec = _hist_rec_ger[_idx_rec + 1][1]
-                _tot_ant_rec = _val_ant_rec.get('totais', {})
-                st.subheader('📊 Comparativo vs período anterior')
-                cc1, cc2, cc3, cc4 = st.columns(4)
-                for _col, _lab, _chave, _fmt in [
-                    (cc1, 'Faturamento', 'faturamento', lambda x: f'R$ {x:,.2f}'),
-                    (cc2, 'MC R$',       'mc_rs',       lambda x: f'R$ {x:,.2f}'),
-                    (cc3, 'Total CX',    'caixas',      lambda x: f'{x:,.3f}'),
-                    (cc4, 'Clientes',    'n_clientes',  lambda x: f'{x:,.0f}'),
-                ]:
-                    _atual_v = totais.get(_chave, 0)
-                    _comp = comparativo.calcular(_atual_v, _tot_ant_rec.get(_chave))
-                    _col.metric(_lab, _fmt(_atual_v), delta=comparativo.formatar_variacao(_comp))
-                st.caption(f'Base de comparação: {_val_ant_rec.get("periodo","-")}')
-
-            clientes = rec.get('clientes', [])
-            if clientes:
-                df = pd.DataFrame(clientes)
-                top30 = df.head(30).set_index('Cliente')[['Faturamento R$']]
-                st.subheader('Top 30 por Faturamento')
-                st.bar_chart(top30, color='#2D6A4F')
-                st.subheader(f'Todos os clientes ({len(df)})')
-                styled = df.style.format({
-                    'Faturamento R$': 'R$ {:,.2f}',
-                    'Caixas': '{:,.3f}',
-                    'MC R$': 'R$ {:,.2f}',
-                    'MC %': '{:.2f}%',
-                })
-                st.dataframe(styled, use_container_width=True, hide_index=True)
-                csv = df.to_csv(index=False).encode('utf-8')
-                st.download_button(
-                    '⬇️ Baixar ranking CSV',
-                    data=csv,
-                    file_name=f'ranking_clientes_{emissao_r.replace("/","")}.csv',
-                    mime='text/csv',
-                )
+    _render_ontrack_clientes()
+    # Ranking de Recorrência mudou para a aba própria '🔄 Recorrência' (mais fácil de
+    # achar, e junto ali agora tem os 5 tipos de período + histórico versionado).
 
 # ── QUEBRAS ───────────────────────────────────────────────────────────────────
 with grp_quebras:
