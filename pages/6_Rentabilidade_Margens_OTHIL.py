@@ -227,7 +227,7 @@ with st.expander('📈 Comparativo detalhado — período atual x período anter
 
 tab_vend, tab_cli, tab_prod, tab_matriz, tab_evo, tab_topbottom, tab_alertas, tab_hist = st.tabs([
     '👤 Por Vendedor', '🧑‍💼 Por Cliente', '📦 Por Produto', '🧭 Matriz Fat x Margem',
-    '📈 Evolução', '🏆 Top / Bottom', '🚨 Pontos de Atenção', '🕓 Histórico',
+    '📈 Evolução', '🏆 Melhores / Piores', '🚨 Pontos de Atenção', '🕓 Histórico',
 ])
 
 with tab_vend:
@@ -318,7 +318,11 @@ with tab_evo:
                        '(sem detalhe diário), pois o relatório de origem não traz a quebra por dia.')
 
 with tab_topbottom:
-    st.subheader('Top e Bottom')
+    st.subheader('Melhores e Piores')
+    st.caption(
+        'Melhores = maior Margem R$ no recorte atual. Piores = menor Margem R$ '
+        '(inclui casos com margem negativa, ou seja, prejuízo).'
+    )
     n_top = st.slider('Quantidade', min_value=3, max_value=20, value=10, key='rent_topn')
     for nome_dim_pl, nome_dim_sg, fn in [
         ('Vendedores', 'Vendedor', rt.por_vendedor),
@@ -333,11 +337,11 @@ with tab_topbottom:
         bottom = list(reversed(ordenadas[-n_top:])) if len(ordenadas) > n_top else list(reversed(ordenadas))
         colT, colB = st.columns(2)
         with colT:
-            st.markdown(f'**🏆 Top {len(top)} {nome_dim_pl} por Margem R$**')
+            st.markdown(f'**🏆 {len(top)} Melhores {nome_dim_pl} por Margem R$**')
             df_top = _tabela_dim(top, nome_dim_sg, ['#', nome_dim_sg, 'Faturamento R$', 'Margem R$', 'Margem %'])
             st.dataframe(_estilo(df_top), use_container_width=True, hide_index=True)
         with colB:
-            st.markdown(f'**⚠️ Bottom {len(bottom)} {nome_dim_pl} por Margem R$**')
+            st.markdown(f'**⚠️ {len(bottom)} Piores {nome_dim_pl} por Margem R$**')
             df_bot = _tabela_dim(bottom, nome_dim_sg, ['#', nome_dim_sg, 'Faturamento R$', 'Margem R$', 'Margem %'])
             st.dataframe(_estilo(df_bot), use_container_width=True, hide_index=True)
         st.divider()
