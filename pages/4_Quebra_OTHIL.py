@@ -382,10 +382,7 @@ def _render_comparativo():
 st.title('📦 Quebras')
 st.caption('Upload do relatório Resumo do Estoque filtrado por classificação QUEBRA.')
 
-with st.expander('👤 Seu nome (fica registrado no histórico de quem salvou cada relatório)'):
-    st.session_state['usuario_nome'] = st.text_input(
-        'Seu nome', value=st.session_state.get('usuario_nome', 'Ingrid'), key='usuario_nome_input_qbr',
-    )
+st.session_state.setdefault('usuario_nome', 'Ingrid')
 
 tab_s, tab_m, tab_comp = st.tabs(['📅 Semanal', '🗓️ Mensal', '🔀 Comparativo'])
 
