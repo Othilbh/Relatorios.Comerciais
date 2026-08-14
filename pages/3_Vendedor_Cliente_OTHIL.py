@@ -44,6 +44,7 @@ import data_store as ds
 
 MODULO = 'vendedor_cliente'
 MODULO_ONTRACK = 'vendedor_cliente_ontrack'
+MODULO_HIST = 'vendedor_cliente_historico'
 
 st.title('Relatorio Vendedor-Cliente')
 
@@ -90,6 +91,16 @@ if st.session_state.get('_vc_periodo_carregado') != PERIODO_REF:
         st.session_state['ref_date_vc']       = ref_date
     st.session_state['_vc_periodo_carregado'] = PERIODO_REF
 
+# ── Histórico (Seção 1) também recuperado automaticamente após restart —
+# mesma lógica: se já foi gerado e salvo antes para este mês (em qualquer
+# sessão), fica disponível sem precisar reenviar o xlsx/PDFs de novo.
+if st.session_state.get('_vc_hist_periodo_carregado') != PERIODO_REF:
+    _registro_hist = ds.load_current(MODULO_HIST, 'mensal', PERIODO_REF)
+    st.session_state['historico_vc_salvo'] = (
+        _registro_hist['valores'].get('historico') if _registro_hist else None
+    )
+    st.session_state['_vc_hist_periodo_carregado'] = PERIODO_REF
+
 st.divider()
 
 # ── Helpers de formatação ─────────────────────────────────────────────────────
@@ -108,6 +119,33 @@ def _ot_status(atual_pct: float, elapsed_pct: float):
     )
     ratio = r['ratio'] if r['ratio'] is not None else 1.0
     return r['emoji'], r['label'], ratio
+
+def _salvar_historico_permanente(json_bytes: bytes, periodo_ref: str):
+    """Persiste o histórico gerado na Seção 1 de forma real (data_store,
+    GitHub-backed), para não depender só do download manual do JSON — se
+    o app reiniciar ou ela abrir em outro computador, o histórico deste
+    mês continua disponível e não precisa reenviar o xlsx/PDFs de novo."""
+    try:
+        historico_dict = json.loads(json_bytes.decode('utf-8'))
+        ds.save_record(
+            modulo=MODULO_HIST, tipo_periodo='mensal', periodo_ref=periodo_ref,
+            valores={'historico': historico_dict},
+            usuario=st.session_state.get('usuario_nome'),
+        )
+        st.session_state['historico_vc_salvo'] = historico_dict
+        st.session_state['_vc_hist_periodo_carregado'] = periodo_ref
+        st.caption(
+            '✅ Histórico também salvo permanentemente no servidor — na Seção 2 '
+            'não é mais obrigatório reenviar este JSON (mas o download acima '
+            'continua disponível se quiser guardar uma cópia).'
+        )
+    except Exception as _e_persist_hist:
+        st.warning(
+            f'Histórico gerado e disponível para download, mas houve um '
+            f'problema ao salvar de forma permanente no servidor: {_e_persist_hist}. '
+            f'Guarde bem o arquivo baixado, pois pode ser necessário reenviá-lo.'
+        )
+
 
 def _get_meta_fat(historico_data: dict, vend: str, cli_key: str):
     """Busca meta de faturamento do cliente no histórico."""
@@ -181,6 +219,7 @@ with tab_rel:
                                 file_name=fname_json,
                                 mime='application/json',
                             )
+                            _salvar_historico_permanente(json_bytes, PERIODO_REF)
                         except Exception as exc:
                             st.error(f'Erro ao processar xlsx: {exc}')
                             import traceback
@@ -214,6 +253,7 @@ with tab_rel:
                                 file_name=fname_json,
                                 mime='application/json',
                             )
+                            _salvar_historico_permanente(json_bytes, PERIODO_REF)
                         except Exception as exc:
                             st.error(f'Erro ao processar PDFs historicos: {exc}')
                             import traceback
@@ -228,11 +268,19 @@ with tab_rel:
         'arquivos da semana. O Excel gerado tem uma aba por vendedor + GERAL.'
     )
 
+    historico_salvo = st.session_state.get('historico_vc_salvo')
+
     col_j, col_a, col_b = st.columns(3)
     with col_j:
         hist_file = st.file_uploader(
             f'Historico ({fname_json})',
             type='json', key='hist_json')
+        if hist_file is None and historico_salvo:
+            st.caption(
+                '✅ Histórico deste mês já está salvo no servidor — não '
+                'precisa reenviar o JSON (pode enviar de novo se quiser '
+                'substituir por outra versão).'
+            )
     with col_a:
         pdf_clientes = st.file_uploader(
             'PDFs Vendedor-Cliente (1 por vendedor, ate 8 arquivos)',
@@ -244,7 +292,7 @@ with tab_rel:
             type='pdf', key='pdf_totais')
 
     faltando = []
-    if hist_file is None:
+    if hist_file is None and not historico_salvo:
         faltando.append('Historico JSON')
     if not pdf_clientes:
         faltando.append('PDFs Vendedor-Cliente')
@@ -257,7 +305,10 @@ with tab_rel:
         if st.button('Gerar Excel Vendedor-Cliente', type='primary', use_container_width=True):
             with st.spinner('Processando e montando planilha...'):
                 try:
-                    historico   = carregar_historico(hist_file.read())
+                    historico   = (
+                        carregar_historico(hist_file.read())
+                        if hist_file is not None else historico_salvo
+                    )
                     totais_res  = parse_totais_vendedor(pdf_totais)
                     totais_dict = totais_res['vendedores']
 
