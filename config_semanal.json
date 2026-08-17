@@ -1,106 +1,118 @@
 {
   "produtos": [
     {
-      "nome": "AMEIXA 45-50 + 50/55",
-      "codigos_texto": "250100101\n250100102\n250107605\n250107603\n",
-      "estoque": 618,
-      "prioridade": "🚨 Grande Urgência"
-    },
-    {
-      "nome": "WILL BREVI VERDE",
-      "codigos_texto": "0101096100\n",
-      "estoque": 116,
-      "prioridade": "🚨 Grande Urgência"
-    },
-    {
-      "nome": "WILLIANS 100 DOLE PONTO VERDE",
-      "codigos_texto": "0101100100.1\n",
-      "estoque": 31,
-      "prioridade": "🚨 Grande Urgência"
-    },
-    {
-      "nome": "GRAN SMITH 113 VERFRUT",
-      "codigos_texto": "0503060113\n",
-      "estoque": 46,
-      "prioridade": "🚨 Grande Urgência"
-    },
-    {
-      "nome": "PACKMANS 1/2 MONO AZUL",
-      "codigos_texto": "020200501\n",
-      "estoque": 100,
+      "nome": "PESSEGO FRUITS PONENT ",
+      "codigos_texto": "24010152",
+      "estoque": 112,
       "prioridade": "🚨 Grande Urgência"
     },
     {
       "nome": "NECTARINA",
-      "codigos_texto": "260100101\n260104801\n",
-      "estoque": 250,
+      "codigos_texto": "260100101\n260104801\n26010492\n",
+      "estoque": 264,
       "prioridade": "🚨 Grande Urgência"
     },
     {
-      "nome": "FUJI 165 POMERANA CX PLAST",
-      "codigos_texto": "702172165.3\n",
-      "estoque": 136,
+      "nome": "CUMB RED GLOBE MANAIRA",
+      "codigos_texto": "830100530",
+      "estoque": 48,
+      "prioridade": "🚨 Grande Urgência"
+    },
+    {
+      "nome": "CUMB CRINSON CHERRY BELLA",
+      "codigos_texto": "830100696",
+      "estoque": 61,
+      "prioridade": "🚨 Grande Urgência"
+    },
+    {
+      "nome": "PACKHAMS 80 FAENZA",
+      "codigos_texto": "010207280",
+      "estoque": 28,
+      "prioridade": "🚨 Grande Urgência"
+    },
+    {
+      "nome": "PACKMANS 1/2 MONO AZUL",
+      "codigos_texto": "020200501",
+      "estoque": 115,
+      "prioridade": "🚨 Grande Urgência"
+    },
+    {
+      "nome": "CUMB THOMPSON BELLA",
+      "codigos_texto": "830100811",
+      "estoque": 2634,
+      "prioridade": "🚨 Grande Urgência"
+    },
+    {
+      "nome": "TANGERINA CAMPOSOL",
+      "codigos_texto": "390600180",
+      "estoque": 60,
+      "prioridade": "🚨 Grande Urgência"
+    },
+    {
+      "nome": "ROMA IMP POMICA",
+      "codigos_texto": "8704714",
+      "estoque": 300,
       "prioridade": "🔥 Alta Prioridade"
     },
     {
-      "nome": "Fuji Azaleia + Gala Santa Carolina + Fuji Expressa",
-      "codigos_texto": "702145135\n702145165\n701196165\n702089150\n",
-      "estoque": 71,
+      "nome": "CUMB THOMPSON GURUVA",
+      "codigos_texto": "830100824",
+      "estoque": 628,
+      "prioridade": "🔥 Alta Prioridade"
+    },
+    {
+      "nome": "AMEIXA 50-55 TANY",
+      "codigos_texto": "250100102",
+      "estoque": 345,
+      "prioridade": "🔥 Alta Prioridade"
+    },
+    {
+      "nome": "AMEIXA 65/70 TANY",
+      "codigos_texto": "250100105",
+      "estoque": 538,
       "prioridade": "🔥 Alta Prioridade"
     },
     {
       "nome": "PINK LADY 1/2",
-      "codigos_texto": "050201332\n",
-      "estoque": 200,
+      "codigos_texto": "050201332",
+      "estoque": 150,
       "prioridade": "🔥 Alta Prioridade"
     },
     {
       "nome": "ARGENTINA 125 DOLE",
-      "codigos_texto": "0501019125.2\n",
+      "codigos_texto": "501019125.2",
       "estoque": 336,
       "prioridade": "🔥 Alta Prioridade"
+    },
+    {
+      "nome": "8KG ITALIA",
+      "codigos_texto": "830200113\n830200107\n",
+      "estoque": 25,
+      "prioridade": "🔥 Alta Prioridade"
+    },
+    {
+      "nome": "WILLIANS DOLE",
+      "codigos_texto": "0101100*",
+      "estoque": 317,
+      "prioridade": "Normal"
+    },
+    {
+      "nome": "8KG THOMPSON AUTUM ",
+      "codigos_texto": "830200705",
+      "estoque": 120,
+      "prioridade": "Normal"
     },
     {
       "nome": "MELAO CEPI",
       "codigos_texto": "3102005*",
       "estoque": 1200,
-      "prioridade": "🔥 Alta Prioridade"
+      "prioridade": "Normal"
     },
     {
       "nome": "MELAO REI",
       "codigos_texto": "3102009*",
-      "estoque": 1800,
-      "prioridade": "🔥 Alta Prioridade"
-    },
-    {
-      "nome": "CUMB RED GLOBE MANAIRA",
-      "codigos_texto": "830100530\n",
-      "estoque": 55,
+      "estoque": 1400,
       "prioridade": "Normal"
-    },
-    {
-      "nome": "CUMB CRINSON CHERRY BELLA",
-      "codigos_texto": "830100696\n",
-      "estoque": 40,
-      "prioridade": "Normal"
-    },
-    {
-      "nome": "CUMB CRINSON CHERRY GRANDVALLE",
-      "codigos_texto": "830100625\n",
-      "estoque": 82,
-      "prioridade": "Normal"
-    },
-    {
-      "nome": "GALA 165 DELICIA",
-      "codigos_texto": "701184165",
-      "estoque": 297,
-      "prioridade": "🔥 Alta Prioridade"
-    },
-    {
-      "nome": "ROMA",
-      "codigos_texto": "8704714",
-      "estoque": 150,
-      "prioridade": "🔥 Alta Prioridade"
     }
   ],
   "vendedor_pcts": {
