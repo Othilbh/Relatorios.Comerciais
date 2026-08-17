@@ -16,7 +16,8 @@ import pandas as pd
 from parsers import parse_estoque, parse_vendas, normalize_codigo
 from parsers_diario import parse_vendas_pdftotext
 from parsers_vendedor import parse_totais_vendedor
-from calc import compute_metas, VENDEDORES_PADRAO, parse_codigos_input, map_vendedor, codigo_matches, soma_falta
+from calc import (compute_metas, VENDEDORES_PADRAO, parse_codigos_input, map_vendedor,
+                   codigo_matches, soma_falta, sugestao_codigo_por_nome)
 from pdfgen import generate_relatorio_vendedor, generate_dashboard, generate_resumo_geral
 import storage
 import periodo
@@ -794,6 +795,20 @@ with tab_cfg:
             st.session_state.config = json.load(up_cfg)
             save_config(st.session_state.config, show_feedback=False)
             st.session_state['_cfg_upload_processado'] = up_cfg.file_id
+            # Limpa o estado dos widgets por produto/vendedor (nome_i, cod_i,
+            # est_i, prio_i, pct_vend) guardado da config ANTERIOR. Sem isso,
+            # um widget com 'key' já existente ignora o `value=`/`index=` em
+            # reruns seguintes e continua mostrando o valor antigo -- então
+            # um produto que ocupa o mesmo índice na config antiga e na
+            # importada continuava exibindo nome/código antigos mesmo depois
+            # do import (e esse valor velho é que ia pro cálculo e podia até
+            # ser salvo de volta, sobrescrevendo o import). Isso combina
+            # exatamente com "alguns códigos não puxam, e outros puxaram
+            # errado" -- limpar aqui garante que cada widget reinicialize do
+            # zero com os dados recém-importados.
+            for _k in list(st.session_state.keys()):
+                if _k.startswith(('nome_', 'cod_', 'est_', 'prio_', 'pct_')):
+                    del st.session_state[_k]
             st.rerun()
 
     st.divider()
@@ -936,6 +951,52 @@ with tab_cfg:
                     lambda x: f'{x:,.0f}'
                 )
                 st.dataframe(df_vend, use_container_width=True, hide_index=True)
+
+        # Diagnóstico de possível erro de digitação no código: pra cada
+        # produto configurado que não bateu com NENHUMA venda, procura no
+        # PDF um nome parecido usando um código diferente do configurado.
+        # Você digita nome E código propositalmente pra evitar erro -- isso
+        # aqui usa os dois: se o nome bate com uma linha do PDF mas o código
+        # configurado é outro, é sinal de erro de digitação no código (não
+        # de o produto simplesmente não ter vendido nada essa semana), e o
+        # app agora avisa sozinho em vez de precisar conferir na mão.
+        possiveis_typos = []
+        for p in produtos_config_diag:
+            tem_venda = any(
+                codigo_matches(normalize_codigo(r['codigo']), e)
+                for r in vendas_rows_diag for e in p['codigos']
+            )
+            if tem_venda:
+                continue
+            candidatos = sugestao_codigo_por_nome(p['nome'], vendas_rows_diag)
+            # só sinaliza candidatos com um código DIFERENTE de todos os já
+            # configurados pra esse produto (evita "sugerir" o próprio
+            # código certo de volta, ex. quando bate por prefixo)
+            candidatos = [c for c in candidatos if c['codigo'] not in p['codigos']]
+            for c in candidatos:
+                possiveis_typos.append({
+                    'Produto configurado': p['nome'],
+                    'Código configurado': ', '.join(p['codigos']) or '(vazio)',
+                    'Nome encontrado no PDF': c['descricao'],
+                    'Código encontrado no PDF': c['codigo'],
+                    'Cx sob esse código': c['qtde'],
+                })
+        if possiveis_typos:
+            with st.expander(
+                f'🚨 {len(possiveis_typos)} produto(s) com possível erro de digitação no código',
+                expanded=True,
+            ):
+                st.caption(
+                    'O NOME desses produtos bate com uma venda no PDF, mas o CÓDIGO configurado '
+                    'é diferente do código daquela venda -- ou seja, o produto provavelmente '
+                    'vendeu normalmente, só que sob um código diferente do que está cadastrado. '
+                    'Confira e corrija o código na seção **2. Produtos da semana** acima.'
+                )
+                df_typo = pd.DataFrame(possiveis_typos)
+                df_typo['Cx sob esse código'] = df_typo['Cx sob esse código'].map(
+                    lambda x: f'{x:,.0f}'
+                )
+                st.dataframe(df_typo, use_container_width=True, hide_index=True)
 
         # Diagnóstico por produto: mostra linhas brutas extraídas do PDF
         with st.expander('🔍 Diagnóstico por produto (linhas brutas do PDF)'):
