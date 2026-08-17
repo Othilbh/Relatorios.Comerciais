@@ -28,7 +28,17 @@ CLIENTE_RE = re.compile(r'^Cliente:\s*([\w*]+)\s*-\s*(.+?)\s{2,}Cidade:')
 TOT_CLIENTE_RE = re.compile(r'^\s*Totais do Cliente - (.+):\s+(\S.*)$')
 TOT_VENDEDOR_RE = re.compile(r'^\s*Totais do Vendedor - (.+):\s+(\S.*)$')
 TOTAL_GERAL_RE = re.compile(r'^\s*Total Geral:\s+(\S.*)$')
-CX_RE = re.compile(r'\bCX\s+(?=[\d\-,.])')
+# Sem '\b' antes de "CX": quando o nome do vendedor/complemento é longo o
+# bastante para preencher a coluna até encostar em "CX" (ex.: "RONISTONIS"
+# -- "...RONISTONISCX       2,000..."), não sobra espaço nenhum entre o
+# texto e "CX", e um '\b' ali exigiria uma fronteira \w->\W que não existe
+# entre "S" e "C" (ambos caracteres de palavra). Com o '\b' a linha inteira
+# não era reconhecida como linha de produto: vazava pra "pending_lines" e
+# contaminava o produto seguinte (que "herdava" o código errado, e o
+# produto de verdade -- cujo texto tinha vazado -- desaparecia do
+# cálculo). "CX" só marca a coluna de unidade nesse relatório, então não
+# há necessidade de exigir fronteira de palavra antes dele.
+CX_RE = re.compile(r'CX\s+(?=[\d\-,.])')
 EMISSAO_RE = re.compile(r'Emissão:\s*(\d{2}/\d{2}/\d{4})')
 PERIODO_RE = re.compile(r'Período\s*:\s*(\d{2}/\d{2}/\d{4}[^N]*?\d{2}/\d{2}/\d{4})')
 
