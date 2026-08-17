@@ -154,63 +154,133 @@ def _label_slug(slug, tipo):
         return slug
 
 
+# ── Navegação de período por DATA (mesma lógica/arquitetura da página
+# Relatório Diário — periodo.py + data_store.py — reaproveitada aqui em vez
+# de duplicar uma estrutura paralela). Corrige o mesmo bug de raiz que
+# afetava as setas do Relatório Diário: o código antigo desta seção usava
+# um índice dentro da lista de dashboards SALVOS, combinado com
+# st.selectbox(..., index=...) — o Streamlit ignora esse index= a partir do
+# segundo rerun (o valor persistido no session_state da própria selectbox
+# manda), então o clique nas setas era desfeito na linha seguinte. Além
+# disso, por navegar sobre a LISTA de salvos (não sobre datas), não dava
+# pra "andar" até um período sem dado nenhum — violava a mesma regra do
+# item 2 do pedido original (navegação não pode depender de já existir
+# registro salvo).
+def _diario_data(ref):
+    return datetime.datetime.strptime(ref, '%Y-%m-%d').date()
+
+
+def _periodo_atual_ref(tipo):
+    if tipo == 'diario':
+        return datetime.date.today().strftime('%Y-%m-%d')
+    return periodo_mod.periodo_atual(tipo)
+
+
+def _periodo_anterior(tipo, ref):
+    if tipo == 'diario':
+        return (_diario_data(ref) - datetime.timedelta(days=1)).strftime('%Y-%m-%d')
+    return periodo_mod.periodo_anterior(tipo, ref)
+
+
+def _periodo_posterior(tipo, ref):
+    if tipo == 'diario':
+        return (_diario_data(ref) + datetime.timedelta(days=1)).strftime('%Y-%m-%d')
+    return periodo_mod.periodo_posterior(tipo, ref)
+
+
+def _intervalo_periodo(tipo, ref):
+    if tipo == 'diario':
+        d = _diario_data(ref)
+        return d, d
+    return periodo_mod.intervalo_datas(tipo, ref)
+
+
+def _rotulo_periodo(tipo, ref):
+    if tipo == 'diario':
+        return _diario_data(ref).strftime('%d/%m/%Y')
+    return periodo_mod.rotulo(tipo, ref)
+
+
 def _render_secao_dash(tipo, titulo_secao, emoji):
     st.header(f'{emoji} {titulo_secao}')
-    dashboards = _listar_dashboards(tipo)
 
-    if not dashboards:
+    state_key = f'_ger_periodo_sel_{tipo}'
+    if state_key not in st.session_state:
+        st.session_state[state_key] = _periodo_atual_ref(tipo)
+
+    def _ir_anterior():
+        st.session_state[state_key] = _periodo_anterior(tipo, st.session_state[state_key])
+
+    def _ir_posterior():
+        st.session_state[state_key] = _periodo_posterior(tipo, st.session_state[state_key])
+
+    col_prev, col_atual, col_next = st.columns([1, 5, 1])
+    with col_prev:
+        st.button('◀', key=f'ger_prev_{tipo}', help='Período anterior', on_click=_ir_anterior,
+                   use_container_width=True)
+    with col_next:
+        st.button('▶', key=f'ger_next_{tipo}', help='Próximo período', on_click=_ir_posterior,
+                   use_container_width=True)
+
+    ref_sel = st.session_state[state_key]
+    ini, fim = _intervalo_periodo(tipo, ref_sel)
+    tem_dado = ds.has_data(MOD_RELATORIO_DIARIO, tipo, ref_sel)
+
+    with col_atual:
+        if tipo == 'diario':
+            st.markdown(f'**{_rotulo_periodo(tipo, ref_sel)}**')
+        else:
+            st.markdown(f'**{ini.strftime("%d/%m/%Y")} – {fim.strftime("%d/%m/%Y")}**  ·  '
+                        f'{_rotulo_periodo(tipo, ref_sel)}')
+        st.caption('🟢 Período salvo ✓' if tem_dado else '⚪ Nenhum dado cadastrado para este período.')
+
+    dashboards = _listar_dashboards(tipo)
+    if dashboards:
+        with st.expander(f'🔎 Períodos salvos ({len(dashboards)}) — seleção rápida'):
+            st.caption('Atalho para pular direto a um período que já tem dado. A navegação ◀ ▶ acima '
+                       'continua funcionando para QUALQUER período, com ou sem dado.')
+            slugs_ord = [s for s, _ in dashboards]
+            labels_map = {}
+            for s, m in dashboards:
+                if tipo == 'diario':
+                    labels_map[s] = f"{m.get('emissao', s)}  —  {m.get('periodo','-')}"
+                else:
+                    labels_map[s] = _label_slug(s, tipo) + f"  ({m.get('periodo','-')})"
+            escolha_rapida = st.selectbox(
+                'Ir direto para', slugs_ord, format_func=lambda s: labels_map.get(s, s),
+                key=f'ger_quick_sel_{tipo}', index=None, placeholder='Selecione um período salvo...')
+            if escolha_rapida:
+                st.session_state[state_key] = escolha_rapida
+                st.rerun()
+
+    st.divider()
+
+    if not tem_dado:
         tipo_label = {'diario': 'Relatório Diário', 'semanal': 'aba Semanal', 'mensal': 'aba Mensal'}
-        st.info(f'Nenhum dashboard disponível. Gere um na página **{tipo_label.get(tipo,tipo)}** primeiro.')
+        st.info(f'Nenhum dado cadastrado para o período de {ini.strftime("%d/%m/%Y")} a '
+                f'{fim.strftime("%d/%m/%Y")}. Gere ou importe esse período na página '
+                f'**{tipo_label.get(tipo, tipo)}** (seção "Histórico" → "Importar dados históricos").')
         return
 
-    slugs  = [s for s, _ in dashboards]
-    if tipo == 'diario':
-        labels = [f"{m.get('emissao', s)}  —  {m.get('periodo','-')}" for s, m in dashboards]
-    else:
-        labels = [_label_slug(s, tipo) + f"  ({m.get('periodo','-')})" for s, m in dashboards]
+    registro = ds.load_current(MOD_RELATORIO_DIARIO, tipo, ref_sel)
+    valores = registro.get('valores', {}) or {}
+    gerado  = (registro.get('atualizado_em') or '')[:16].replace('T', ' ')
+    st.caption(f'Período: {valores.get("periodo","-")}  |  Salvo em: {gerado}')
 
-    idx_key = f'_ger_idx_{tipo}'
-    if idx_key not in st.session_state:
-        st.session_state[idx_key] = 0
-
-    col_prev, col_sel, col_next = st.columns([1, 6, 1])
-    with col_prev:
-        st.write('')
-        if st.button('◀', key=f'ger_prev_{tipo}', help='Período anterior'):
-            st.session_state[idx_key] = min(st.session_state[idx_key] + 1, len(slugs) - 1)
-    with col_next:
-        st.write('')
-        if st.button('▶', key=f'ger_next_{tipo}', help='Próximo período'):
-            st.session_state[idx_key] = max(st.session_state[idx_key] - 1, 0)
-    with col_sel:
-        escolha = st.selectbox(
-            f'{len(dashboards)} período(s) salvo(s):',
-            labels,
-            index=min(st.session_state[idx_key], len(labels)-1),
-            key=f'ger_sel_{tipo}',
-        )
-        st.session_state[idx_key] = labels.index(escolha)
-
-    idx     = st.session_state[idx_key]
-    slug_h  = slugs[idx]
-    meta_h  = dashboards[idx][1]
-    gerado  = meta_h.get('gerado_em', '')[:16].replace('T', ' ')
-    st.caption(f'Período: {meta_h.get("periodo","-")}  |  Gerado em: {gerado}')
-
-    html_path = os.path.join(_dir_tipo(tipo), f'{slug_h}.html')
+    html_path = os.path.join(_dir_tipo(tipo), f'{ref_sel}.html')
     if not os.path.exists(html_path):
         st.warning('Este dashboard não pôde ser regenerado automaticamente '
-                    '(dado antigo, salvo antes da persistência com histórico de itens). '
-                    'Gere novamente na página de origem.')
+                    '(dado antigo, salvo antes da persistência com histórico de itens, ou período '
+                    'importado sem PDF). Gere novamente (ou reenvie o PDF) na página de origem.')
         return
     with open(html_path, 'r', encoding='utf-8') as f:
         html_text = f.read()
 
     components.html(html_text, height=1400, scrolling=True)
     st.download_button(
-        f'⬇️ Baixar {_label_slug(slug_h, tipo) if tipo != "diario" else slug_h}',
+        f'⬇️ Baixar {_label_slug(ref_sel, tipo) if tipo != "diario" else ref_sel}',
         data=html_text.encode('utf-8'),
-        file_name=f'dashboard_{tipo}_{slug_h}_OTHIL.html',
+        file_name=f'dashboard_{tipo}_{ref_sel}_OTHIL.html',
         mime='text/html',
         key=f'ger_dl_{tipo}',
     )
