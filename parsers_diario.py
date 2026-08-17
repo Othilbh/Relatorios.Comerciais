@@ -350,9 +350,12 @@ def parse_vendas_pdftotext(file) -> list[dict]:
     """Parseia o relatório 'Lucratividade por Vendedor' (formato sem traço no
     cabeçalho do vendedor) usando pdftotext -layout.
 
-    Retorna lista de dicts: {'vendedor': str, 'codigo': str, 'qtde_vendida': float}
-    — mesmo formato de parse_vendas() em parsers.py, mas usando a tokenização
-    posicional de _tokenize_tail para não depender de espaços entre colunas.
+    Retorna lista de dicts: {'vendedor': str, 'codigo': str, 'qtde_vendida': float,
+    'descricao': str} — mesmo formato de parse_vendas() em parsers.py (mais o
+    campo 'descricao', usado por calc.sugestao_codigo_por_nome para detectar
+    código configurado errado quando o NOME do produto bate mas o código
+    não), usando a tokenização posicional de _tokenize_tail para não
+    depender de espaços entre colunas.
     """
     text = extract_text(file)
     rows_out = []
@@ -393,6 +396,7 @@ def parse_vendas_pdftotext(file) -> list[dict]:
                     'vendedor': pending_qty['vendedor'],
                     'codigo': pending_qty['codigo'],
                     'qtde_vendida': qtde_pendente,
+                    'descricao': pending_qty['descricao'],
                 })
                 pending_qty = None
                 continue
@@ -413,6 +417,7 @@ def parse_vendas_pdftotext(file) -> list[dict]:
             if not cm:
                 continue
             codigo = cm.group(1)
+            descricao = _clean_produto(full_desc)
 
             tail = line[cxm.end():]
             qtde = _extrai_qtde_tail(tail)
@@ -422,13 +427,14 @@ def parse_vendas_pdftotext(file) -> list[dict]:
                 # sozinha na linha seguinte (ver comentário no topo da
                 # função). Guarda o código/vendedor pra tentar de novo no
                 # próximo laço, em vez de descartar a venda.
-                pending_qty = {'codigo': codigo, 'vendedor': cur_vendor_raw}
+                pending_qty = {'codigo': codigo, 'vendedor': cur_vendor_raw, 'descricao': descricao}
                 continue
 
             rows_out.append({
                 'vendedor': cur_vendor_raw,
                 'codigo': codigo,
                 'qtde_vendida': qtde,
+                'descricao': descricao,
             })
             continue
 
