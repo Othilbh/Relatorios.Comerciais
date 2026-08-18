@@ -24,8 +24,6 @@ pode não refletir o estoque conferido na segunda-feira na hora de bater a
 meta.
 """
 import math
-import re
-import unicodedata
 from parsers import normalize_codigo
 # map_vendedor()/VENDOR_ALIASES vêm de parsers_diario -- fonte única. Havia
 # uma segunda cópia (divergente) aqui em calc.py que nunca foi atualizada
@@ -73,63 +71,6 @@ def codigo_matches(codigo_norm: str, entry: str) -> bool:
         prefix = normalize_codigo(entry[:-1])
         return bool(prefix) and codigo_norm.startswith(prefix)
     return codigo_norm == normalize_codigo(entry)
-
-
-def _normaliza_nome(s: str) -> set:
-    """Maiúsculas, sem acento, só letras/números, dividido em palavras --
-    para comparar nome de produto configurado contra descrição extraída do
-    PDF sem depender de acento/pontuação/ordem exata das palavras."""
-    s = unicodedata.normalize('NFKD', s or '').encode('ascii', 'ignore').decode('ascii')
-    s = re.sub(r'[^A-Za-z0-9 ]', ' ', s.upper())
-    # Palavras puramente numéricas são mantidas mesmo curtas (ex.: "50",
-    # "55", "65", "70") -- são justamente o que distingue variantes de
-    # tamanho do mesmo produto (ex.: "AMEIXA 50-55 TANY" vs. "AMEIXA 65/70
-    # TANY"); descartá-las faria as duas colapsarem no mesmo conjunto
-    # {AMEIXA, TANY} e uma sugerir o código da outra.
-    return {w for w in s.split() if len(w) >= 3 or w.isdigit()}
-
-
-def sugestao_codigo_por_nome(nome_produto: str, vendas_rows) -> list[dict]:
-    """Quando o CÓDIGO configurado de um produto não bate com nada nas
-    vendas, procura no PDF alguma linha cuja DESCRIÇÃO pareça ser o mesmo
-    produto pelo NOME -- para pegar erro de digitação no código.
-
-    A Ingrid digita nome E código de propósito, exatamente para evitar esse
-    tipo de erro; se o nome bate com uma linha do PDF mas o código
-    configurado não é o código daquela linha, é sinal forte de erro de
-    digitação no código (não de o produto realmente não ter vendido nada),
-    e por isso vale avisar -- ao contrário de um produto sem nenhuma venda
-    e sem nenhum nome parecido no PDF, que é simplesmente uma semana sem
-    movimento (não deve gerar aviso nenhum, pra não virar ruído).
-
-    Retorna lista de {'codigo', 'descricao', 'qtde'} (candidatos, por
-    volume decrescente) -- lista vazia se não achar nenhum nome parecido.
-    """
-    alvo = _normaliza_nome(nome_produto)
-    if not alvo:
-        return []
-    candidatos = {}
-    for row in vendas_rows:
-        desc = row.get('descricao')
-        if not desc:
-            continue
-        palavras_desc = _normaliza_nome(desc)
-        if not palavras_desc:
-            continue
-        # "bate" só se TODAS as palavras significativas do nome configurado
-        # aparecem na descrição da linha do PDF (subconjunto completo, não
-        # limiar parcial) -- ex.: "PESSEGO FRUITS PONENT" digitado é
-        # subconjunto de "PESSEGO FRUITS PONENT BRANCO" no PDF, então bate.
-        # Um limiar parcial (ex.: 60% de overlap) já causou falso positivo:
-        # "PESSEGO FRUITS PONENT" batendo 2/3 com uma descrição de
-        # NECTARINA só porque "FRUITS"/"PONENT" também aparecem lá, sem
-        # nenhuma palavra de "PESSEGO" em comum. Exigir o subconjunto
-        # completo elimina esse tipo de coincidência parcial.
-        if alvo <= palavras_desc:
-            cod = row['codigo']
-            c = candidatos.setdefault(cod, {'codigo': cod, 'descricao': desc, 'qtde': 0.0})
-            c['qtde'] += row['qtde_vendida']
-    return sorted(candidatos.values(), key=lambda x: -x['qtde'])
 
 
 def soma_falta(linhas) -> float:
