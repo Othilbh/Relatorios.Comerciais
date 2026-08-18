@@ -28,17 +28,7 @@ CLIENTE_RE = re.compile(r'^Cliente:\s*([\w*]+)\s*-\s*(.+?)\s{2,}Cidade:')
 TOT_CLIENTE_RE = re.compile(r'^\s*Totais do Cliente - (.+):\s+(\S.*)$')
 TOT_VENDEDOR_RE = re.compile(r'^\s*Totais do Vendedor - (.+):\s+(\S.*)$')
 TOTAL_GERAL_RE = re.compile(r'^\s*Total Geral:\s+(\S.*)$')
-# Sem '\b' antes de "CX": quando o nome do vendedor/complemento é longo o
-# bastante para preencher a coluna até encostar em "CX" (ex.: "RONISTONIS"
-# -- "...RONISTONISCX       2,000..."), não sobra espaço nenhum entre o
-# texto e "CX", e um '\b' ali exigiria uma fronteira \w->\W que não existe
-# entre "S" e "C" (ambos caracteres de palavra). Com o '\b' a linha inteira
-# não era reconhecida como linha de produto: vazava pra "pending_lines" e
-# contaminava o produto seguinte (que "herdava" o código errado, e o
-# produto de verdade -- cujo texto tinha vazado -- desaparecia do
-# cálculo). "CX" só marca a coluna de unidade nesse relatório, então não
-# há necessidade de exigir fronteira de palavra antes dele.
-CX_RE = re.compile(r'CX\s+(?=[\d\-,.])')
+CX_RE = re.compile(r'\bCX\s+(?=[\d\-,.])')
 EMISSAO_RE = re.compile(r'Emissão:\s*(\d{2}/\d{2}/\d{4})')
 PERIODO_RE = re.compile(r'Período\s*:\s*(\d{2}/\d{2}/\d{4}[^N]*?\d{2}/\d{2}/\d{4})')
 
@@ -327,60 +317,23 @@ _VENDOR_RE_META = re.compile(r'^Vendedor:\s*\d+\s+(.+)$')
 _QTY_INDICES = [i for i, d in enumerate(_SEQ) if d == 3]  # [0, 3, 6, 14]
 
 
-def _extrai_qtde_tail(tail: str):
-    """Tenta extrair a quantidade (Total das Saídas Qtd) de um trecho de texto
-    que deveria conter os números de uma linha de produto (o que vem depois de
-    "CX "). Retorna None se não achar nenhum número aproveitável.
-
-    Estratégia:
-      - Pega o último campo de quantidade disponível em _SEQ (Total das Saídas
-        Qtd = índice 6). Se o relatório for simplificado e tiver menos campos,
-        usa o maior índice de qty disponível. Fallback: primeiro valor extraído.
-      - Se a tokenização posicional falhar (relatório com "--------" nas
-        colunas zeradas), cai para extrair por regex os números com 3 casas
-        decimais (ou, na falta deles, qualquer número) e pega o último.
-    """
-    vals = _tokenize_tail(tail)
-    if vals:
-        for idx in reversed(_QTY_INDICES):
-            if idx < len(vals):
-                return vals[idx]
-        return vals[0]
-
-    qty3_matches = re.findall(r'\b\d[\d.]*,\d{3}\b', tail)
-    if qty3_matches:
-        return _to_float(qty3_matches[-1])
-    any_nums = re.findall(r'\b\d[\d.]*,\d+\b', tail)
-    if any_nums:
-        return _to_float(any_nums[-1])
-    return None
-
-
 def parse_vendas_pdftotext(file) -> list[dict]:
     """Parseia o relatório 'Lucratividade por Vendedor' (formato sem traço no
     cabeçalho do vendedor) usando pdftotext -layout.
 
-    Retorna lista de dicts: {'vendedor': str, 'codigo': str, 'qtde_vendida': float,
-    'descricao': str} — mesmo formato de parse_vendas() em parsers.py (mais o
-    campo 'descricao', usado por calc.sugestao_codigo_por_nome para detectar
-    código configurado errado quando o NOME do produto bate mas o código
-    não), usando a tokenização posicional de _tokenize_tail para não
-    depender de espaços entre colunas.
+    Retorna lista de dicts: {'vendedor': str, 'codigo': str, 'qtde_vendida': float}
+    — mesmo formato de parse_vendas() em parsers.py, mas usando a tokenização
+    posicional de _tokenize_tail para não depender de espaços entre colunas.
+
+    Estratégia de extração de quantidade:
+      - Pega o último campo de quantidade disponível em _SEQ (Total das Saídas
+        Qtd = índice 6). Se o relatório for simplificado e tiver menos campos,
+        usa o maior índice de qty disponível. Fallback: primeiro valor extraído.
     """
     text = extract_text(file)
     rows_out = []
     cur_vendor_raw = None
     pending_lines = []
-    # Guarda {'codigo', 'vendedor'} quando uma linha de produto tem "CX" mas
-    # NENHUM número em seguida na mesma linha (layout raro em que a
-    # quantidade fica sozinha, sem "CX", na linha física seguinte — visto em
-    # produtos cuja Qtd de "Saídas por Vendas" fica em branco/"-", o que
-    # desloca o "CX" pra colar direto na descrição). Sem esse tratamento, a
-    # venda desse produto era perdida (linha descartada) E o número da linha
-    # seguinte "vazava" como se fosse o CÓDIGO do próximo produto (ex.: um
-    # "1,000" órfão virava um código fantasma "1"), fazendo o próximo produto
-    # de verdade desaparecer do cálculo também.
-    pending_qty = None
 
     for line in text.split('\n'):
         # Cabeçalho de vendedor
@@ -388,32 +341,11 @@ def parse_vendas_pdftotext(file) -> list[dict]:
         if m:
             cur_vendor_raw = m.group(1).strip()
             pending_lines = []
-            pending_qty = None
             continue
 
         if _is_junk_line(line):
             pending_lines = []
-            pending_qty = None
             continue
-
-        # Uma linha de produto anterior ficou esperando a quantidade (ver
-        # comentário acima) -- tenta consumir esta linha como sendo ela,
-        # antes de tratá-la como início de um novo produto.
-        if pending_qty is not None:
-            qtde_pendente = _extrai_qtde_tail(line)
-            if qtde_pendente is not None:
-                rows_out.append({
-                    'vendedor': pending_qty['vendedor'],
-                    'codigo': pending_qty['codigo'],
-                    'qtde_vendida': qtde_pendente,
-                    'descricao': pending_qty['descricao'],
-                })
-                pending_qty = None
-                continue
-            # Não achou número nesta linha -- desiste de esperar (evita
-            # contaminar a leitura normal da linha atual) em vez de manter
-            # um estado pendente indefinidamente.
-            pending_qty = None
 
         # Linha de produto (tem "CX " seguido de número)
         cxm = CX_RE.search(line)
@@ -427,24 +359,38 @@ def parse_vendas_pdftotext(file) -> list[dict]:
             if not cm:
                 continue
             codigo = cm.group(1)
-            descricao = _clean_produto(full_desc)
 
             tail = line[cxm.end():]
-            qtde = _extrai_qtde_tail(tail)
+            vals = _tokenize_tail(tail)
 
-            if qtde is None:
-                # A quantidade não veio nesta linha -- provavelmente está
-                # sozinha na linha seguinte (ver comentário no topo da
-                # função). Guarda o código/vendedor pra tentar de novo no
-                # próximo laço, em vez de descartar a venda.
-                pending_qty = {'codigo': codigo, 'vendedor': cur_vendor_raw, 'descricao': descricao}
-                continue
+            if vals:
+                # Formato completo: pega Total das Saídas Qtd (último idx de qty)
+                qtde = 0.0
+                for idx in reversed(_QTY_INDICES):
+                    if idx < len(vals):
+                        qtde = vals[idx]
+                        break
+                if qtde == 0.0:
+                    qtde = vals[0]
+            else:
+                # Formato com "--------" nas colunas zeradas: _tokenize_tail falha
+                # pois "---" não é número. Extrai todos os números com 3 casas
+                # decimais da tail e pega o último (= Total das Saídas se houver
+                # múltiplos, ou a única qty se o relatório for simplificado).
+                qty3_matches = re.findall(r'\b\d[\d.]*,\d{3}\b', tail)
+                if not qty3_matches:
+                    # Sem 3 casas: tenta qualquer número (fallback)
+                    any_nums = re.findall(r'\b\d[\d.]*,\d+\b', tail)
+                    if not any_nums:
+                        continue
+                    qtde = _to_float(any_nums[-1])
+                else:
+                    qtde = _to_float(qty3_matches[-1])
 
             rows_out.append({
                 'vendedor': cur_vendor_raw,
                 'codigo': codigo,
                 'qtde_vendida': qtde,
-                'descricao': descricao,
             })
             continue
 
