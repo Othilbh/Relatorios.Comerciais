@@ -1,4 +1,5 @@
 """OTHIL — Relatórios Comerciais — ponto de entrada (router)."""
+import os
 import streamlit as st
 
 st.set_page_config(
@@ -56,6 +57,21 @@ h1, h2, h3 {
 """, unsafe_allow_html=True)
 
 # Navigation
+# Data/hora do último deploy_github.ps1, gravada em VERSION.txt pelo
+# próprio script no momento do envio. Mostrar isso na barra lateral resolve
+# um problema recorrente: não tinha como confirmar, olhando de fora, se um
+# deploy realmente chegou no app publicado ou não (o cache do GitHub podia
+# mostrar conteúdo antigo por minutos mesmo depois de um deploy que já
+# tinha funcionado). Agora é só olhar o próprio app rodando.
+try:
+    _version_path = os.path.join(os.path.dirname(__file__), 'VERSION.txt')
+    with open(_version_path, 'r', encoding='utf-8') as _vf:
+        _versao = _vf.read().strip()
+    if _versao:
+        st.sidebar.caption(f'🕓 Publicado em: {_versao}')
+except FileNotFoundError:
+    pass
+
 pg = st.navigation(
     {
         "": [
