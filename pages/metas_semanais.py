@@ -16,8 +16,7 @@ import pandas as pd
 from parsers import parse_estoque, parse_vendas, normalize_codigo
 from parsers_diario import parse_vendas_pdftotext
 from parsers_vendedor import parse_totais_vendedor
-from calc import (compute_metas, VENDEDORES_PADRAO, parse_codigos_input, map_vendedor,
-                   codigo_matches, soma_falta, sugestao_codigo_por_nome)
+from calc import compute_metas, VENDEDORES_PADRAO, parse_codigos_input, map_vendedor, codigo_matches, soma_falta
 from pdfgen import generate_relatorio_vendedor, generate_dashboard, generate_resumo_geral
 import storage
 import periodo
@@ -192,45 +191,6 @@ def _diagnostico_codigos(vendas_rows: list, produtos_config: list) -> list:
             'Vendedores': ', '.join(sorted(v for v in dados['vendedores'] if v)),
         }
         for cod, dados in sorted(agg.items(), key=lambda x: -x[1]['qtde'])
-    ]
-
-
-def _diagnostico_vendedores_excluidos(vendas_rows: list, produtos_config: list,
-                                       vendedor_pcts: dict) -> list:
-    """Retorna vendedores que o relatório RECONHECE (têm alias mapeado em
-    map_vendedor) mas que não fazem parte da lista de vendedores com meta
-    semanal configurada (vendedor_pcts) -- ou seja, as vendas deles são
-    silenciosamente excluídas do 'Vendido', mesmo quando o CÓDIGO do produto
-    está certinho e o vendedor aparece normalmente no PDF. Já aconteceu antes
-    (histórico: Luca ficou de fora quando foi cadastrado, e as vendas dele
-    sumiam sem nenhum aviso) -- esse diagnóstico existe pra isso nunca mais
-    passar despercebido, em vez de descobrir só quando o número não bate.
-
-    Só conta linhas cujo código casa com algum produto configurado (linhas de
-    código não reconhecido já aparecem no diagnóstico de códigos, e vendas de
-    um vendedor não-rastreado num produto não configurado não afetam nenhuma
-    meta de qualquer forma)."""
-    from collections import defaultdict
-    agg = defaultdict(lambda: {'qtde': 0.0, 'produtos': set()})
-    for row in vendas_rows:
-        disp = map_vendedor(row['vendedor'])
-        if not disp or disp in vendedor_pcts:
-            continue
-        cn = normalize_codigo(row['codigo'])
-        for p in produtos_config:
-            if any(codigo_matches(cn, e) for e in p['codigos']):
-                agg[disp]['qtde'] += row['qtde_vendida']
-                agg[disp]['produtos'].add(p['nome'])
-                break
-    if not agg:
-        return []
-    return [
-        {
-            'Vendedor': vend,
-            'CX fora do cálculo': dados['qtde'],
-            'Produtos afetados': ', '.join(sorted(dados['produtos'])),
-        }
-        for vend, dados in sorted(agg.items(), key=lambda x: -x[1]['qtde'])
     ]
 
 
@@ -554,30 +514,18 @@ def _render_fechamento_semanal():
     cfg_atual  = st.session_state.get('config', {})
     periodo_texto = cfg_atual.get('periodo', '')
 
-    # ── Fechar semana atual (ou retroativa) ──────────────────────────────
+    # ── Fechar semana atual ──────────────────────────────────────────────
     if resultados:
-        data_ref = st.date_input(
-            'Semana a fechar (data de referência)',
-            value=datetime.date.today(),
-            format='DD/MM/YYYY',
-            help='Deixe em hoje para a semana atual. Para fechar uma semana '
-                 'atrasada/retroativa (ex.: PDFs enviados depois), escolha uma '
-                 'data dentro daquela semana — o fechamento fica salvo no '
-                 'histórico daquela semana específica, não na de hoje.',
-            key='fech_data_ref',
-        )
-        slug_atual  = _slug_semana(data_ref)
+        slug_atual  = _slug_semana(datetime.date.today())
         label_atual = _label_semana(slug_atual)
-        retroativo  = data_ref != datetime.date.today()
 
-        st.subheader(f'Fechar: {label_atual}' + (' (retroativo)' if retroativo else ''))
+        st.subheader(f'Fechar: {label_atual}')
         st.caption(f'Período configurado: **{periodo_texto or "(não informado)"}**')
 
-        # Dia da semana (para o On Track inline) -- se for retroativo, assume
-        # semana inteira decorrida (dia 5) por padrão, já que já passou.
+        # Dia da semana (para o On Track inline)
         dia_fech = st.slider(
             'Dia da semana (para projeção)', 1, 5,
-            value=5 if retroativo else min(datetime.date.today().weekday() + 1, 5),
+            value=min(datetime.date.today().weekday() + 1, 5),
             format='Dia %d de 5',
             key='fech_dia',
         )
@@ -591,12 +539,10 @@ def _render_fechamento_semanal():
         _render_comparativo_semanal(resultados, totais_rs, slug_atual)
 
         st.divider()
-        label_botao = '💾 Fechar Semana e Salvar no Histórico' if not retroativo \
-            else f'💾 Fechar {label_atual} (retroativo) e Salvar no Histórico'
-        if st.button(label_botao, type='primary', key='btn_fechar'):
+        if st.button('💾 Fechar Semana e Salvar no Histórico', type='primary', key='btn_fechar'):
             try:
                 _salvar_fechamento(resultados, totais_rs, periodo_texto, slug_atual,
-                                    usuario=st.session_state.get('usuario_nome', 'Ingrid'))
+                                    usuario=st.session_state.get('usuario_nome'))
                 st.success(f'✅ {label_atual} salvo no histórico da Gerência.')
                 st.rerun()
             except Exception as e:
@@ -688,7 +634,10 @@ if not storage.is_configured():
 st.title('Metas Semanais')
 st.caption('Metas semanais por vendedor e configuração de responsáveis/percentuais.')
 
-st.session_state.setdefault('usuario_nome', 'Ingrid')
+with st.expander('👤 Seu nome (fica registrado no histórico de quem salvou cada alteração)'):
+    st.session_state['usuario_nome'] = st.text_input(
+        'Seu nome', value=st.session_state.get('usuario_nome', 'Ingrid'), key='usuario_nome_input',
+    )
 
 # ---------------------------------------------------------------------------
 # Tabs
@@ -786,29 +735,9 @@ with tab_cfg:
             mime='application/json',
         )
         up_cfg = st.file_uploader('⬆️ Importar configuração', type='json', key='cfg_upload')
-        # Processa cada arquivo enviado só uma vez (guarda o file_id já
-        # processado): sem isso, como o file_uploader continua retornando o
-        # mesmo arquivo em TODO rerun até o usuário removê-lo manualmente, o
-        # st.rerun() logo abaixo entrava em loop infinito assim que um
-        # arquivo era importado (a página nunca terminava de "Running...").
-        if up_cfg is not None and st.session_state.get('_cfg_upload_processado') != up_cfg.file_id:
+        if up_cfg is not None:
             st.session_state.config = json.load(up_cfg)
             save_config(st.session_state.config, show_feedback=False)
-            st.session_state['_cfg_upload_processado'] = up_cfg.file_id
-            # Limpa o estado dos widgets por produto/vendedor (nome_i, cod_i,
-            # est_i, prio_i, pct_vend) guardado da config ANTERIOR. Sem isso,
-            # um widget com 'key' já existente ignora o `value=`/`index=` em
-            # reruns seguintes e continua mostrando o valor antigo -- então
-            # um produto que ocupa o mesmo índice na config antiga e na
-            # importada continuava exibindo nome/código antigos mesmo depois
-            # do import (e esse valor velho é que ia pro cálculo e podia até
-            # ser salvo de volta, sobrescrevendo o import). Isso combina
-            # exatamente com "alguns códigos não puxam, e outros puxaram
-            # errado" -- limpar aqui garante que cada widget reinicialize do
-            # zero com os dados recém-importados.
-            for _k in list(st.session_state.keys()):
-                if _k.startswith(('nome_', 'cod_', 'est_', 'prio_', 'pct_')):
-                    del st.session_state[_k]
             st.rerun()
 
     st.divider()
@@ -925,78 +854,6 @@ with tab_cfg:
                 st.dataframe(df_diag, use_container_width=True, hide_index=True)
         else:
             st.success('✅ Todos os códigos do PDF foram reconhecidos — nenhuma cx perdida.')
-
-        # Diagnóstico de vendedores reconhecidos mas fora da lista de metas
-        # (ex.: aconteceu com o Luca -- vendas dele sumiam do Vendido sem
-        # nenhum aviso, mesmo com o código do produto certinho)
-        vend_excl = _diagnostico_vendedores_excluidos(
-            vendas_rows_diag, produtos_config_diag, cfg['vendedor_pcts'])
-        if vend_excl:
-            total_vend_excl = sum(r['CX fora do cálculo'] for r in vend_excl)
-            with st.expander(
-                f'⚠️ {len(vend_excl)} vendedor(es) reconhecido(s) mas sem meta configurada '
-                f'— {total_vend_excl:,.0f} cx fora do cálculo',
-                expanded=True,
-            ):
-                st.caption(
-                    'Esses vendedores aparecem no PDF e o app sabe quem são, mas não estão na '
-                    'lista de "Percentuais de meta por vendedor" abaixo — então as vendas deles '
-                    'não entram no Vendido de nenhum produto, mesmo com o código certo. Se '
-                    'devem contar nas metas desta semana, adicione o vendedor no expansor '
-                    '**"⚙️ Percentuais de meta por vendedor"** acima (com o percentual que você '
-                    'quiser aplicar) e calcule de novo.'
-                )
-                df_vend = pd.DataFrame(vend_excl)
-                df_vend['CX fora do cálculo'] = df_vend['CX fora do cálculo'].map(
-                    lambda x: f'{x:,.0f}'
-                )
-                st.dataframe(df_vend, use_container_width=True, hide_index=True)
-
-        # Diagnóstico de possível erro de digitação no código: pra cada
-        # produto configurado que não bateu com NENHUMA venda, procura no
-        # PDF um nome parecido usando um código diferente do configurado.
-        # Você digita nome E código propositalmente pra evitar erro -- isso
-        # aqui usa os dois: se o nome bate com uma linha do PDF mas o código
-        # configurado é outro, é sinal de erro de digitação no código (não
-        # de o produto simplesmente não ter vendido nada essa semana), e o
-        # app agora avisa sozinho em vez de precisar conferir na mão.
-        possiveis_typos = []
-        for p in produtos_config_diag:
-            tem_venda = any(
-                codigo_matches(normalize_codigo(r['codigo']), e)
-                for r in vendas_rows_diag for e in p['codigos']
-            )
-            if tem_venda:
-                continue
-            candidatos = sugestao_codigo_por_nome(p['nome'], vendas_rows_diag)
-            # só sinaliza candidatos com um código DIFERENTE de todos os já
-            # configurados pra esse produto (evita "sugerir" o próprio
-            # código certo de volta, ex. quando bate por prefixo)
-            candidatos = [c for c in candidatos if c['codigo'] not in p['codigos']]
-            for c in candidatos:
-                possiveis_typos.append({
-                    'Produto configurado': p['nome'],
-                    'Código configurado': ', '.join(p['codigos']) or '(vazio)',
-                    'Nome encontrado no PDF': c['descricao'],
-                    'Código encontrado no PDF': c['codigo'],
-                    'Cx sob esse código': c['qtde'],
-                })
-        if possiveis_typos:
-            with st.expander(
-                f'🚨 {len(possiveis_typos)} produto(s) com possível erro de digitação no código',
-                expanded=True,
-            ):
-                st.caption(
-                    'O NOME desses produtos bate com uma venda no PDF, mas o CÓDIGO configurado '
-                    'é diferente do código daquela venda -- ou seja, o produto provavelmente '
-                    'vendeu normalmente, só que sob um código diferente do que está cadastrado. '
-                    'Confira e corrija o código na seção **2. Produtos da semana** acima.'
-                )
-                df_typo = pd.DataFrame(possiveis_typos)
-                df_typo['Cx sob esse código'] = df_typo['Cx sob esse código'].map(
-                    lambda x: f'{x:,.0f}'
-                )
-                st.dataframe(df_typo, use_container_width=True, hide_index=True)
 
         # Diagnóstico por produto: mostra linhas brutas extraídas do PDF
         with st.expander('🔍 Diagnóstico por produto (linhas brutas do PDF)'):
