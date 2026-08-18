@@ -5,7 +5,7 @@ import os
 import re
 import datetime
 import tempfile
-
+ 
 import streamlit as st
 import streamlit.components.v1 as components
 import pandas as pd
@@ -22,7 +22,7 @@ import rentabilidade as rent
 import produtos as prod
 import resumo_matriz
 from xlsx_vendedor_cliente import VENDOR_TAB, _normalize
-
+ 
 MOD_RELATORIO_DIARIO = 'relatorio_diario'
 MOD_FECHAMENTO = 'metas_semanais_fechamento'
 MOD_ONTRACK_METAS = 'metas_semanais_ontrack'
@@ -32,7 +32,7 @@ MOD_VENDEDOR_CLIENTE = 'vendedor_cliente'
 MOD_PREVPERDAS = 'prevencao_perdas'
 MOD_RECORRENCIA = 'recorrencia'
 TIPO_RECORRENCIA = 'livre'
-
+ 
 _GERENCIA_DIR     = os.path.join(os.path.dirname(__file__), '..', 'gerencia_data')
 _ONTRACK_PUB_FILE = os.path.join(_GERENCIA_DIR, 'ontrack_publicado.json')
 _ONTRACK_CLI_FILE = os.path.join(_GERENCIA_DIR, 'ontrack_clientes_publicado.json')
@@ -43,15 +43,15 @@ _PREVPERDAS_DIR   = os.path.join(_GERENCIA_DIR, 'prevencao_perdas')
 _PERDAS_DIR       = os.path.join(_GERENCIA_DIR, 'perdas_realizadas')
 _MESES_QBR     = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez']
 _SENHA_FALLBACK = 'othil2024'
-
-
+ 
+ 
 def _get_senha() -> str:
     try:
         return st.secrets['gerencia_senha']
     except Exception:
         return _SENHA_FALLBACK
-
-
+ 
+ 
 def _check_auth() -> bool:
     if st.session_state.get('_gerencia_auth'):
         return True
@@ -76,14 +76,14 @@ def _check_auth() -> bool:
             else:
                 st.error('Senha incorreta.')
     return False
-
-
+ 
+ 
 def _dir_tipo(tipo):
     d = os.path.join(_GERENCIA_DIR, tipo)
     os.makedirs(d, exist_ok=True)
     return d
-
-
+ 
+ 
 def _listar_dashboards(tipo):
     """Lista os dashboards salvos, mais recente primeiro. Lê da persistência
     real (data_store — sobrevive a restart/redeploy/hibernação do Streamlit
@@ -92,7 +92,7 @@ def _listar_dashboards(tipo):
     reboot. Arquivos locais entram como complemento/fallback."""
     d = _dir_tipo(tipo)
     items = {}
-
+ 
     try:
         for slug in ds.list_periodos(MOD_RELATORIO_DIARIO, tipo):
             registro = ds.load_current(MOD_RELATORIO_DIARIO, tipo, slug)
@@ -121,7 +121,7 @@ def _listar_dashboards(tipo):
             items[slug] = meta
     except Exception:
         pass
-
+ 
     for fname in os.listdir(d):
         if fname.endswith('.json'):
             try:
@@ -134,10 +134,10 @@ def _listar_dashboards(tipo):
                     items[slug] = meta
             except Exception:
                 pass
-
+ 
     return sorted(items.items(), key=lambda kv: kv[0], reverse=True)
-
-
+ 
+ 
 def _label_slug(slug, tipo):
     try:
         if tipo == 'semanal':
@@ -152,70 +152,140 @@ def _label_slug(slug, tipo):
             return slug
     except Exception:
         return slug
-
-
+ 
+ 
+# ── Navegação de período por DATA (mesma lógica/arquitetura da página
+# Relatório Diário — periodo.py + data_store.py — reaproveitada aqui em vez
+# de duplicar uma estrutura paralela). Corrige o mesmo bug de raiz que
+# afetava as setas do Relatório Diário: o código antigo desta seção usava
+# um índice dentro da lista de dashboards SALVOS, combinado com
+# st.selectbox(..., index=...) — o Streamlit ignora esse index= a partir do
+# segundo rerun (o valor persistido no session_state da própria selectbox
+# manda), então o clique nas setas era desfeito na linha seguinte. Além
+# disso, por navegar sobre a LISTA de salvos (não sobre datas), não dava
+# pra "andar" até um período sem dado nenhum — violava a mesma regra do
+# item 2 do pedido original (navegação não pode depender de já existir
+# registro salvo).
+def _diario_data(ref):
+    return datetime.datetime.strptime(ref, '%Y-%m-%d').date()
+ 
+ 
+def _periodo_atual_ref(tipo):
+    if tipo == 'diario':
+        return datetime.date.today().strftime('%Y-%m-%d')
+    return periodo_mod.periodo_atual(tipo)
+ 
+ 
+def _periodo_anterior(tipo, ref):
+    if tipo == 'diario':
+        return (_diario_data(ref) - datetime.timedelta(days=1)).strftime('%Y-%m-%d')
+    return periodo_mod.periodo_anterior(tipo, ref)
+ 
+ 
+def _periodo_posterior(tipo, ref):
+    if tipo == 'diario':
+        return (_diario_data(ref) + datetime.timedelta(days=1)).strftime('%Y-%m-%d')
+    return periodo_mod.periodo_posterior(tipo, ref)
+ 
+ 
+def _intervalo_periodo(tipo, ref):
+    if tipo == 'diario':
+        d = _diario_data(ref)
+        return d, d
+    return periodo_mod.intervalo_datas(tipo, ref)
+ 
+ 
+def _rotulo_periodo(tipo, ref):
+    if tipo == 'diario':
+        return _diario_data(ref).strftime('%d/%m/%Y')
+    return periodo_mod.rotulo(tipo, ref)
+ 
+ 
 def _render_secao_dash(tipo, titulo_secao, emoji):
     st.header(f'{emoji} {titulo_secao}')
-    dashboards = _listar_dashboards(tipo)
-
-    if not dashboards:
-        tipo_label = {'diario': 'Relatório Diário', 'semanal': 'aba Semanal', 'mensal': 'aba Mensal'}
-        st.info(f'Nenhum dashboard disponível. Gere um na página **{tipo_label.get(tipo,tipo)}** primeiro.')
-        return
-
-    slugs  = [s for s, _ in dashboards]
-    if tipo == 'diario':
-        labels = [f"{m.get('emissao', s)}  —  {m.get('periodo','-')}" for s, m in dashboards]
-    else:
-        labels = [_label_slug(s, tipo) + f"  ({m.get('periodo','-')})" for s, m in dashboards]
-
-    idx_key = f'_ger_idx_{tipo}'
-    if idx_key not in st.session_state:
-        st.session_state[idx_key] = 0
-
-    col_prev, col_sel, col_next = st.columns([1, 6, 1])
+ 
+    state_key = f'_ger_periodo_sel_{tipo}'
+    if state_key not in st.session_state:
+        st.session_state[state_key] = _periodo_atual_ref(tipo)
+ 
+    def _ir_anterior():
+        st.session_state[state_key] = _periodo_anterior(tipo, st.session_state[state_key])
+ 
+    def _ir_posterior():
+        st.session_state[state_key] = _periodo_posterior(tipo, st.session_state[state_key])
+ 
+    col_prev, col_atual, col_next = st.columns([1, 5, 1])
     with col_prev:
-        st.write('')
-        if st.button('◀', key=f'ger_prev_{tipo}', help='Período anterior'):
-            st.session_state[idx_key] = min(st.session_state[idx_key] + 1, len(slugs) - 1)
+        st.button('◀', key=f'ger_prev_{tipo}', help='Período anterior', on_click=_ir_anterior,
+                   use_container_width=True)
     with col_next:
-        st.write('')
-        if st.button('▶', key=f'ger_next_{tipo}', help='Próximo período'):
-            st.session_state[idx_key] = max(st.session_state[idx_key] - 1, 0)
-    with col_sel:
-        escolha = st.selectbox(
-            f'{len(dashboards)} período(s) salvo(s):',
-            labels,
-            index=min(st.session_state[idx_key], len(labels)-1),
-            key=f'ger_sel_{tipo}',
-        )
-        st.session_state[idx_key] = labels.index(escolha)
-
-    idx     = st.session_state[idx_key]
-    slug_h  = slugs[idx]
-    meta_h  = dashboards[idx][1]
-    gerado  = meta_h.get('gerado_em', '')[:16].replace('T', ' ')
-    st.caption(f'Período: {meta_h.get("periodo","-")}  |  Gerado em: {gerado}')
-
-    html_path = os.path.join(_dir_tipo(tipo), f'{slug_h}.html')
+        st.button('▶', key=f'ger_next_{tipo}', help='Próximo período', on_click=_ir_posterior,
+                   use_container_width=True)
+ 
+    ref_sel = st.session_state[state_key]
+    ini, fim = _intervalo_periodo(tipo, ref_sel)
+    tem_dado = ds.has_data(MOD_RELATORIO_DIARIO, tipo, ref_sel)
+ 
+    with col_atual:
+        if tipo == 'diario':
+            st.markdown(f'**{_rotulo_periodo(tipo, ref_sel)}**')
+        else:
+            st.markdown(f'**{ini.strftime("%d/%m/%Y")} – {fim.strftime("%d/%m/%Y")}**  ·  '
+                        f'{_rotulo_periodo(tipo, ref_sel)}')
+        st.caption('🟢 Período salvo ✓' if tem_dado else '⚪ Nenhum dado cadastrado para este período.')
+ 
+    dashboards = _listar_dashboards(tipo)
+    if dashboards:
+        with st.expander(f'🔎 Períodos salvos ({len(dashboards)}) — seleção rápida'):
+            st.caption('Atalho para pular direto a um período que já tem dado. A navegação ◀ ▶ acima '
+                       'continua funcionando para QUALQUER período, com ou sem dado.')
+            slugs_ord = [s for s, _ in dashboards]
+            labels_map = {}
+            for s, m in dashboards:
+                if tipo == 'diario':
+                    labels_map[s] = f"{m.get('emissao', s)}  —  {m.get('periodo','-')}"
+                else:
+                    labels_map[s] = _label_slug(s, tipo) + f"  ({m.get('periodo','-')})"
+            escolha_rapida = st.selectbox(
+                'Ir direto para', slugs_ord, format_func=lambda s: labels_map.get(s, s),
+                key=f'ger_quick_sel_{tipo}', index=None, placeholder='Selecione um período salvo...')
+            if escolha_rapida:
+                st.session_state[state_key] = escolha_rapida
+                st.rerun()
+ 
+    st.divider()
+ 
+    if not tem_dado:
+        tipo_label = {'diario': 'Relatório Diário', 'semanal': 'aba Semanal', 'mensal': 'aba Mensal'}
+        st.info(f'Nenhum dado cadastrado para o período de {ini.strftime("%d/%m/%Y")} a '
+                f'{fim.strftime("%d/%m/%Y")}. Gere ou importe esse período na página '
+                f'**{tipo_label.get(tipo, tipo)}** (seção "Histórico" → "Importar dados históricos").')
+        return
+ 
+    registro = ds.load_current(MOD_RELATORIO_DIARIO, tipo, ref_sel)
+    valores = registro.get('valores', {}) or {}
+    gerado  = (registro.get('atualizado_em') or '')[:16].replace('T', ' ')
+    st.caption(f'Período: {valores.get("periodo","-")}  |  Salvo em: {gerado}')
+ 
+    html_path = os.path.join(_dir_tipo(tipo), f'{ref_sel}.html')
     if not os.path.exists(html_path):
         st.warning('Este dashboard não pôde ser regenerado automaticamente '
-                    '(dado antigo, salvo antes da persistência com histórico de itens). '
-                    'Gere novamente na página de origem.')
+                    '(dado antigo, salvo antes da persistência com histórico de itens, ou período '
+                    'importado sem PDF). Gere novamente (ou reenvie o PDF) na página de origem.')
         return
     with open(html_path, 'r', encoding='utf-8') as f:
         html_text = f.read()
-
+ 
     components.html(html_text, height=1400, scrolling=True)
     st.download_button(
-        f'⬇️ Baixar {_label_slug(slug_h, tipo) if tipo != "diario" else slug_h}',
+        f'⬇️ Baixar {_label_slug(ref_sel, tipo) if tipo != "diario" else ref_sel}',
         data=html_text.encode('utf-8'),
-        file_name=f'dashboard_{tipo}_{slug_h}_OTHIL.html',
+        file_name=f'dashboard_{tipo}_{ref_sel}_OTHIL.html',
         mime='text/html',
         key=f'ger_dl_{tipo}',
     )
-
-
+ 
+ 
 def _listar_ontrack_hist(directory):
     """Lista snapshots de histórico de On Track de um diretório, mais recente primeiro."""
     if not os.path.isdir(directory):
@@ -231,16 +301,16 @@ def _listar_ontrack_hist(directory):
         except Exception:
             pass
     return items
-
-
+ 
+ 
 # ── Quebra helpers ────────────────────────────────────────────────────────────
-
+ 
 def _qbr_dir(tipo: str) -> str:
     d = os.path.join(_QUEBRA_DIR, tipo)
     os.makedirs(d, exist_ok=True)
     return d
-
-
+ 
+ 
 def _qbr_label(slug: str, tipo: str) -> str:
     try:
         if tipo == 'semanal':
@@ -252,8 +322,8 @@ def _qbr_label(slug: str, tipo: str) -> str:
     except Exception:
         pass
     return slug
-
-
+ 
+ 
 def _qbr_listar(tipo: str) -> list:
     """Histórico de Quebras — lê da persistência real (data_store) primeiro;
     arquivos locais entram como complemento/fallback."""
@@ -279,11 +349,11 @@ def _qbr_listar(tipo: str) -> list:
         except Exception:
             pass
     return sorted(items.items(), key=lambda kv: kv[0], reverse=True)
-
-
+ 
+ 
 def _render_quebra_comparativo():
     st.header('🔀 Comparativo de Quebras')
-
+ 
     tipo = st.radio(
         'Tipo de período:',
         ['semanal', 'mensal'],
@@ -291,57 +361,57 @@ def _render_quebra_comparativo():
         horizontal=True,
         key='ger_comp_tipo',
     )
-
+ 
     historico = _qbr_listar(tipo)
     if len(historico) < 2:
         st.info('Necessário ter pelo menos 2 períodos salvos para comparar.')
         return
-
+ 
     slugs  = [s for s, _ in historico]
     labels = [f"{_qbr_label(s, tipo)}  —  {m.get('periodo', '-')}" for s, m in historico]
-
+ 
     col_a, col_b = st.columns(2)
     with col_a:
         escolha_a = st.selectbox('Período A (base):', labels, index=0, key='ger_comp_sel_a')
     with col_b:
         default_b = 1 if len(labels) > 1 else 0
         escolha_b = st.selectbox('Período B (comparar):', labels, index=default_b, key='ger_comp_sel_b')
-
+ 
     if escolha_a == escolha_b:
         st.warning('Selecione períodos diferentes para comparar.')
         return
-
+ 
     dados_a = historico[labels.index(escolha_a)][1]
     dados_b = historico[labels.index(escolha_b)][1]
     label_a = _qbr_label(slugs[labels.index(escolha_a)], tipo)
     label_b = _qbr_label(slugs[labels.index(escolha_b)], tipo)
-
+ 
     st.divider()
-
+ 
     total_a = dados_a.get('total_cx', 0)
     total_b = dados_b.get('total_cx', 0)
     delta   = total_b - total_a
     delta_pct = (delta / total_a * 100) if total_a else 0
-
+ 
     c1, c2, c3 = st.columns(3)
     c1.metric(f'Total CX — {label_a}', f"{total_a:,.0f} cx")
     c2.metric(f'Total CX — {label_b}', f"{total_b:,.0f} cx")
     c3.metric('Variação (B − A)', f"{delta:+,.0f} cx",
               delta=f"{delta_pct:+.1f}%", delta_color='inverse')
-
+ 
     st.divider()
     st.subheader('Por Categoria de Produto')
-
+ 
     cat_a = {c['categoria']: c['cx'] for c in dados_a.get('categorias', [])}
     cat_b = {c['categoria']: c['cx'] for c in dados_b.get('categorias', [])}
     todas_cats = sorted(set(cat_a) | set(cat_b))
-
+ 
     df_comp = pd.DataFrame({
         label_a: [cat_a.get(c, 0) for c in todas_cats],
         label_b: [cat_b.get(c, 0) for c in todas_cats],
     }, index=todas_cats)
     st.bar_chart(df_comp, color=['#2D6A4F', '#74C69D'])
-
+ 
     df_cat_tbl = df_comp.copy()
     df_cat_tbl['Δ (B − A)'] = df_cat_tbl[label_b] - df_cat_tbl[label_a]
     df_cat_tbl['Δ %'] = df_cat_tbl.apply(
@@ -351,10 +421,10 @@ def _render_quebra_comparativo():
     df_cat_tbl[label_b]     = df_cat_tbl[label_b].map(lambda x: f"{x:,.0f}")
     df_cat_tbl['Δ (B − A)'] = df_cat_tbl['Δ (B − A)'].map(lambda x: f"{x:+,.0f}")
     st.dataframe(df_cat_tbl, use_container_width=True, hide_index=True)
-
+ 
     st.divider()
     st.subheader('Por Grupo de Produto')
-
+ 
     grp_a = {g['grupo']: g for g in dados_a.get('grupos', [])}
     grp_b = {g['grupo']: g for g in dados_b.get('grupos', [])}
     rows = []
@@ -368,7 +438,7 @@ def _render_quebra_comparativo():
             label_b:     cx_b,
             'Δ (B − A)': cx_b - cx_a,
         })
-
+ 
     if not rows:
         st.info('Nenhum grupo de produto registrado nesses dois períodos.')
     else:
@@ -377,22 +447,22 @@ def _render_quebra_comparativo():
         df_grp[label_b]     = df_grp[label_b].map(lambda x: f"{x:,.0f}")
         df_grp['Δ (B − A)'] = df_grp['Δ (B − A)'].map(lambda x: f"{x:+,.0f}")
         st.dataframe(df_grp, use_container_width=True, hide_index=True)
-
-
+ 
+ 
 def _render_quebra_secao(tipo: str, titulo: str, emoji: str):
     st.header(f'{emoji} {titulo}')
     historico = _qbr_listar(tipo)
     if not historico:
         st.info(f'Nenhum relatório de quebra disponível. Envie um PDF na página **Quebras** primeiro.')
         return
-
+ 
     slugs  = [s for s, _ in historico]
     labels = [f"{_qbr_label(s, tipo)}  —  {m.get('periodo', '-')}" for s, m in historico]
-
+ 
     idx_key = f'_ger_qbr_idx_{tipo}'
     if idx_key not in st.session_state:
         st.session_state[idx_key] = 0
-
+ 
     col_prev, col_sel, col_next = st.columns([1, 6, 1])
     with col_prev:
         st.write('')
@@ -410,23 +480,23 @@ def _render_quebra_secao(tipo: str, titulo: str, emoji: str):
             key=f'ger_qbr_sel_{tipo}',
         )
         st.session_state[idx_key] = labels.index(escolha)
-
+ 
     idx = st.session_state[idx_key]
     slug_sel = slugs[idx]
     dados = historico[idx][1]
-
+ 
     st.caption(f'Período: {dados.get("periodo", "-")}  |  Emissão: {dados.get("emissao", "-")}')
-
+ 
     total = dados.get('total_cx', 0)
     categorias = dados.get('categorias', [])
     grupos = dados.get('grupos', [])
-
+ 
     col1, col2 = st.columns(2)
     col1.metric('Total CX Quebradas', f"{total:,.0f} cx")
     if categorias:
         top = categorias[0]
         col2.metric(f'Maior: {top["categoria"]}', f"{top['cx']:,.0f} cx")
-
+ 
     # ── Comparativo automático vs período anterior salvo (menor é melhor)
     if idx + 1 < len(historico):
         dados_ant = historico[idx + 1][1]
@@ -438,19 +508,19 @@ def _render_quebra_secao(tipo: str, titulo: str, emoji: str):
             delta=comparativo.formatar_variacao(comp_auto, casas=1),
             delta_color='inverse',
         )
-
+ 
     if categorias:
         df_cat = pd.DataFrame(categorias).set_index('categoria')
         st.bar_chart(df_cat['cx'], color='#2D6A4F')
-
+ 
     if grupos:
         df_g = pd.DataFrame(grupos)[['grupo', 'categoria', 'cx']]
         df_g.columns = ['Grupo', 'Categoria', 'CX Quebradas']
         st.dataframe(df_g, use_container_width=True, hide_index=True)
-
-
+ 
+ 
 # ── Recorrência helpers ────────────────────────────────────────────────────────
-
+ 
 def _listar_recorrencias_ger():
     """Histórico de publicações de Recorrência — lê da persistência real
     (data_store) primeiro; arquivo local único antigo ('latest') entra como
@@ -474,21 +544,21 @@ def _listar_recorrencias_ger():
                 pass
     itens.sort(key=lambda t: t[2], reverse=True)
     return itens
-
-
+ 
+ 
 # ── Fechamentos Semanais ──────────────────────────────────────────────────────
-
+ 
 _FECHAMENTOS_DIR = os.path.join(_GERENCIA_DIR, 'fechamentos')
-
-
+ 
+ 
 _GER_STATUS_COR = {
     on_track.STATUS_VERDE:    '#2D6A4F',
     on_track.STATUS_ATENCAO:  '#B8860B',
     on_track.STATUS_FORA:     '#C00000',
     on_track.STATUS_SEM_META: '#6c757d',
 }
-
-
+ 
+ 
 def _on_track_status_ger(atingido: float, dia: int):
     """(emoji, label, hex_color) — via lógica central de On Track
     (on_track.py), tempo decorrido em dias úteis (1..5), mesma convenção
@@ -499,8 +569,8 @@ def _on_track_status_ger(atingido: float, dia: int):
         periodo_ref='(dias uteis)', pct_tempo_decorrido=pct_tempo,
     )
     return r['emoji'], r['label'], _GER_STATUS_COR[r['status']]
-
-
+ 
+ 
 def _listar_ontrack_metas_hist():
     """Histórico de publicações de On Track de Metas Semanais — lê da
     persistência real (data_store) primeiro; arquivos locais (dir/arquivo
@@ -517,8 +587,8 @@ def _listar_ontrack_metas_hist():
         if slug not in items:
             items[slug] = data
     return sorted(items.items(), key=lambda kv: kv[0], reverse=True)
-
-
+ 
+ 
 def _listar_ontrack_clientes_hist():
     """Histórico de publicações de On Track Vendedor×Cliente — lê da
     persistência real (data_store) primeiro; arquivos locais (dir antigo)
@@ -537,13 +607,13 @@ def _listar_ontrack_clientes_hist():
         if slug not in items:
             items[slug] = data
     return sorted(items.items(), key=lambda kv: kv[0], reverse=True)
-
-
+ 
+ 
 def _render_ontrack_publicado():
     st.header('📊 On Track Atual')
-
+ 
     historico_ot = _listar_ontrack_metas_hist()
-
+ 
     if not historico_ot:
         # backward compat: tentar arquivo único (publicações salvas antes
         # de existir o histórico versionado)
@@ -565,36 +635,36 @@ def _render_ontrack_publicado():
         )
         idx_ot = labels_ot.index(escolha_ot)
         snap = historico_ot[idx_ot][1]
-
+ 
     pub_em     = snap.get('publicado_em', '')[:16].replace('T', ' ')
     periodo    = snap.get('periodo', '—')
     resultados = snap.get('resultados', [])
     totais_rs  = snap.get('totais_rs', {})
-
+ 
     st.caption(f"Período: **{periodo}**  |  Publicado em: **{pub_em}**")
-
+ 
     dia = st.slider(
         'Dia da semana (para status On Track)', 1, 5,
         value=min(datetime.date.today().weekday() + 1, 5),
         format='Dia %d de 5', key='ger_ot_dia',
     )
-
+ 
     st.divider()
-
+ 
     # KPIs gerais
     total_meta = sum(l['meta']    for r in resultados for l in r.get('linhas', []))
     total_vend = sum(l['vendido'] for r in resultados for l in r.get('linhas', []))
     total_atg  = total_vend / total_meta if total_meta else 0
     proj_cx    = math.ceil(total_vend / dia * 5) if dia > 0 else total_vend
     em, lb, _  = _on_track_status_ger(total_atg, dia)
-
+ 
     k1, k2, k3, k4, k5 = st.columns(5)
     k1.metric('Meta (cx)',     f'{total_meta:,.0f}')
     k2.metric('Vendido (cx)',  f'{total_vend:,.0f}')
     k3.metric('% Atingido',    f'{total_atg*100:.1f}%')
     k4.metric('Projeção (cx)', f'{proj_cx:,.0f}')
     k5.metric('Status',        f'{em} {lb}')
-
+ 
     tg = totais_rs.get('total_geral', {})
     if tg:
         st.subheader('Faturamento Geral (R$)')
@@ -602,7 +672,7 @@ def _render_ontrack_publicado():
         r1.metric('Faturamento', f"R$ {tg.get('fat', 0):,.2f}")
         r2.metric('MC R$',       f"R$ {tg.get('mc_rs', 0):,.2f}")
         r3.metric('MC %',        f"{tg.get('mc_pct', 0):.2f}%")
-
+ 
     # ── Comparativo vs semana anterior salva ────────────────────────────────
     if historico_ot and idx_ot + 1 < len(historico_ot):
         snap_ant_ot = historico_ot[idx_ot + 1][1]
@@ -620,9 +690,9 @@ def _render_ontrack_publicado():
             cc2.metric('Faturamento', f"R$ {tg.get('fat', 0):,.2f}", delta=comparativo.formatar_variacao(comp_fat))
             cc3.metric('MC R$', f"R$ {tg.get('mc_rs', 0):,.2f}", delta=comparativo.formatar_variacao(comp_mc))
         st.caption(f'Base de comparação: {_label_fech(historico_ot[idx_ot + 1][0])}')
-
+ 
     st.divider()
-
+ 
     # Por produto
     st.subheader('Por Produto')
     for r in resultados:
@@ -649,9 +719,9 @@ def _render_ontrack_publicado():
                     'Status':      f'{v_em} {v_lb}',
                 })
             st.dataframe(pd.DataFrame(vrows), use_container_width=True, hide_index=True)
-
+ 
     st.divider()
-
+ 
     # Por vendedor
     st.subheader('Por Vendedor')
     vend_agg = {}
@@ -662,7 +732,7 @@ def _render_ontrack_publicado():
                 vend_agg[v] = {'meta': 0.0, 'vendido': 0.0}
             vend_agg[v]['meta']    += l.get('meta', 0)
             vend_agg[v]['vendido'] += l.get('vendido', 0)
-
+ 
     vend_rs = totais_rs.get('vendedores', {})
     vrows_all = []
     for v, ag in sorted(vend_agg.items()):
@@ -679,8 +749,8 @@ def _render_ontrack_publicado():
             'MC R$':       f"R$ {rs['mc_rs']:,.2f}" if rs.get('mc_rs') is not None else '—',
         })
     st.dataframe(pd.DataFrame(vrows_all), use_container_width=True, hide_index=True)
-
-
+ 
+ 
 def _listar_fechamentos():
     """Lista os fechamentos salvos, mais recente primeiro. Lê da
     persistência real (data_store — sobrevive a restart do app); arquivos
@@ -701,7 +771,7 @@ def _listar_fechamentos():
                 }
     except Exception:
         pass
-
+ 
     os.makedirs(_FECHAMENTOS_DIR, exist_ok=True)
     for fname in os.listdir(_FECHAMENTOS_DIR):
         if not fname.endswith('.json'):
@@ -714,35 +784,35 @@ def _listar_fechamentos():
                 items[slug] = json.load(f)
         except Exception:
             pass
-
+ 
     return sorted(items.items(), key=lambda kv: kv[0], reverse=True)
-
-
+ 
+ 
 def _label_fech(slug: str) -> str:
     try:
         return periodo_mod.rotulo('semanal', slug)
     except Exception:
         return slug
-
-
+ 
+ 
 def _render_fechamentos_semanais():
     st.header('🏁 Fechamentos Semanais')
     historico = _listar_fechamentos()
-
+ 
     if not historico:
         st.info(
             'Nenhum fechamento salvo ainda. Na página **Metas Semanais**, '
             'calcule as metas e clique em **"Fechar Semana"** na aba Fechamento Semanal.'
         )
         return
-
+ 
     slugs  = [s for s, _ in historico]
     labels = [f"{_label_fech(s)}  —  {d.get('periodo', '-')}" for s, d in historico]
-
+ 
     idx_key = '_ger_fech_idx'
     if idx_key not in st.session_state:
         st.session_state[idx_key] = 0
-
+ 
     col_prev, col_sel, col_next = st.columns([1, 6, 1])
     with col_prev:
         st.write('')
@@ -760,43 +830,43 @@ def _render_fechamentos_semanais():
             key='ger_fech_sel',
         )
         st.session_state[idx_key] = labels.index(escolha)
-
+ 
     idx   = st.session_state[idx_key]
     dados = historico[idx][1]
-
+ 
     gerado = dados.get('gerado_em', '')[:16].replace('T', ' ')
     st.caption(f"Período: {dados.get('periodo', '-')}  |  Salvo em: {gerado}")
-
+ 
     prods     = dados.get('produtos', [])
     h_meta    = sum(l['meta']    for r in prods for l in r.get('linhas', []))
     h_vend    = sum(l['vendido'] for r in prods for l in r.get('linhas', []))
     h_atg     = h_vend / h_meta if h_meta else 0
-
+ 
     c1, c2, c3 = st.columns(3)
     c1.metric('Meta total (cx)', f'{h_meta:,.0f}')
     c2.metric('Vendido (cx)',    f'{h_vend:,.0f}')
     c3.metric('% Atingido',     f'{h_atg*100:.1f}%')
-
+ 
     tg = dados.get('totais_rs', {}).get('total_geral', {})
     if tg:
         r1, r2, r3 = st.columns(3)
         r1.metric('Faturamento', f"R$ {tg.get('fat', 0):,.2f}")
         r2.metric('MC R$',       f"R$ {tg.get('mc_rs', 0):,.2f}")
         r3.metric('MC %',        f"{tg.get('mc_pct', 0):.2f}%")
-
+ 
     st.divider()
-
+ 
     # Matriz Produto × Vendedor agrupada por prioridade -- igual ao Resumo
     # Geral (mesma implementação usada na prévia de Metas Semanais, ver
     # resumo_matriz.py, pra nunca ficar diferente daqui pra lá)
     resumo_matriz.render_matriz_produto_vendedor(prods)
-
+ 
     # Comparativo entre semanas (se houver mais de 1)
     if len(historico) >= 2:
         st.divider()
         st.subheader('Comparativo de Semanas')
         st.caption('Variação (Δ%) sempre em relação à semana anterior na lista (mais antiga primeiro).')
-
+ 
         historico_asc = sorted(historico, key=lambda kv: kv[0])  # mais antiga primeiro p/ calcular Δ
         comp_rows = []
         vend_anterior = None
@@ -808,10 +878,10 @@ def _render_fechamentos_semanais():
             da    = dv / dm if dm else 0
             dtg   = d.get('totais_rs', {}).get('total_geral', {})
             fat   = dtg.get('fat') if dtg else None
-
+ 
             comp_v = comparativo.calcular(dv, vend_anterior)
             comp_f = comparativo.calcular(fat, fat_anterior) if fat is not None else None
-
+ 
             comp_rows.append({
                 'Semana':        _label_fech(s),
                 'Período':       d.get('periodo', '-'),
@@ -825,16 +895,16 @@ def _render_fechamentos_semanais():
             })
             vend_anterior = dv
             fat_anterior = fat
-
+ 
         st.dataframe(pd.DataFrame(list(reversed(comp_rows))), use_container_width=True, hide_index=True)
-
-
+ 
+ 
 def _render_ontrack_clientes():
     st.header('👥 On Track Vendedor × Cliente')
-
+ 
     historico_cli = _listar_ontrack_clientes_hist()
     idx_cli = None
-
+ 
     if not historico_cli:
         # backward compat: tentar arquivo único
         if not os.path.exists(_ONTRACK_CLI_FILE):
@@ -855,7 +925,7 @@ def _render_ontrack_clientes():
         )
         idx_cli = labels_cli.index(escolha_cli)
         snap = historico_cli[idx_cli][1]
-
+ 
     pub_em         = snap.get('publicado_em', '')[:16].replace('T', ' ')
     periodo        = snap.get('periodo', '—')
     days_elapsed   = snap.get('days_elapsed', 1)
@@ -864,36 +934,36 @@ def _render_ontrack_clientes():
     elapsed_pct    = snap.get('elapsed_pct', 0)
     totais         = snap.get('totais', {})
     rows           = snap.get('rows', [])
-
+ 
     st.caption(f"Período: **{periodo}**  |  Publicado em: **{pub_em}**  |  Dia {days_elapsed} de {days_in_month}")
-
+ 
     if not rows:
         st.info('Nenhum dado disponível no snapshot publicado.')
         return
-
+ 
     def _brl(v):
         s = f"{abs(v):,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
         return f"R$ {'-' if v < 0 else ''}{s}"
-
+ 
     _COR = {'🟢': '#2D6A4F', '🟡': '#B8860B', '🔴': '#C00000', '—': '#888'}
-
+ 
     tot_fat  = totais.get('fat', 0)
     tot_meta = totais.get('meta', 0)
     tot_pct  = totais.get('pct', 0)
     tot_rest = totais.get('rest', 0)
     tot_proj = totais.get('proj', 0)
     tot_dif  = totais.get('dif', 0)
-
+ 
     def _ot_status_cli(pct, elp):
         ratio = pct / elp if elp > 0 else 1.0
         if ratio >= 0.85:   return '🟢', 'No Ritmo',    ratio
         elif ratio >= 0.55: return '🟡', 'Atenção',      ratio
         else:               return '🔴', 'Fora do Ritmo', ratio
-
+ 
     g_em, g_lb, _ = _ot_status_cli(tot_pct, elapsed_pct)
     cor_s  = _COR.get(g_em, '#888')
     cor_d  = '#2D6A4F' if tot_dif >= 0 else '#C00000'
-
+ 
     # Cards de resumo
     st.markdown(f"""
     <div style="display:grid; grid-template-columns:repeat(6,1fr); gap:10px; margin-bottom:14px;">
@@ -923,7 +993,7 @@ def _render_ontrack_clientes():
       </div>
     </div>
     """, unsafe_allow_html=True)
-
+ 
     # Barra de progresso
     prog_w = min(tot_pct, 1.0) * 100
     exp_w  = elapsed_pct * 100
@@ -939,7 +1009,7 @@ def _render_ontrack_clientes():
       <div style="font-size:10px; color:#999; margin-top:2px;">▲ Ritmo esperado: {exp_w:.0f}%  |  {days_remaining} dias restantes</div>
     </div>
     """, unsafe_allow_html=True)
-
+ 
     # ── Comparativo vs mês anterior salvo ────────────────────────────────
     if idx_cli is not None and idx_cli + 1 < len(historico_cli):
         snap_ant_cli = historico_cli[idx_cli + 1][1]
@@ -953,9 +1023,9 @@ def _render_ontrack_clientes():
             comp_pct_cli = comparativo.calcular(tot_pct, pct_ant_cli)
             pc2.metric('% Atingido', f'{tot_pct*100:.1f}%', delta=comparativo.formatar_variacao(comp_pct_cli))
         st.caption(f'Base de comparação: {_label_slug(historico_cli[idx_cli + 1][0], "mensal")}')
-
+ 
     st.divider()
-
+ 
     # Ranking de vendedores
     st.subheader('🏆 Ranking de Vendedores')
     vend_agg: dict = {}
@@ -966,7 +1036,7 @@ def _render_ontrack_clientes():
         vend_agg[v]['fat']   += r.get('fat', 0)
         vend_agg[v]['meta']  += r.get('meta', 0)
         vend_agg[v]['mc_rs'] += r.get('mc_rs', 0)
-
+ 
     rank_rows = []
     for v, d in vend_agg.items():
         pct = d['fat'] / d['meta'] if d['meta'] > 0 else 0.0
@@ -976,7 +1046,7 @@ def _render_ontrack_clientes():
         rank_rows.append({'v': v, 'fat': d['fat'], 'meta': d['meta'],
                           'pct': pct, 'em': em, 'lb': lb, 'tend': tend, 'tend_cor': tend_cor})
     rank_rows.sort(key=lambda x: x['pct'], reverse=True)
-
+ 
     medals = ['🥇', '🥈', '🥉']
     cards = '<div style="display:grid; grid-template-columns:repeat(auto-fill,minmax(260px,1fr)); gap:12px; margin-bottom:16px;">'
     for i, rv in enumerate(rank_rows):
@@ -1005,9 +1075,9 @@ def _render_ontrack_clientes():
         </div>"""
     cards += '</div>'
     st.markdown(cards, unsafe_allow_html=True)
-
+ 
     st.divider()
-
+ 
     # Tabela detalhada
     st.subheader(f'Detalhamento — {len(rows)} cliente(s)')
     df_rows = []
@@ -1026,14 +1096,14 @@ def _render_ontrack_clientes():
             'Status':      f"{r['em']} {r['lb']}",
         })
     st.dataframe(pd.DataFrame(df_rows), use_container_width=True, hide_index=True)
-
-
+ 
+ 
 def _brl_vc(v):
     v = v or 0.0
     s = f"{abs(v):,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
     return f"R$ {'-' if v < 0 else ''}{s}"
-
-
+ 
+ 
 def _get_meta_fat_vc(historico_data: dict, vend: str, cli_key: str):
     """Busca meta de faturamento do cliente no histórico salvo -- mesma
     lógica de pages/3_Vendedor_Cliente_OTHIL.py (não duplica o cálculo,
@@ -1052,8 +1122,8 @@ def _get_meta_fat_vc(historico_data: dict, vend: str, cli_key: str):
         if _normalize(k) == cli_norm:
             return v.get('fat') if v else None
     return None
-
-
+ 
+ 
 def _meses_vc_disponiveis():
     """Meses com relatório Vendedor-Cliente salvo (gerado na página
     Vendedor-Cliente, aba 'Relatório Semanal' -- o registro fica salvo
@@ -1063,8 +1133,8 @@ def _meses_vc_disponiveis():
         return sorted(ds.list_periodos(MOD_VENDEDOR_CLIENTE, 'mensal'), reverse=True)
     except Exception:
         return []
-
-
+ 
+ 
 def _render_top50_clientes_ger():
     st.header('🏆 Top 50 Clientes')
     st.caption('Lê o mesmo relatório salvo automaticamente quando você gera o Excel Vendedor-Cliente '
@@ -1074,13 +1144,13 @@ def _render_top50_clientes_ger():
                       label='Abrir módulo completo →', icon='📋')
     except Exception:
         pass
-
+ 
     meses_vc = _meses_vc_disponiveis()
     if not meses_vc:
         st.info('Nenhum relatório Vendedor-Cliente salvo ainda. Gere o Excel na página '
                 '**Vendedor-Cliente** primeiro.')
         return
-
+ 
     ref_50 = st.selectbox('Mês', meses_vc, format_func=lambda r: periodo_mod.rotulo('mensal', r),
                            key='ger_vc_top50_mes')
     registro_50 = ds.load_current(MOD_VENDEDOR_CLIENTE, 'mensal', ref_50)
@@ -1092,17 +1162,17 @@ def _render_top50_clientes_ger():
     if not clientes_data_50:
         st.info('Registro salvo, mas sem dados de clientes.')
         return
-
+ 
     ordenar_por = st.selectbox(
         'Ordenar por',
         ['Faturamento', 'Volume', 'Margem (MC R$)', 'Rentabilidade (MC %)', 'Atingimento da meta'],
         key='ger_vc_top50_sort',
     )
-
+ 
     ref_ant_50 = periodo_mod.periodo_anterior('mensal', ref_50)
     reg_ant_50 = ds.load_current(MOD_VENDEDOR_CLIENTE, 'mensal', ref_ant_50)
     clientes_ant_50 = reg_ant_50['valores'].get('clientes_data', {}) if reg_ant_50 else {}
-
+ 
     linhas_50 = []
     for vendedor, clientes in clientes_data_50.items():
         for cliente, dados in clientes.items():
@@ -1111,7 +1181,7 @@ def _render_top50_clientes_ger():
             mc_rs = dados.get('mc_rs', 0)
             mc_pct = dados.get('mc_pct', 0)
             meta = _get_meta_fat_vc(historico_data_50, vendedor, cliente) or 0
-
+ 
             fat_ant = None
             cli_ant = (clientes_ant_50.get(vendedor) or {})
             if cliente in cli_ant:
@@ -1123,7 +1193,7 @@ def _render_top50_clientes_ger():
                         fat_ant = v.get('fat')
                         break
             comp = comparativo.calcular(fat, fat_ant)
-
+ 
             if meta:
                 pct_atg = fat / meta
                 r_ot = on_track.calcular(meta, fat, 'mensal', ref_50)
@@ -1131,7 +1201,7 @@ def _render_top50_clientes_ger():
             else:
                 pct_atg = None
                 status_txt = '—'
-
+ 
             linhas_50.append({
                 'Vendedor': vendedor, 'Cliente': cliente,
                 '_fat': fat, '_vol': vol, '_mc_rs': mc_rs, '_mc_pct': mc_pct,
@@ -1142,11 +1212,11 @@ def _render_top50_clientes_ger():
                 '% Atingido': f'{pct_atg*100:.1f}%' if pct_atg is not None else '—',
                 'On Track': status_txt,
             })
-
+ 
     if not linhas_50:
         st.info('Nenhum cliente neste mês.')
         return
-
+ 
     sort_key_map = {
         'Faturamento': '_fat', 'Volume': '_vol', 'Margem (MC R$)': '_mc_rs',
         'Rentabilidade (MC %)': '_mc_pct', 'Atingimento da meta': '_pct_atg',
@@ -1155,34 +1225,34 @@ def _render_top50_clientes_ger():
     top50 = linhas_50[:50]
     for i, r in enumerate(top50, start=1):
         r['Ranking'] = i
-
+ 
     st.caption(f'{len(linhas_50)} cliente(s) no total — mostrando os {len(top50)} principais '
                f'por {ordenar_por.lower()}.')
-
+ 
     df_top50 = pd.DataFrame(top50)[[
         'Ranking', 'Vendedor', 'Cliente', 'Faturamento', 'Volume (cx)',
         'Margem (MC R$)', 'Rentabilidade', 'Comparativo', '% Atingido', 'On Track',
     ]]
     st.dataframe(df_top50, use_container_width=True, hide_index=True)
-
+ 
     csv_top50 = df_top50.to_csv(index=False, sep=';').encode('utf-8-sig')
     st.download_button(
         '⬇️ Exportar Top 50 (CSV)', data=csv_top50,
         file_name=f'top50_clientes_ger_{ref_50}.csv', mime='text/csv', key='ger_vc_top50_csv',
     )
-
-
+ 
+ 
 def _render_clientes_por_vendedor_ger():
     st.header('👤 Clientes por Vendedor')
     st.caption('Lê o mesmo relatório salvo automaticamente quando você gera o Excel Vendedor-Cliente '
                '(aba "📋 Relatório Semanal") -- não precisa de nenhuma publicação extra.')
-
+ 
     meses_vc = _meses_vc_disponiveis()
     if not meses_vc:
         st.info('Nenhum relatório Vendedor-Cliente salvo ainda. Gere o Excel na página '
                 '**Vendedor-Cliente** primeiro.')
         return
-
+ 
     ref_pv = st.selectbox('Mês', meses_vc, format_func=lambda r: periodo_mod.rotulo('mensal', r),
                            key='ger_vc_pv_mes')
     registro_pv = ds.load_current(MOD_VENDEDOR_CLIENTE, 'mensal', ref_pv)
@@ -1194,18 +1264,18 @@ def _render_clientes_por_vendedor_ger():
     if not clientes_data_pv:
         st.info('Registro salvo, mas sem dados de clientes.')
         return
-
+ 
     vendedor_sel_pv = st.selectbox('Selecionar vendedor', sorted(clientes_data_pv.keys()),
                                     key='ger_vc_pv_vendedor')
-
+ 
     ref_ant_pv = periodo_mod.periodo_anterior('mensal', ref_pv)
     reg_ant_pv = ds.load_current(MOD_VENDEDOR_CLIENTE, 'mensal', ref_ant_pv)
     clientes_ant_pv_vend = ((reg_ant_pv['valores'].get('clientes_data', {}) if reg_ant_pv else {})
                              .get(vendedor_sel_pv, {}))
-
+ 
     clientes_vendedor = clientes_data_pv.get(vendedor_sel_pv, {})
     fat_total_vendedor = sum(d.get('fat', 0) for d in clientes_vendedor.values()) or 1e-9
-
+ 
     linhas_pv = []
     for cliente, dados in clientes_vendedor.items():
         fat = dados.get('fat', 0)
@@ -1214,7 +1284,7 @@ def _render_clientes_por_vendedor_ger():
         mc_pct = dados.get('mc_pct', 0)
         meta = _get_meta_fat_vc(historico_data_pv, vendedor_sel_pv, cliente) or 0
         participacao = fat / fat_total_vendedor
-
+ 
         fat_ant = None
         if cliente in clientes_ant_pv_vend:
             fat_ant = clientes_ant_pv_vend[cliente].get('fat')
@@ -1225,13 +1295,13 @@ def _render_clientes_por_vendedor_ger():
                     fat_ant = v.get('fat')
                     break
         comp = comparativo.calcular(fat, fat_ant)
-
+ 
         if meta:
             r_ot = on_track.calcular(meta, fat, 'mensal', ref_pv)
             status_txt = f"{r_ot['emoji']} {r_ot['label']}"
         else:
             status_txt = '—'
-
+ 
         linhas_pv.append({
             '_fat': fat,
             'Cliente': cliente, 'Faturamento': _brl_vc(fat), 'Volume (cx)': f'{vol:,.0f}',
@@ -1240,43 +1310,43 @@ def _render_clientes_por_vendedor_ger():
             'Participação no vendedor': f'{participacao*100:.1f}%',
             'On Track': status_txt,
         })
-
+ 
     if not linhas_pv:
         st.info(f'Nenhum cliente de {vendedor_sel_pv} neste mês.')
         return
-
+ 
     linhas_pv.sort(key=lambda r: r['_fat'], reverse=True)
-
+ 
     st.caption(f'{len(linhas_pv)} cliente(s) de **{vendedor_sel_pv}** em '
                f'{periodo_mod.rotulo("mensal", ref_pv)} — faturamento total: {_brl_vc(fat_total_vendedor)}')
-
+ 
     df_pv = pd.DataFrame(linhas_pv)[[
         'Cliente', 'Faturamento', 'Volume (cx)', 'Margem (MC R$)', 'Rentabilidade',
         'Comparativo', 'Participação no vendedor', 'On Track',
     ]]
     st.dataframe(df_pv, use_container_width=True, hide_index=True)
-
+ 
     csv_pv = df_pv.to_csv(index=False, sep=';').encode('utf-8-sig')
     st.download_button(
         f'⬇️ Exportar clientes de {vendedor_sel_pv} (CSV)', data=csv_pv,
         file_name=f'clientes_{vendedor_sel_pv}_ger_{ref_pv}.csv', mime='text/csv', key='ger_vc_pv_csv',
     )
-
-
+ 
+ 
 # ── Prevenção de Perdas ───────────────────────────────────────────────────────
-
+ 
 _NIVEL_COR = {
     '🔴 Crítico':         '#FFDADA',
     '🟠 Alta Prioridade': '#FFE8CC',
     '🟡 Atenção':         '#FFF9CC',
     '🟢 Controlado':      '#D8F3DC',
 }
-
-
+ 
+ 
 def _render_cruzamento_quebra():
     st.header('🔗 Cruzamento com Quebra')
     st.caption('Produtos que aparecem TANTO no estoque parado QUANTO nos relatórios de quebra — duplo risco operacional.')
-
+ 
     # PP mais recente (qualquer tipo) — lê da persistência real (data_store),
     # com fallback local; sobrevive a restart/redeploy do Streamlit Cloud.
     hist_pp = _prevperdas_listar('sem_venda') + _prevperdas_listar('mes_estoque')
@@ -1285,11 +1355,11 @@ def _render_cruzamento_quebra():
         return
     hist_pp.sort(key=lambda kv: kv[0], reverse=True)
     _slug_pp, snap_pp = hist_pp[0]
-
+ 
     prods_pp = snap_pp.get('produtos', [])
     tipo_pp  = '1 Semana Sem Venda' if snap_pp.get('tipo') == 'sem_venda' else '1 Mês em Estoque'
     pub_pp   = snap_pp.get('publicado_em', '')[:10]
-
+ 
     # Quebra mais recente (semanal, ou mensal como fallback) — idem
     snap_qbr = None
     label_qbr = ''
@@ -1299,16 +1369,16 @@ def _render_cruzamento_quebra():
             _slug_q, snap_qbr = hist_q[0]
             label_qbr = f"Quebra {tipo_q} — {snap_qbr.get('periodo','-')}"
             break
-
+ 
     if not snap_qbr:
         st.info('Nenhum dado de Quebra disponível. Processe um PDF na página **Quebras** primeiro.')
         return
-
+ 
     st.caption(
         f"Prevenção de Perdas: **{tipo_pp}** (publicado {pub_pp})  ·  "
         f"Quebra: **{label_qbr}**"
     )
-
+ 
     # Grupos de quebra como palavras-chave
     grupos_qbr = snap_qbr.get('grupos', [])
     palavras_qbr = []
@@ -1317,11 +1387,11 @@ def _render_cruzamento_quebra():
         for token in nome.upper().split():
             if len(token) >= 3:
                 palavras_qbr.append((token, g.get('cx', 0), g.get('categoria', ''), nome))
-
+ 
     if not palavras_qbr:
         st.info('Os dados de Quebra não possuem grupos de produto para cruzar.')
         return
-
+ 
     # Cruzar por nome
     cruzados = []
     for p in prods_pp:
@@ -1339,13 +1409,13 @@ def _render_cruzamento_quebra():
                 'CX Quebradas':    melhor[1],
                 'Ação Recomendada': p['acao'],
             })
-
+ 
     if not cruzados:
         st.success('✅ Nenhum produto em comum entre o estoque parado e os relatórios de quebra.')
         return
-
+ 
     st.warning(f"⚠️ **{len(cruzados)} produto(s)** com duplo risco: parado em estoque E com quebra registrada.")
-
+ 
     df_cruz = pd.DataFrame(cruzados).sort_values('Valor Parado (R$)', ascending=False)
     st.dataframe(
         df_cruz,
@@ -1356,52 +1426,52 @@ def _render_cruzamento_quebra():
             'CX Quebradas':      st.column_config.NumberColumn(format='%.0f'),
         }
     )
-
-
+ 
+ 
 def _render_perdas_realizadas_ger():
     st.header('📊 Histórico de Perdas Realizadas')
-
+ 
     if not os.path.isdir(_PERDAS_DIR):
         st.info('Nenhuma perda registrada ainda. Use a aba **📋 Registrar Perda** na página Prevenção de Perdas.')
         return
-
+ 
     arqs = sorted([f for f in os.listdir(_PERDAS_DIR) if f.endswith('.json')], reverse=True)
     if not arqs:
         st.info('Nenhuma perda registrada ainda.')
         return
-
+ 
     _MESES_PT = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez']
-
+ 
     def _label_mes(slug):
         try:
             y, m = slug.split('-')
             return f"{_MESES_PT[int(m)-1]} / {y}"
         except Exception:
             return slug
-
+ 
     labels = [_label_mes(a.replace('.json','')) for a in arqs]
     escolha = st.selectbox(f'{len(arqs)} mês(es) com registros:', labels, index=0,
                             key='ger_perdas_sel')
     arq_sel = arqs[labels.index(escolha)]
-
+ 
     try:
         with open(os.path.join(_PERDAS_DIR, arq_sel), 'r', encoding='utf-8') as f:
             lista = json.load(f)
     except Exception:
         st.error('Erro ao carregar dados.')
         return
-
+ 
     if not lista:
         st.info('Nenhum registro neste mês.')
         return
-
+ 
     total_cx  = sum(r.get('quantidade_cx', 0) for r in lista)
     total_val = sum(r.get('valor_rs', 0) for r in lista)
     motivos   = {}
     for r in lista:
         m = r.get('motivo', 'Outro')
         motivos[m] = motivos.get(m, 0) + 1
-
+ 
     c1, c2, c3, c4 = st.columns(4)
     c1.metric("Registros",       len(lista))
     c2.metric("Total CX",        f"{total_cx:,.3f}".replace(',','X').replace('.',',').replace('X','.'))
@@ -1409,15 +1479,15 @@ def _render_perdas_realizadas_ger():
     c3.metric("Valor Perdido",   tv)
     top_motivo = max(motivos, key=motivos.get) if motivos else '—'
     c4.metric("Motivo Principal", top_motivo)
-
+ 
     st.divider()
-
+ 
     # Breakdown por motivo
     if len(motivos) > 1:
         df_mot = pd.DataFrame([{'Motivo': k, 'Qtd': v} for k,v in sorted(motivos.items(), key=lambda x:-x[1])])
         st.subheader('Por Motivo')
         st.bar_chart(df_mot.set_index('Motivo')['Qtd'], color='#2D6A4F')
-
+ 
     # Tabela completa
     st.subheader(f'Todos os registros — {len(lista)}')
     df_p = pd.DataFrame(lista)
@@ -1430,14 +1500,14 @@ def _render_perdas_realizadas_ger():
                      'CX':        st.column_config.NumberColumn(format='%.3f'),
                      'Valor (R$)':st.column_config.NumberColumn(format='R$ %.2f'),
                  })
-
+ 
     # Download CSV
     csv = df_p.to_csv(index=False, sep=';', decimal=',').encode('utf-8-sig')
     st.download_button('⬇️ Baixar CSV', data=csv,
                         file_name=f"perdas_{arq_sel.replace('.json','')}.csv",
                         mime='text/csv')
-
-
+ 
+ 
 def _prevperdas_listar(tipo):
     """Lista snapshots de prevenção de perdas de um tipo (sem_venda / mes_estoque)
     — lê da persistência real (data_store) primeiro; arquivos locais entram
@@ -1466,19 +1536,19 @@ def _prevperdas_listar(tipo):
             except Exception:
                 pass
     return sorted(items.items(), key=lambda kv: kv[0], reverse=True)
-
-
+ 
+ 
 def _render_prevperdas_secao(tipo, titulo):
     st.header(f'🚨 {titulo}')
     historico = _prevperdas_listar(tipo)
-
+ 
     if not historico:
         st.info(
             'Nenhum dado publicado ainda. Na página **Prevenção de Perdas**, '
             'processe um PDF e clique em **"📤 Publicar na Gerência"**.'
         )
         return
-
+ 
     # Selectbox de datas
     labels = []
     for slug, d in historico:
@@ -1490,22 +1560,22 @@ def _render_prevperdas_secao(tipo, titulo):
             label = data_str
         pub = d.get('publicado_em', '')[:16].replace('T', ' ')
         labels.append(f"{label}  —  Publicado: {pub}")
-
+ 
     escolha = st.selectbox(f'{len(historico)} publicação(ões):', labels, index=0,
                             key=f'ger_pp_sel_{tipo}')
     idx_pp = labels.index(escolha)
     snap = historico[idx_pp][1]
-
+ 
     resumo = snap.get('resumo', {})
     emissao = snap.get('emissao', '-')
     periodo = snap.get('periodo', '')
-
+ 
     st.caption(
         f"Emissão: **{emissao}**"
         + (f"  |  Período desde: **{periodo}**" if periodo else "")
         + f"  |  Publicado em: **{snap.get('publicado_em','')[:16].replace('T',' ')}**"
     )
-
+ 
     # Cards
     c1, c2, c3, c4, c5, c6 = st.columns(6)
     c1.metric("📦 Total",             resumo.get('total', 0))
@@ -1516,7 +1586,7 @@ def _render_prevperdas_secao(tipo, titulo):
     vr_fmt = f"R$ {vr:,.0f}".replace(',', 'X').replace('.', ',').replace('X', '.')
     c5.metric("💰 Valor em Risco",    vr_fmt)
     c6.metric("📅 Estoque ≥ 30 dias", resumo.get('estoque_30d', 0))
-
+ 
     # ── Comparativo vs publicação anterior (menor é melhor — menos risco) ──
     if idx_pp + 1 < len(historico):
         resumo_ant = historico[idx_pp + 1][1].get('resumo', {})
@@ -1529,15 +1599,15 @@ def _render_prevperdas_secao(tipo, titulo):
         pp2.metric('🔴 Críticos', resumo.get('criticos', 0), delta=comparativo.formatar_variacao(comp_crit_pp, casas=1))
         pp3.metric('💰 Valor em Risco', vr_fmt, delta=comparativo.formatar_variacao(comp_vr_pp, casas=1))
         st.caption('Base de comparação: publicação anterior')
-
+ 
     st.divider()
-
+ 
     # Tabela de produtos
     produtos = snap.get('produtos', [])
     if not produtos:
         st.info('Nenhum produto no snapshot.')
         return
-
+ 
     df_pp = pd.DataFrame(produtos)
     df_pp = df_pp.rename(columns={
         'prioridade':     'Prioridade',
@@ -1550,18 +1620,18 @@ def _render_prevperdas_secao(tipo, titulo):
         'valor_estoque':  'Valor em Estoque (R$)',
         'acao':           'Ação Recomendada',
     })
-
+ 
     _COR_PP = {
         '🔴 Crítico':        'background-color:#FFCCCC',
         '🟠 Alta Prioridade':'background-color:#FFE0B2',
         '🟡 Atenção':        'background-color:#FFFDE7',
         '🟢 Controlado':     'background-color:#E8F5E9',
     }
-
+ 
     def _colorir_linha(row):
         cor = _COR_PP.get(row.get('Prioridade', ''), '')
         return [cor] * len(row)
-
+ 
     styled = df_pp.style.apply(_colorir_linha, axis=1).format({
         'Saldo (cx)':           '{:.3f}',
         'Qtd Vendida':          '{:.3f}',
@@ -1569,23 +1639,23 @@ def _render_prevperdas_secao(tipo, titulo):
         'Dias em Estoque':      '{:.0f}',
         'Dias sem Venda':       '{:.0f}',
     }, na_rep='-')
-
+ 
     st.dataframe(styled, use_container_width=True, hide_index=True)
-
-
+ 
+ 
 # ── Metas Gerais ────────────────────────────────────────────────────────────
-
+ 
 _GER_STATUS_LABEL_COR = {
     on_track.STATUS_VERDE:    ('#D8EFE3', '#1B4332'),
     on_track.STATUS_ATENCAO:  ('#FEF9C3', '#7D6608'),
     on_track.STATUS_FORA:     ('#FADADD', '#7A1F2B'),
     on_track.STATUS_SEM_META: ('#EDEDED', '#555555'),
 }
-
-
+ 
+ 
 def _render_indicador_mg(titulo, unidade_fmt, meta, realizado, ot, completude_msg=None):
     bg, fg = _GER_STATUS_LABEL_COR[ot['status']]
-    st.markdown(f"""
+    html = f"""
     <div style="background:{bg}; color:{fg}; border-radius:10px; padding:0.9rem 1rem; margin-bottom:0.5rem;">
         <div style="font-weight:600; font-size:0.95rem;">{ot['emoji']} {titulo}</div>
         <div style="font-size:1.4rem; font-weight:700; margin-top:0.2rem;">
@@ -1598,11 +1668,23 @@ def _render_indicador_mg(titulo, unidade_fmt, meta, realizado, ot, completude_ms
         </div>
         {f'<div style="font-size:0.78rem; opacity:0.75; margin-top:0.2rem;">Projeção de fechamento: {unidade_fmt(ot["projecao_fechamento"])}</div>' if ot.get('projecao_fechamento') is not None else ''}
     </div>
-    """, unsafe_allow_html=True)
+    """
+    # Remove linhas em branco (só espaço) do HTML montado. Quando um dos
+    # trechos condicionais acima fica vazio (ex.: sem meta definida ainda,
+    # como acontecia com Volume e Quebra em "Sem meta" -- rótulo, % da meta
+    # e projeção todos vazios), sobra uma linha só com espaços no meio do
+    # bloco. O parser de Markdown do Streamlit encerra o "HTML block" na
+    # primeira linha em branco -- então o resto (inclusive o "</div>" final)
+    # deixa de ser reconhecido como HTML e vira um bloco de código cru (por
+    # estar indentado), aparecendo literalmente na tela em vez do card
+    # estilizado. Sem nenhuma linha em branco no meio, o bloco inteiro é
+    # reconhecido como HTML de ponta a ponta.
+    html = '\n'.join(line for line in html.split('\n') if line.strip())
+    st.markdown(html, unsafe_allow_html=True)
     if completude_msg:
         st.caption(completude_msg)
-
-
+ 
+ 
 def _render_metas_gerais():
     st.header('🌐 Meta Geral')
     st.caption(
@@ -1610,7 +1692,7 @@ def _render_metas_gerais():
         'Independente das Metas Semanais. O "Realizado" é somado automaticamente a partir '
         'dos módulos Vendedor-Cliente e Quebras (não precisa digitar de novo aqui).'
     )
-
+ 
     tipos_mg = [t for t in periodo_mod.TIPOS_PERIODO if t != 'semanal']
     col_tipo, col_periodo = st.columns([1, 2])
     with col_tipo:
@@ -1624,16 +1706,16 @@ def _render_metas_gerais():
             'Período', opcoes_periodo,
             format_func=lambda r: periodo_mod.rotulo(tipo_mg, r), index=0, key='mg_periodo',
         )
-
+ 
     # ── Realizado (agregado automaticamente) ────────────────────────────────
     rv = mg.realizado_vendas(tipo_mg, ref_mg)
     rq = mg.realizado_quebra(tipo_mg, ref_mg)
     ref_ant_mg = periodo_mod.periodo_anterior(tipo_mg, ref_mg)
     rv_ant = mg.realizado_vendas(tipo_mg, ref_ant_mg)
     rq_ant = mg.realizado_quebra(tipo_mg, ref_ant_mg)
-
+ 
     tab_empresa, tab_vendedor = st.tabs(['🏢 Empresa', '👤 Vendedor'])
-
+ 
     # =========================================================================
     # ABA EMPRESA — consolidado (equivalente à aba "GERAL" do Vendedor-Cliente)
     # =========================================================================
@@ -1657,14 +1739,14 @@ def _render_metas_gerais():
                                     usuario=st.session_state.get('usuario_nome'))
                     st.success('Meta salva.')
                     st.rerun()
-
+ 
         pct_tempo_mg = periodo_mod.pct_tempo_decorrido(tipo_mg, ref_mg)
         _completude_msgs = {
             'sem_dado': f'⚪ Sem dado publicado ainda para {periodo_mod.rotulo(tipo_mg, ref_mg)} (fonte: {rv.get("origem","-")}).',
             'parcial':  f'🟡 Dado parcial: {len(rv.get("meses_com_dado", []))}/{len(rv.get("meses_total", []))} mês(es) do período têm publicação.',
             'completo': None,
         }
-
+ 
         st.subheader('Indicadores da Empresa')
         ic1, ic2, ic3, ic4 = st.columns(4)
         with ic1:
@@ -1688,7 +1770,7 @@ def _render_metas_gerais():
             _render_indicador_mg('Quebra (CX)', lambda x: f'{x:,.0f} cx',
                                   meta_atual.get('quebra_max_cx'), rq.get('total_cx'), ot_qbr,
                                   _completude_msgs.get(rq['completude']))
-
+ 
         # ── Comparativo vs período anterior ──────────────────────────────────
         st.subheader('📊 Comparativo vs período anterior')
         if rv.get('faturamento') is not None and rv_ant.get('faturamento') is not None:
@@ -1706,7 +1788,7 @@ def _render_metas_gerais():
             st.caption(f'Base de comparação: {periodo_mod.rotulo(tipo_mg, ref_ant_mg)}')
         else:
             st.info('Sem dado suficiente no período anterior para comparar.')
-
+ 
         # ── Evolução ──────────────────────────────────────────────────────────
         st.subheader('📈 Evolução')
         hist_refs = list(reversed(periodo_mod.listar_periodos(tipo_mg, n=8, ate=ref_mg)))
@@ -1729,7 +1811,7 @@ def _render_metas_gerais():
             with ev2:
                 st.caption('Quebra (CX)')
                 st.bar_chart(df_evol[['Quebra (CX)']], color='#C00000')
-
+ 
     # =========================================================================
     # ABA VENDEDOR — ranking + detalhe individual (equivalente às abas por
     # vendedor do Vendedor-Cliente)
@@ -1762,7 +1844,7 @@ def _render_metas_gerais():
                 'Margem %': '{:.2f}%', 'Participação': '{:.1f}%',
             })
             st.dataframe(styled_rank, use_container_width=True, hide_index=True)
-
+ 
             # Drill-down individual
             st.divider()
             st.subheader('🔎 Detalhe por vendedor')
@@ -1784,12 +1866,12 @@ def _render_metas_gerais():
                             delta=comparativo.formatar_variacao(comp_fat_v))
                 dcc2.metric('Volume (CX)', f"{v_sel.get('vol', 0):,.3f}",
                             delta=comparativo.formatar_variacao(comp_vol_v))
-
-
+ 
+ 
 # ── Auth ──────────────────────────────────────────────────────────────────────
 if not _check_auth():
     st.stop()
-
+ 
 def _render_rentabilidade_resumo():
     st.header('💰 Rentabilidade e Margens — Resumo')
     st.caption('Visão consolidada para a Gerência (reaproveita o mesmo motor de cálculo do módulo '
@@ -1799,7 +1881,7 @@ def _render_rentabilidade_resumo():
                       label='Abrir módulo completo (filtros, rankings, matriz, histórico) →', icon='💰')
     except Exception:
         pass
-
+ 
     itens_base, avisos = rent.carregar_base_consolidada()
     if not itens_base:
         st.info('Ainda não há dados suficientes. Faça upload de pelo menos um Relatório Diário, '
@@ -1807,7 +1889,7 @@ def _render_rentabilidade_resumo():
         return
     if avisos:
         st.caption(f'ℹ️ {len(avisos)} registro(s) não incluído(s) no histórico consolidado (evita duplicidade).')
-
+ 
     col_tipo, col_periodo = st.columns([1, 2])
     with col_tipo:
         tipo_r = st.selectbox('Período', periodo_mod.TIPOS_PERIODO, format_func=periodo_mod.rotulo_tipo,
@@ -1819,7 +1901,7 @@ def _render_rentabilidade_resumo():
     with col_periodo:
         ref_r = st.selectbox('Referência', opcoes_r, format_func=lambda r: periodo_mod.rotulo(tipo_r, r),
                               key='ger_rent_periodo')
-
+ 
     itens_p = rent.filtrar_periodo(itens_base, tipo_r, ref_r)
     if not itens_p:
         st.info('Sem dados para este período.')
@@ -1828,10 +1910,10 @@ def _render_rentabilidade_resumo():
     ref_ant = periodo_mod.periodo_anterior(tipo_r, ref_r)
     itens_ant = rent.filtrar_periodo(itens_base, tipo_r, ref_ant)
     kpi_ant = rent.agregar(itens_ant) if itens_ant else None
-
+ 
     def _c(chave):
         return comparativo.calcular(kpi[chave], kpi_ant[chave]) if kpi_ant else None
-
+ 
     c1, c2, c3, c4 = st.columns(4)
     c1.metric('Faturamento', f"R$ {kpi['faturamento']:,.2f}",
               delta=comparativo.formatar_variacao(_c('faturamento')) if kpi_ant else None)
@@ -1841,7 +1923,7 @@ def _render_rentabilidade_resumo():
               delta=comparativo.formatar_variacao(_c('margem_pct')) if kpi_ant else None)
     c4.metric('Ticket Médio', f"R$ {kpi['ticket_medio']:,.2f}",
               delta=comparativo.formatar_variacao(_c('ticket_medio')) if kpi_ant else None)
-
+ 
     rcol1, rcol2, rcol3 = st.columns(3)
     with rcol1:
         st.markdown('**Top 5 Vendedores (Margem R$)**')
@@ -1861,7 +1943,7 @@ def _render_rentabilidade_resumo():
         st.dataframe(pd.DataFrame([{'Produto': p['chave'], 'Margem R$': p['margem_rs'],
                                      'Margem %': p['margem_pct']} for p in top_p]),
                      use_container_width=True, hide_index=True)
-
+ 
     alertas = rent.alertas_gerenciais(itens_p, itens_ant or None)
     st.markdown('**🚨 Pontos de Atenção**')
     if not alertas:
@@ -1872,8 +1954,8 @@ def _render_rentabilidade_resumo():
             st.markdown(f"{icone} **{a['tipo']}** — {a['detalhe']}")
         if len(alertas) > 5:
             st.caption(f'+ {len(alertas) - 5} outro(s) ponto(s) de atenção. Veja o módulo completo para a lista inteira.')
-
-
+ 
+ 
 def _render_produtos_resumo():
     st.header('📦 Relatórios de Produtos — Resumo')
     st.caption('Visão consolidada para a Gerência (reaproveita o mesmo motor de cálculo do módulo '
@@ -1883,7 +1965,7 @@ def _render_produtos_resumo():
                       label='Abrir módulo completo (filtros, rankings, matrizes, histórico) →', icon='📦')
     except Exception:
         pass
-
+ 
     itens_base, avisos = prod.carregar_base_consolidada()
     if not itens_base:
         st.info('Ainda não há dados suficientes. Faça upload de pelo menos um Relatório Diário, '
@@ -1891,7 +1973,7 @@ def _render_produtos_resumo():
         return
     if avisos:
         st.caption(f'ℹ️ {len(avisos)} registro(s) não incluído(s) no histórico consolidado (evita duplicidade).')
-
+ 
     col_tipo, col_periodo = st.columns([1, 2])
     with col_tipo:
         tipo_p = st.selectbox('Período', periodo_mod.TIPOS_PERIODO, format_func=periodo_mod.rotulo_tipo,
@@ -1903,7 +1985,7 @@ def _render_produtos_resumo():
     with col_periodo:
         ref_p = st.selectbox('Referência', opcoes_p, format_func=lambda r: periodo_mod.rotulo(tipo_p, r),
                               key='ger_prod_periodo')
-
+ 
     itens_p = prod.filtrar_periodo(itens_base, tipo_p, ref_p)
     if not itens_p:
         st.info('Sem dados para este período.')
@@ -1912,10 +1994,10 @@ def _render_produtos_resumo():
     ref_ant = periodo_mod.periodo_anterior(tipo_p, ref_p)
     itens_ant = prod.filtrar_periodo(itens_base, tipo_p, ref_ant)
     kpi_ant = prod.kpis_produto(itens_ant) if itens_ant else None
-
+ 
     def _c(chave):
         return comparativo.calcular(kpi.get(chave), kpi_ant.get(chave)) if kpi_ant else None
-
+ 
     c1, c2, c3, c4 = st.columns(4)
     c1.metric('Produtos Trabalhados', kpi.get('skus', 0),
               delta=comparativo.formatar_variacao(_c('skus')) if kpi_ant else None)
@@ -1925,7 +2007,7 @@ def _render_produtos_resumo():
               delta=comparativo.formatar_variacao(_c('volume')) if kpi_ant else None)
     c4.metric('Margem de Contribuição', f"R$ {kpi['margem_rs']:,.2f}",
               delta=comparativo.formatar_variacao(_c('margem_rs')) if kpi_ant else None)
-
+ 
     c5, c6, c7 = st.columns(3)
     margem_pp_ger = (kpi['margem_pct'] - kpi_ant['margem_pct']) if kpi_ant else None
     c5.metric('Margem %', f"{kpi['margem_pct']:.2f}%",
@@ -1933,7 +2015,7 @@ def _render_produtos_resumo():
                      if margem_pp_ger is not None else None))
     c6.metric('Grupo Líder', kpi.get('grupo_lider') or '-')
     c7.metric('Produto Líder', kpi.get('produto_lider') or '-')
-
+ 
     ranking_ger = prod.ranking_com_crescimento(itens_p, itens_ant or None)
     contagem_ger = prod.contagem_crescimento_queda(ranking_ger)
     dest = prod.destaques(itens_p, itens_ant)
@@ -1953,13 +2035,13 @@ def _render_produtos_resumo():
                             f"— {contagem_ger['queda']} produto(s) em queda no total.")
             else:
                 st.markdown('**📉 Maior queda:** nenhum produto caiu neste recorte.')
-
+ 
     st.markdown('**🏆 Top 5 Produtos (Faturamento)**')
     top_p = sorted(prod.por_produto(itens_p), key=lambda l: l['faturamento'], reverse=True)[:5]
     st.dataframe(pd.DataFrame([{'Produto': p['chave'], 'Faturamento R$': p['faturamento'],
                                  'Margem R$': p['margem_rs'], 'Volume (cx)': p['volume']} for p in top_p]),
                  use_container_width=True, hide_index=True)
-
+ 
     alertas = prod.alertas_produtos(itens_p, itens_ant or None)
     st.markdown('**🚨 Pontos de Atenção**')
     if not alertas:
@@ -1970,8 +2052,8 @@ def _render_produtos_resumo():
             st.markdown(f"{icone} **{a['tipo']}** — {a['detalhe']}")
         if len(alertas) > 5:
             st.caption(f'+ {len(alertas) - 5} outro(s) ponto(s) de atenção. Veja o módulo completo para a lista inteira.')
-
-
+ 
+ 
 def _render_recorrencia_resumo():
     st.header('🔄 Recorrência de Vendas — Resumo')
     st.caption('Publicações salvas na página **Recorrência**, organizadas por período '
@@ -1981,7 +2063,7 @@ def _render_recorrencia_resumo():
                       label='Abrir módulo completo (upload de PDF, matriz cliente x produto) →', icon='🔄')
     except Exception:
         pass
-
+ 
     col_tipo, col_periodo = st.columns([1, 2])
     with col_tipo:
         tipo_rc = st.selectbox('Período', periodo_mod.TIPOS_PERIODO, format_func=periodo_mod.rotulo_tipo,
@@ -1998,7 +2080,7 @@ def _render_recorrencia_resumo():
             ref_rc = st.selectbox('Referência', refs_rc,
                                    format_func=lambda r: periodo_mod.rotulo(tipo_rc, r),
                                    key='ger_rec_periodo')
-
+ 
         registro_rc = ds.load_current(MOD_RECORRENCIA, tipo_rc, ref_rc)
         if not registro_rc:
             st.info('Sem dados para este período.')
@@ -2007,17 +2089,17 @@ def _render_recorrencia_resumo():
             totais_rc = val_rc.get('totais', {})
             st.caption(f"Período (texto do PDF): {val_rc.get('periodo','-')}  |  "
                        f"Emissão: {val_rc.get('emissao','-')}")
-
+ 
             ref_ant_rc = periodo_mod.periodo_anterior(tipo_rc, ref_rc)
             try:
                 registro_ant_rc = ds.load_current(MOD_RECORRENCIA, tipo_rc, ref_ant_rc)
             except Exception:
                 registro_ant_rc = None
             tot_ant_rc = registro_ant_rc['valores'].get('totais', {}) if registro_ant_rc else None
-
+ 
             def _c_rc(chave):
                 return comparativo.calcular(totais_rc.get(chave), tot_ant_rc.get(chave)) if tot_ant_rc else None
-
+ 
             c1, c2, c3, c4, c5 = st.columns(5)
             c1.metric('Faturamento', f"R$ {totais_rc.get('faturamento', 0):,.2f}",
                       delta=comparativo.formatar_variacao(_c_rc('faturamento')) if tot_ant_rc else None)
@@ -2030,7 +2112,7 @@ def _render_recorrencia_resumo():
                       delta=comparativo.formatar_variacao(_c_rc('n_clientes')) if tot_ant_rc else None)
             if tot_ant_rc:
                 st.caption(f'Base de comparação: {periodo_mod.rotulo(tipo_rc, ref_ant_rc)}')
-
+ 
             clientes_rc = val_rc.get('clientes', [])
             if clientes_rc:
                 df_rc = pd.DataFrame(clientes_rc)
@@ -2045,7 +2127,7 @@ def _render_recorrencia_resumo():
                         'MC %': '{:.2f}%',
                     })
                     st.dataframe(styled_rc, use_container_width=True, hide_index=True)
-
+ 
     _hist_legado_rc = _listar_recorrencias_ger()
     if _hist_legado_rc:
         with st.expander(f'📜 Histórico antigo ({len(_hist_legado_rc)} publicação(ões) salvas '
@@ -2056,8 +2138,8 @@ def _render_recorrencia_resumo():
                     f"{_val_lrc.get('periodo','-')} — emissão {_val_lrc.get('emissao','-')} "
                     f"— Faturamento R$ {_tot_lrc.get('faturamento', 0):,.2f}"
                 )
-
-
+ 
+ 
 # ── Header ────────────────────────────────────────────────────────────────────
 st.markdown("""
 <div style="display:flex; align-items:center; gap:1rem; margin-bottom:1rem;">
@@ -2066,13 +2148,13 @@ st.markdown("""
     <h1 style="margin:0; color:#1B4332; font-size:1.6rem;">Área de Gerência</h1>
 </div>
 """, unsafe_allow_html=True)
-
+ 
 if st.button('🔒 Sair', key='_gerencia_logout'):
     st.session_state['_gerencia_auth'] = False
     st.rerun()
-
+ 
 st.divider()
-
+ 
 # ── Grupos de abas ───────────────────────────────────────────────────────────
 (grp_vendas, grp_metas, grp_metas_gerais, grp_rentabilidade, grp_produtos,
  grp_clientes, grp_recorrencia, grp_quebras, grp_prevperdas) = st.tabs([
@@ -2086,7 +2168,7 @@ st.divider()
     '📦 Quebras',
     '🚨 Prevenção de Perdas',
 ])
-
+ 
 # ── VENDAS ────────────────────────────────────────────────────────────────────
 with grp_vendas:
     tab_d, tab_s, tab_m = st.tabs([
@@ -2100,7 +2182,7 @@ with grp_vendas:
         _render_secao_dash('semanal', 'Dashboards Semanais', '📆')
     with tab_m:
         _render_secao_dash('mensal', 'Dashboards Mensais', '🗓️')
-
+ 
 # ── METAS ─────────────────────────────────────────────────────────────────────
 with grp_metas:
     tab_ot, tab_fech = st.tabs([
@@ -2111,23 +2193,23 @@ with grp_metas:
         _render_ontrack_publicado()
     with tab_fech:
         _render_fechamentos_semanais()
-
+ 
 # ── METAS GERAIS ──────────────────────────────────────────────────────────────
 with grp_metas_gerais:
     _render_metas_gerais()
-
+ 
 # ── RENTABILIDADE ─────────────────────────────────────────────────────────────
 with grp_rentabilidade:
     _render_rentabilidade_resumo()
-
+ 
 # ── PRODUTOS ──────────────────────────────────────────────────────────────────
 with grp_produtos:
     _render_produtos_resumo()
-
+ 
 # ── RECORRÊNCIA ───────────────────────────────────────────────────────────────
 with grp_recorrencia:
     _render_recorrencia_resumo()
-
+ 
 # ── CLIENTES ──────────────────────────────────────────────────────────────────
 with grp_clientes:
     tab_cli_ot, tab_cli_top50, tab_cli_pv = st.tabs([
@@ -2141,7 +2223,7 @@ with grp_clientes:
         _render_clientes_por_vendedor_ger()
     # Ranking de Recorrência mudou para a aba própria '🔄 Recorrência' (mais fácil de
     # achar, e junto ali agora tem os 5 tipos de período + histórico versionado).
-
+ 
 # ── QUEBRAS ───────────────────────────────────────────────────────────────────
 with grp_quebras:
     tab_qbr_s, tab_qbr_m, tab_qbr_comp = st.tabs([
@@ -2155,7 +2237,7 @@ with grp_quebras:
         _render_quebra_secao('mensal', 'Quebras Mensais', '📦')
     with tab_qbr_comp:
         _render_quebra_comparativo()
-
+ 
 # ── PREVENÇÃO DE PERDAS ───────────────────────────────────────────────────────
 with grp_prevperdas:
     tab_pp_sv, tab_pp_me, tab_pp_cruz = st.tabs([
@@ -2169,3 +2251,4 @@ with grp_prevperdas:
         _render_prevperdas_secao('mes_estoque', '1 Mês em Estoque')
     with tab_pp_cruz:
         _render_cruzamento_quebra()
+ 
