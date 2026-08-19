@@ -52,7 +52,15 @@ def calcular(meta: float, realizado: float, tipo_periodo: str, periodo_ref: str,
     ISO) — nesses casos o chamador pode calcular a própria fração e passar
     aqui, mantendo a mesma lógica central de status/projeção.
     """
-    if not meta:
+    if not meta or realizado is None:
+        # realizado is None significa "ainda não há dado publicado para este
+        # período" (diferente de "publicado e deu zero") -- sem este check,
+        # o chamador precisava converter None em 0 antes de chamar esta
+        # função para não estourar `realizado / meta` logo abaixo, e isso
+        # fazia pct_atingido virar 0 (em vez de desconhecido), classificando
+        # o indicador como 🔴 Fora do Track assim que o período começa,
+        # mesmo sem nenhum dado real publicado ainda. Mesmo tratamento que
+        # já existia em metas_gerais.status_quebra para o caso análogo.
         return {
             'meta': meta, 'realizado': realizado,
             'pct_atingido': None, 'pct_tempo_decorrido': None, 'pct_esperado': None,
