@@ -443,16 +443,21 @@ def _build_resumo_geral(periodo: str, data_emissao: str, metas_results: list,
         fontSize=fs, leading=fs * 1.2, textColor=colors.white,
     )
 
+    # Cada vendedor mostra SÓ o vendido (pedido explícito da Ingrid --
+    # célula com vendido+meta+% junto ficava poluída). Meta e % só aparecem
+    # na coluna TOTAL, que continua usando a meta REAL do produto/grupo
+    # ('estoque_total'), nunca a soma das metas individuais dos vendedores.
     vendedores  = list(vendedor_pcts.keys())
     col_widths  = [level['prod_col'], level['qtde_col']] + \
-                  [level['num_col'], level['pct_col']] * (len(vendedores) + 1)
+                  [level['num_col']] * len(vendedores) + \
+                  [level['num_col'], level['pct_col']]
 
     def _header_rows():
         r1 = [Paragraph('Produto', hdr_style), Paragraph('Qtde', hdr_style)]
         r2 = ['', '']
         for v in vendedores:
-            r1 += [Paragraph(v, hdr_style), '']
-            r2 += ['Vend', '%']
+            r1 += [Paragraph(v, hdr_style)]
+            r2 += ['']
         r1 += [Paragraph('TOTAL', hdr_style), '']
         r2 += ['Vend', '%']
         return r1, r2
@@ -461,8 +466,7 @@ def _build_resumo_geral(periodo: str, data_emissao: str, metas_results: list,
         row = [Paragraph(r['produto'], prod_style), f"{r['estoque_total']:.0f}"]
         for v in vendedores:
             l = next((x for x in r['linhas'] if x['vendedor'] == v), None)
-            row += [f"{l['vendido']:.1f}" if l else '-',
-                    _fmt_pct(l['atingido']) if l else '-']
+            row += [f"{l['vendido']:.1f}" if l else '-']
         _, ve, _, p = _produto_totais(r)
         row += [f"{ve:.1f}", _fmt_pct(p)]
         return row
@@ -470,14 +474,12 @@ def _build_resumo_geral(periodo: str, data_emissao: str, metas_results: list,
     def _subtotal_row(label, group):
         # 'est' (Qtde) e a meta do grupo/TOTAL usam a mesma base: soma do
         # 'estoque_total' real dos produtos, não a soma das metas
-        # individuais (m_v continua individual -- meta do próprio vendedor
-        # somada nos produtos do grupo, isso está correto).
+        # individuais dos vendedores.
         est = sum(r['estoque_total'] for r in group)
         row = [Paragraph(label, sub_style), f"{est:.0f}"]
         for v in vendedores:
             ve_v = sum(l['vendido'] for r in group for l in r['linhas'] if l['vendedor'] == v)
-            m_v  = sum(l['meta']    for r in group for l in r['linhas'] if l['vendedor'] == v)
-            row += [f"{ve_v:.1f}", _fmt_pct(ve_v / m_v if m_v else 0)]
+            row += [f"{ve_v:.1f}"]
         ve_g = sum(l['vendido'] for r in group for l in r['linhas'])
         m_g  = est
         row += [f"{ve_g:.1f}", _fmt_pct(ve_g / m_g if m_g else 0)]
@@ -505,10 +507,14 @@ def _build_resumo_geral(periodo: str, data_emissao: str, metas_results: list,
             ('SPAN',          (0, 0), (0, 1)),
             ('SPAN',          (1, 0), (1, 1)),
         ]
+        # Cada vendedor agora é 1 coluna só (mostra só o vendido) -- o nome
+        # do vendedor ocupa as 2 linhas do cabeçalho (merge vertical), igual
+        # a 'Produto'/'Qtde'. Só a coluna TOTAL continua com 2 sub-colunas
+        # (Vend/%), então o nome dela precisa de merge horizontal.
         col = 2
         for _ in vendedores:
-            cmds.append(('SPAN', (col, 0), (col + 1, 0)))
-            col += 2
+            cmds.append(('SPAN', (col, 0), (col, 1)))
+            col += 1
         cmds.append(('SPAN', (col, 0), (col + 1, 0)))
         t.setStyle(TableStyle(cmds))
         return t
