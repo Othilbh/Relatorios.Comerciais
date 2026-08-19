@@ -32,10 +32,13 @@ def render_matriz_produto_vendedor(resultados: list, titulo: str = 'Resumo Geral
     linha de SUBTOTAL por grupo -- igual ao PDF Resumo Geral.
 
     Cada célula de vendedor mostra SÓ o vendido (pedido explícito da
-    Ingrid: célula com vendido/meta/% junto ficava poluída). Meta e % só
-    aparecem nas colunas 'Qtde' e 'TOTAL' de cada linha/subtotal -- e essas
-    sempre usam a meta REAL do produto ('estoque_total'), nunca a soma das
-    metas individuais dos vendedores (ver correção de meta geral)."""
+    Ingrid: célula com vendido/meta/% junto ficava poluída). A meta de cada
+    linha/subtotal fica na coluna 'Qtde', o vendido total na coluna
+    'Vendido Total' e o percentual na coluna '% Atingido' -- SEM combinar
+    vendido/meta no mesmo campo (ex.: "275/618"), também por pedido
+    explícito da Ingrid. 'Qtde' sempre usa a meta REAL do produto
+    ('estoque_total'), nunca a soma das metas individuais dos vendedores
+    (ver correção de meta geral)."""
     if not resultados:
         st.info('Sem dados para montar o Resumo Geral.')
         return
@@ -78,7 +81,8 @@ def render_matriz_produto_vendedor(resultados: list, titulo: str = 'Resumo Geral
                     p_vend += l['vendido']
                 else:
                     row[v] = '-'
-            row['TOTAL'] = f"{p_vend:.0f}/{p_meta:.0f} ({p_vend/p_meta*100:.0f}%)" if p_meta else '—'
+            row['Vendido Total'] = f"{p_vend:.0f}"
+            row['% Atingido'] = f"{p_vend/p_meta*100:.0f}%" if p_meta else '—'
             rows_m.append(row)
 
         # Linha de subtotal -- mesma regra: a meta do grupo (coluna TOTAL)
@@ -92,7 +96,8 @@ def render_matriz_produto_vendedor(resultados: list, titulo: str = 'Resumo Geral
             sv = sum(l['vendido'] for r in grupo for l in r.get('linhas', []) if l['vendedor'] == v)
             sub[v] = f"{sv:.0f}"
         gv = sum(l['vendido'] for r in grupo for l in r.get('linhas', []))
-        sub['TOTAL'] = f"{gv:.0f}/{gm:.0f} ({gv/gm*100:.0f}%)" if gm else '—'
+        sub['Vendido Total'] = f"{gv:.0f}"
+        sub['% Atingido'] = f"{gv/gm*100:.0f}%" if gm else '—'
         rows_m.append(sub)
 
         st.dataframe(pd.DataFrame(rows_m), use_container_width=True, hide_index=True)
@@ -106,5 +111,6 @@ def render_matriz_produto_vendedor(resultados: list, titulo: str = 'Resumo Geral
         tv = sum(l['vendido'] for r in resultados for l in r.get('linhas', []) if l['vendedor'] == v)
         tot[v] = f"{tv:.0f}"
     gv_all = sum(l['vendido'] for r in resultados for l in r.get('linhas', []))
-    tot['TOTAL'] = f"{gv_all:.0f}/{gm_all:.0f} ({gv_all/gm_all*100:.0f}%)" if gm_all else '—'
+    tot['Vendido Total'] = f"{gv_all:.0f}"
+    tot['% Atingido'] = f"{gv_all/gm_all*100:.0f}%" if gm_all else '—'
     st.dataframe(pd.DataFrame([tot]), use_container_width=True, hide_index=True)
