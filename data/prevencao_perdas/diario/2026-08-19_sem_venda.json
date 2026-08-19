@@ -1,0 +1,284 @@
+{
+  "current": {
+    "id": "7ead87ef-4493-4edb-bc9b-6614c6ce60d2",
+    "modulo_origem": "prevencao_perdas",
+    "tipo_periodo": "diario",
+    "periodo_ref": "2026-08-19_sem_venda",
+    "data_referencia": "2026-08-19",
+    "criado_em": "2026-08-19T13:13:14+00:00",
+    "atualizado_em": "2026-08-19T13:13:14+00:00",
+    "usuario": "Ingrid",
+    "versao": 1,
+    "valores": {
+      "publicado_em": "2026-08-19T13:13:14.244914",
+      "emissao": "19/08/2026",
+      "periodo": "12/08/2026",
+      "tipo": "sem_venda",
+      "resumo": {
+        "total": 23,
+        "criticos": 4,
+        "alta_prioridade": 6,
+        "atencao": 13,
+        "valor_risco": 117612.96999999999,
+        "sem_venda_7d": 23,
+        "estoque_30d": 4
+      },
+      "produtos": [
+        {
+          "prioridade": "🔴 Crítico",
+          "produto": "GRAN SMITH 113 VERFRUT",
+          "responsavel": "FARLEY",
+          "dias_estoque": 70,
+          "dias_sem_venda": 7,
+          "saldo_cx": 34.0,
+          "qtd_vendida": 0.0,
+          "valor_estoque": 5828.62,
+          "acao": "Promoção urgente / Vender urgente"
+        },
+        {
+          "prioridade": "🔴 Crítico",
+          "produto": "PORTUGUESA 60/65 SABOR",
+          "responsavel": "JULIANA",
+          "dias_estoque": 35,
+          "dias_sem_venda": 7,
+          "saldo_cx": 8.0,
+          "qtd_vendida": 0.0,
+          "valor_estoque": 1086.88,
+          "acao": "Promoção urgente / Vender urgente"
+        },
+        {
+          "prioridade": "🔴 Crítico",
+          "produto": "MIRTILO CRUNCH",
+          "responsavel": "DORA",
+          "dias_estoque": 78,
+          "dias_sem_venda": 7,
+          "saldo_cx": 1.0,
+          "qtd_vendida": 0.0,
+          "valor_estoque": 116.6,
+          "acao": "Promoção urgente / Vender urgente"
+        },
+        {
+          "prioridade": "🔴 Crítico",
+          "produto": "MIRTILO DOLE",
+          "responsavel": "RONISTONIS",
+          "dias_estoque": 61,
+          "dias_sem_venda": 7,
+          "saldo_cx": 1.0,
+          "qtd_vendida": 0.0,
+          "valor_estoque": 99.43,
+          "acao": "Promoção urgente / Vender urgente"
+        },
+        {
+          "prioridade": "🟠 Alta Prioridade",
+          "produto": "GALA 135 HIRAGAMIS CX BRANCA",
+          "responsavel": "JULIANA",
+          "dias_estoque": 2,
+          "dias_sem_venda": 7,
+          "saldo_cx": 112.0,
+          "qtd_vendida": 0.0,
+          "valor_estoque": 16297.12,
+          "acao": "Priorizar venda / Contatar vendedor"
+        },
+        {
+          "prioridade": "🟠 Alta Prioridade",
+          "produto": "ARGENTINA 80 CERVI VERMELHA",
+          "responsavel": "LUCIANO",
+          "dias_estoque": 1,
+          "dias_sem_venda": 7,
+          "saldo_cx": 49.0,
+          "qtd_vendida": 0.0,
+          "valor_estoque": 12676.3,
+          "acao": "Priorizar venda / Contatar vendedor"
+        },
+        {
+          "prioridade": "🟠 Alta Prioridade",
+          "produto": "CUMB NUBIA/JUBILEE RCA",
+          "responsavel": "REGINALDO",
+          "dias_estoque": 2,
+          "dias_sem_venda": 7,
+          "saldo_cx": 220.0,
+          "qtd_vendida": 0.0,
+          "valor_estoque": 11125.4,
+          "acao": "Priorizar venda / Contatar vendedor"
+        },
+        {
+          "prioridade": "🟠 Alta Prioridade",
+          "produto": "CAQUI HOTH 20X1",
+          "responsavel": "RONISTONIS",
+          "dias_estoque": 19,
+          "dias_sem_venda": 7,
+          "saldo_cx": 10.0,
+          "qtd_vendida": 0.0,
+          "valor_estoque": 937.8,
+          "acao": "Priorizar venda / Contatar vendedor"
+        },
+        {
+          "prioridade": "🟠 Alta Prioridade",
+          "produto": "PORTUGUESA 65/70 AURORA PREMIUM",
+          "responsavel": "DORA",
+          "dias_estoque": 21,
+          "dias_sem_venda": 7,
+          "saldo_cx": 1.0,
+          "qtd_vendida": 0.0,
+          "valor_estoque": 213.59,
+          "acao": "Priorizar venda / Contatar vendedor"
+        },
+        {
+          "prioridade": "🟠 Alta Prioridade",
+          "produto": "LARANJA IMP BAHIA CITRUS CX AZUL",
+          "responsavel": "RONISTONIS",
+          "dias_estoque": 20,
+          "dias_sem_venda": 7,
+          "saldo_cx": 1.0,
+          "qtd_vendida": 0.0,
+          "valor_estoque": 34.83,
+          "acao": "Priorizar venda / Contatar vendedor"
+        },
+        {
+          "prioridade": "🟡 Atenção",
+          "produto": "CUMB VITORIA VITACE",
+          "responsavel": "JULIANA",
+          "dias_estoque": 2,
+          "dias_sem_venda": 7,
+          "saldo_cx": 220.0,
+          "qtd_vendida": 0.0,
+          "valor_estoque": 9941.8,
+          "acao": "Monitorar / Ação preventiva"
+        },
+        {
+          "prioridade": "🟡 Atenção",
+          "produto": "GALA 135 HIRAGAMIS CX PARDA",
+          "responsavel": "LUCIANO",
+          "dias_estoque": 2,
+          "dias_sem_venda": 7,
+          "saldo_cx": 67.0,
+          "qtd_vendida": 0.0,
+          "valor_estoque": 8576.0,
+          "acao": "Monitorar / Ação preventiva"
+        },
+        {
+          "prioridade": "🟡 Atenção",
+          "produto": "FUJI 100 HIRAGAMIS CX PARDA",
+          "responsavel": "DORA",
+          "dias_estoque": 2,
+          "dias_sem_venda": 7,
+          "saldo_cx": 56.0,
+          "qtd_vendida": 0.0,
+          "valor_estoque": 8475.04,
+          "acao": "Monitorar / Ação preventiva"
+        },
+        {
+          "prioridade": "🟡 Atenção",
+          "produto": "GALA 150 HIRAGAMIS CX BRANCA",
+          "responsavel": "DORA",
+          "dias_estoque": 2,
+          "dias_sem_venda": 7,
+          "saldo_cx": 56.0,
+          "qtd_vendida": 0.0,
+          "valor_estoque": 7495.04,
+          "acao": "Monitorar / Ação preventiva"
+        },
+        {
+          "prioridade": "🟡 Atenção",
+          "produto": "GALA 165 HIRAGAMIS CX BRANCA",
+          "responsavel": "DORA",
+          "dias_estoque": 2,
+          "dias_sem_venda": 7,
+          "saldo_cx": 56.0,
+          "qtd_vendida": 0.0,
+          "valor_estoque": 7495.04,
+          "acao": "Monitorar / Ação preventiva"
+        },
+        {
+          "prioridade": "🟡 Atenção",
+          "produto": "FUJI 135 HIRAGAMIS CX PARDA",
+          "responsavel": "FARLEY",
+          "dias_estoque": 2,
+          "dias_sem_venda": 7,
+          "saldo_cx": 56.0,
+          "qtd_vendida": 0.0,
+          "valor_estoque": 7168.0,
+          "acao": "Monitorar / Ação preventiva"
+        },
+        {
+          "prioridade": "🟡 Atenção",
+          "produto": "CUMB VITORIA VALEXFRUIT",
+          "responsavel": "REGINALDO",
+          "dias_estoque": 2,
+          "dias_sem_venda": 7,
+          "saldo_cx": 110.0,
+          "qtd_vendida": 0.0,
+          "valor_estoque": 5614.4,
+          "acao": "Monitorar / Ação preventiva"
+        },
+        {
+          "prioridade": "🟡 Atenção",
+          "produto": "GALA 150 HIRAGAMIS CX PARDA",
+          "responsavel": "LUCIANO",
+          "dias_estoque": 2,
+          "dias_sem_venda": 7,
+          "saldo_cx": 45.0,
+          "qtd_vendida": 0.0,
+          "valor_estoque": 5234.85,
+          "acao": "Monitorar / Ação preventiva"
+        },
+        {
+          "prioridade": "🟡 Atenção",
+          "produto": "GALA 150 AZALEIA",
+          "responsavel": "JULIANA",
+          "dias_estoque": 2,
+          "dias_sem_venda": 7,
+          "saldo_cx": 56.0,
+          "qtd_vendida": 0.0,
+          "valor_estoque": 3900.4,
+          "acao": "Monitorar / Ação preventiva"
+        },
+        {
+          "prioridade": "🟡 Atenção",
+          "produto": "MELANCIA CEPI T4 14KG",
+          "responsavel": "FARLEY",
+          "dias_estoque": 2,
+          "dias_sem_venda": 7,
+          "saldo_cx": 54.0,
+          "qtd_vendida": 0.0,
+          "valor_estoque": 2856.6,
+          "acao": "Monitorar / Ação preventiva"
+        },
+        {
+          "prioridade": "🟡 Atenção",
+          "produto": "MAMAO FORMOSO NORTE T7X",
+          "responsavel": "AFANAIS",
+          "dias_estoque": 2,
+          "dias_sem_venda": 7,
+          "saldo_cx": 39.0,
+          "qtd_vendida": 0.0,
+          "valor_estoque": 2018.25,
+          "acao": "Monitorar / Ação preventiva"
+        },
+        {
+          "prioridade": "🟡 Atenção",
+          "produto": "GALA 110 HIRAGAMIS CX PARDA",
+          "responsavel": "DORA",
+          "dias_estoque": 2,
+          "dias_sem_venda": 7,
+          "saldo_cx": 2.0,
+          "qtd_vendida": 0.0,
+          "valor_estoque": 291.0,
+          "acao": "Monitorar / Ação preventiva"
+        },
+        {
+          "prioridade": "🟡 Atenção",
+          "produto": "PIMENTAO REI DUO",
+          "responsavel": "RONISTONIS",
+          "dias_estoque": 9,
+          "dias_sem_venda": 7,
+          "saldo_cx": 1.0,
+          "qtd_vendida": 0.0,
+          "valor_estoque": 129.98,
+          "acao": "Monitorar / Ação preventiva"
+        }
+      ]
+    }
+  },
+  "history": []
+}
