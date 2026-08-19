@@ -18,6 +18,7 @@ import comparativo
 import on_track
 import data_store as ds
 import metas_gerais as mg
+import calc
 import rentabilidade as rent
 import produtos as prod
 import resumo_matriz
@@ -1876,6 +1877,60 @@ def _render_metas_gerais():
                 st.caption('Quebra (CX)')
                 st.bar_chart(df_evol[['Quebra (CX)']], color='#C00000')
 
+        # ── OnTrack Semanal — quebra da meta MENSAL fixa (Faturamento) ──────
+        # Só faz sentido pra 'mensal' (não dá pra quebrar um trimestre/ano em
+        # "semana 1 a 4"). A meta em si (meta_atual['faturamento'], já
+        # definida acima) NUNCA muda aqui -- só a expectativa acumulada por
+        # semana, calculada a partir dos percentuais configuráveis abaixo.
+        if tipo_mg == 'mensal':
+            st.divider()
+            st.subheader('📅 OnTrack Semanal — Quebra da Meta Mensal (Faturamento)')
+            st.caption(
+                'A Meta de Faturamento definida acima nunca muda. Aqui só se acompanha '
+                'quanto dela já era esperado ter sido vendido até cada semana (percentuais '
+                'incrementais acumulados -- podem passar de 100%, isso é normal) comparado '
+                'com o vendido real acumulado até aquele ponto.'
+            )
+            with st.expander('⚙️ Configurar percentuais semanais'):
+                _pcts_atuais = mg.carregar_pcts_semanais()
+                with st.form(key='mg_form_pcts_semanais'):
+                    _n_sem_cfg = st.number_input(
+                        'Quantidade de semanas configuradas', min_value=1, max_value=8,
+                        value=len(_pcts_atuais), step=1, key='mg_pcts_n',
+                    )
+                    _pcts_inputs = []
+                    _cols_pct = st.columns(int(_n_sem_cfg))
+                    for _i in range(int(_n_sem_cfg)):
+                        _valor_padrao = _pcts_atuais[_i] if _i < len(_pcts_atuais) else 0.0
+                        with _cols_pct[_i]:
+                            _pcts_inputs.append(st.number_input(
+                                f'Semana {_i + 1} (%)', min_value=0.0,
+                                value=float(_valor_padrao), step=1.0, key=f'mg_pct_sem_{_i}',
+                            ))
+                    _soma_pcts = sum(_pcts_inputs)
+                    st.caption(f'Soma dos percentuais: {_soma_pcts:.0f}% — pode ser diferente '
+                               f'de 100% (maior ou menor), isso é permitido de propósito.')
+                    if st.form_submit_button('💾 Salvar percentuais', type='primary'):
+                        mg.salvar_pcts_semanais(_pcts_inputs, usuario=st.session_state.get('usuario_nome'))
+                        st.success('Percentuais semanais salvos.')
+                        st.rerun()
+
+            _meta_fat_mg = meta_atual.get('faturamento')
+            if not _meta_fat_mg:
+                st.info('Defina a Meta de Faturamento acima pra ver a quebra semanal.')
+            else:
+                _quebra_emp = mg.quebra_semanal_meta(ref_mg, _meta_fat_mg)
+                _rows_quebra = [{
+                    'Semana':             f"{l['semana']}ª — {l['label']}",
+                    'Meta fixa (R$)':     f"R$ {_meta_fat_mg:,.2f}",
+                    '% semanal':          f"{l['pct_semana']:.0f}%",
+                    '% acumulado':        f"{l['pct_acumulado']:.0f}%",
+                    'Esperado acumulado': f"R$ {l['esperado_acumulado']:,.2f}",
+                    'Vendido acumulado':  f"R$ {l['vendido_acumulado']:,.2f}" if l['vendido_acumulado'] is not None else '—',
+                    'Atingimento':        f"{l['atingimento']:.0f}%" if l['atingimento'] is not None else '—',
+                } for l in _quebra_emp]
+                st.dataframe(pd.DataFrame(_rows_quebra), use_container_width=True, hide_index=True)
+
     # =========================================================================
     # ABA VENDEDOR — ranking + detalhe individual (equivalente às abas por
     # vendedor do Vendedor-Cliente)
@@ -1930,6 +1985,56 @@ def _render_metas_gerais():
                             delta=comparativo.formatar_variacao(comp_fat_v))
                 dcc2.metric('Volume (CX)', f"{v_sel.get('vol', 0):,.3f}",
                             delta=comparativo.formatar_variacao(comp_vol_v))
+
+        # ── OnTrack Semanal por Vendedor — quebra da meta MENSAL fixa dele ──
+        # Fica FORA do if/else acima de propósito: precisa estar disponível
+        # mesmo sem nenhum dado de vendas ainda (início do mês), já que a
+        # meta é digitada aqui, não vem de realizado_vendas.
+        if tipo_mg == 'mensal':
+            st.divider()
+            st.subheader('📅 OnTrack Semanal por Vendedor')
+            st.caption(
+                'Meta fixa individual de Faturamento por vendedor (independente da meta '
+                'da empresa) -- nunca é calculada como fatia da meta geral nem como soma '
+                'de outra coisa, você digita direto aqui.'
+            )
+            _metas_vend_atuais = mg.carregar_metas_vendedores(tipo_mg, ref_mg)
+            with st.expander('🎯 Definir/editar meta fixa de Faturamento por vendedor'):
+                with st.form(key='mg_form_metas_vendedores'):
+                    _novas_metas_vend = {}
+                    _nomes_vend_cfg = list(calc.VENDEDORES_PADRAO.keys())
+                    _cols_mv = st.columns(4)
+                    for _i, _nome_v in enumerate(_nomes_vend_cfg):
+                        with _cols_mv[_i % 4]:
+                            _novas_metas_vend[_nome_v] = st.number_input(
+                                f'{_nome_v} (R$)', min_value=0.0,
+                                value=float(_metas_vend_atuais.get(_nome_v) or 0.0), step=1000.0,
+                                key=f'mg_meta_vend_{_nome_v}',
+                            )
+                    if st.form_submit_button('💾 Salvar metas dos vendedores', type='primary'):
+                        mg.salvar_metas_vendedores(tipo_mg, ref_mg, _novas_metas_vend,
+                                                    usuario=st.session_state.get('usuario_nome'))
+                        st.success('Metas dos vendedores salvas.')
+                        st.rerun()
+
+            _vend_com_meta = {k: v for k, v in _metas_vend_atuais.items() if v}
+            if not _vend_com_meta:
+                st.info('Defina a meta fixa de pelo menos um vendedor acima pra ver a quebra semanal.')
+            else:
+                _vend_sel_sem = st.selectbox('Vendedor', sorted(_vend_com_meta.keys()),
+                                              key='mg_ot_semanal_vend_sel')
+                _meta_fixa_v = _vend_com_meta[_vend_sel_sem]
+                _quebra_v = mg.quebra_semanal_meta(ref_mg, _meta_fixa_v, vendedor=_vend_sel_sem)
+                _rows_quebra_v = [{
+                    'Semana':             f"{l['semana']}ª — {l['label']}",
+                    'Meta fixa (R$)':     f"R$ {_meta_fixa_v:,.2f}",
+                    '% semanal':          f"{l['pct_semana']:.0f}%",
+                    '% acumulado':        f"{l['pct_acumulado']:.0f}%",
+                    'Esperado acumulado': f"R$ {l['esperado_acumulado']:,.2f}",
+                    'Vendido acumulado':  f"R$ {l['vendido_acumulado']:,.2f}" if l['vendido_acumulado'] is not None else '—',
+                    'Atingimento':        f"{l['atingimento']:.0f}%" if l['atingimento'] is not None else '—',
+                } for l in _quebra_v]
+                st.dataframe(pd.DataFrame(_rows_quebra_v), use_container_width=True, hide_index=True)
 
 
 # ── Auth ──────────────────────────────────────────────────────────────────────
