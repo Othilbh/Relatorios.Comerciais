@@ -251,6 +251,11 @@ def _render_secao_dash(tipo, titulo_secao, emoji):
                 key=f'ger_quick_sel_{tipo}', index=None, placeholder='Selecione um período salvo...')
             if escolha_rapida:
                 st.session_state[state_key] = escolha_rapida
+                # Ver comentário equivalente em pages/1_Relatorio_Diario_OTHIL.py:
+                # sem apagar a key do widget aqui, o próximo rerun recria o
+                # selectbox já com esta opção selecionada (index=None só vale
+                # na primeira criação), disparando um st.rerun() infinito.
+                del st.session_state[f'ger_quick_sel_{tipo}']
                 st.rerun()
 
     st.divider()
@@ -1735,10 +1740,43 @@ def _render_metas_gerais():
                     meta_qbr = st.number_input('Teto de Quebra (CX)', min_value=0.0,
                                                 value=float(meta_atual.get('quebra_max_cx') or 0.0), step=10.0)
                 if st.form_submit_button('💾 Salvar meta', type='primary'):
-                    mg.salvar_meta(tipo_mg, ref_mg, meta_fat, meta_vol, meta_marg, meta_qbr,
-                                    usuario=st.session_state.get('usuario_nome'))
-                    st.success('Meta salva.')
+                    _reg_meta = mg.salvar_meta(tipo_mg, ref_mg, meta_fat, meta_vol, meta_marg, meta_qbr,
+                                                usuario=st.session_state.get('usuario_nome'))
+                    # data_store.save_record devolve '_erro_persistencia_remota' quando
+                    # a gravação no GitHub falha (token expirado, instabilidade da API,
+                    # etc.) -- nesse caso o dado só fica no cache local efêmero e é
+                    # perdido no próximo restart/redeploy do Streamlit Cloud. Antes esse
+                    # retorno era descartado e a tela sempre mostrava "Meta salva." como
+                    # se tivesse persistido de verdade, mesmo quando não persistiu.
+                    _erro_meta = _reg_meta.get('_erro_persistencia_remota') if _reg_meta else None
+                    if _erro_meta:
+                        st.warning(f'Meta salva localmente, mas houve um problema ao salvar de forma '
+                                   f'permanente: {_erro_meta}. Tente salvar de novo em alguns instantes.')
+                    else:
+                        st.success('Meta salva.')
                     st.rerun()
+
+        _hist_meta = mg.historico_meta(tipo_mg, ref_mg)
+        with st.expander(f'🕘 Histórico de alterações da meta — {periodo_mod.rotulo(tipo_mg, ref_mg)} '
+                          f'({len(_hist_meta)} versão(ões) anterior(es))'):
+            if not _hist_meta:
+                st.caption('Nenhuma alteração anterior registrada para este período — a meta atual '
+                           'acima é a primeira versão salva.')
+            else:
+                # Mais recente primeiro (load_history devolve da mais antiga pra mais nova).
+                _linhas_hist = []
+                for _v in reversed(_hist_meta):
+                    _vals = _v.get('valores', {}) or {}
+                    _linhas_hist.append({
+                        'Versão': _v.get('versao'),
+                        'Salvo em': (_v.get('atualizado_em') or '')[:16].replace('T', ' '),
+                        'Por': _v.get('usuario', 'não identificado'),
+                        'Faturamento': f"R$ {_vals.get('faturamento', 0):,.0f}",
+                        'Volume (CX)': f"{_vals.get('volume', 0):,.0f}",
+                        'Margem (%)': f"{_vals.get('margem_pct', 0):.2f}%",
+                        'Teto Quebra (CX)': f"{_vals.get('quebra_max_cx', 0):,.0f}",
+                    })
+                st.dataframe(pd.DataFrame(_linhas_hist), hide_index=True, use_container_width=True)
 
         pct_tempo_mg = periodo_mod.pct_tempo_decorrido(tipo_mg, ref_mg)
         _completude_msgs = {
@@ -1750,21 +1788,30 @@ def _render_metas_gerais():
         st.subheader('Indicadores da Empresa')
         ic1, ic2, ic3, ic4 = st.columns(4)
         with ic1:
-            ot_fat = on_track.calcular(meta_atual.get('faturamento') or 0, rv.get('faturamento') or 0,
+            # NÃO usar `or 0` no realizado: rv.get(...) retorna None quando
+            # ainda não há dado publicado (diferente de "publicado e deu
+            # zero"), e on_track.calcular já trata None corretamente
+            # (status ⚪ Sem meta/dado). Convertendo para 0 aqui, o cálculo
+            # interpretava como "0% atingido" e mostrava 🔴 Fora do Track
+            # incorretamente assim que o período começava, mesmo sem nenhum
+            # dado real publicado ainda.
+            ot_fat = on_track.calcular(meta_atual.get('faturamento') or 0, rv.get('faturamento'),
                                         tipo_mg, ref_mg, pct_tempo_decorrido=pct_tempo_mg)
             _render_indicador_mg('Faturamento', lambda x: f'R$ {x:,.0f}',
                                   meta_atual.get('faturamento'), rv.get('faturamento'), ot_fat,
                                   _completude_msgs.get(rv['completude']))
         with ic2:
-            ot_vol = on_track.calcular(meta_atual.get('volume') or 0, rv.get('volume') or 0,
+            ot_vol = on_track.calcular(meta_atual.get('volume') or 0, rv.get('volume'),
                                         tipo_mg, ref_mg, pct_tempo_decorrido=pct_tempo_mg)
             _render_indicador_mg('Volume (CX)', lambda x: f'{x:,.0f} cx',
-                                  meta_atual.get('volume'), rv.get('volume'), ot_vol)
+                                  meta_atual.get('volume'), rv.get('volume'), ot_vol,
+                                  _completude_msgs.get(rv['completude']))
         with ic3:
-            ot_marg = on_track.calcular(meta_atual.get('margem_pct') or 0, rv.get('margem_pct') or 0,
+            ot_marg = on_track.calcular(meta_atual.get('margem_pct') or 0, rv.get('margem_pct'),
                                          tipo_mg, ref_mg, pct_tempo_decorrido=pct_tempo_mg)
             _render_indicador_mg('Margem (%)', lambda x: f'{x:.2f}%',
-                                  meta_atual.get('margem_pct'), rv.get('margem_pct'), ot_marg)
+                                  meta_atual.get('margem_pct'), rv.get('margem_pct'), ot_marg,
+                                  _completude_msgs.get(rv['completude']))
         with ic4:
             ot_qbr = mg.status_quebra(meta_atual.get('quebra_max_cx'), rq.get('total_cx'), tipo_mg, ref_mg)
             _render_indicador_mg('Quebra (CX)', lambda x: f'{x:,.0f} cx',
@@ -1773,21 +1820,35 @@ def _render_metas_gerais():
 
         # ── Comparativo vs período anterior ──────────────────────────────────
         st.subheader('📊 Comparativo vs período anterior')
-        if rv.get('faturamento') is not None and rv_ant.get('faturamento') is not None:
+        _linhas_comp = [
+            ('Faturamento', rv.get('faturamento'), rv_ant.get('faturamento'), lambda x: f'R$ {x:,.0f}', False),
+            ('Volume (CX)', rv.get('volume'), rv_ant.get('volume'), lambda x: f'{x:,.0f}', False),
+            ('Margem (%)', rv.get('margem_pct'), rv_ant.get('margem_pct'), lambda x: f'{x:.2f}%', False),
+            ('Quebra (CX)', rq.get('total_cx'), rq_ant.get('total_cx'), lambda x: f'{x:,.0f}', True),
+        ]
+        # Antes, este bloco inteiro só aparecia se FATURAMENTO especificamente
+        # tivesse dado no período atual e no anterior -- então, se só o
+        # relatório de Vendedor-Cliente atrasasse num mês (mas a Quebra já
+        # tivesse sido publicada normalmente, fluxo real já que são uploads
+        # independentes), o comparativo de Quebra (que estaria disponível)
+        # também sumia. Agora mostra qualquer indicador que tenha dado no
+        # período atual, com "n/d" individual (via comparativo.calcular, que
+        # já trata "sem dado anterior" com segurança) quando faltar só o lado
+        # anterior daquele indicador específico.
+        if any(_atual is not None for _, _atual, _, _, _ in _linhas_comp):
             cc1, cc2, cc3, cc4 = st.columns(4)
-            for _col, _lab, _atual, _ant, _fmt, _menor_melhor in [
-                (cc1, 'Faturamento', rv.get('faturamento'), rv_ant.get('faturamento'), lambda x: f'R$ {x:,.0f}', False),
-                (cc2, 'Volume (CX)', rv.get('volume'), rv_ant.get('volume'), lambda x: f'{x:,.0f}', False),
-                (cc3, 'Margem (%)', rv.get('margem_pct'), rv_ant.get('margem_pct'), lambda x: f'{x:.2f}%', False),
-                (cc4, 'Quebra (CX)', rq.get('total_cx'), rq_ant.get('total_cx'), lambda x: f'{x:,.0f}', True),
-            ]:
+            for _col, (_lab, _atual, _ant, _fmt, _menor_melhor) in zip(
+                    [cc1, cc2, cc3, cc4], _linhas_comp):
                 if _atual is None:
+                    with _col:
+                        st.metric(_lab, '—', delta='n/d')
                     continue
                 _comp = comparativo.calcular(_atual, _ant, menor_e_melhor=_menor_melhor)
-                _col.metric(_lab, _fmt(_atual), delta=comparativo.formatar_variacao(_comp))
+                _col.metric(_lab, _fmt(_atual), delta=comparativo.formatar_variacao(_comp),
+                             delta_color='inverse' if _menor_melhor else 'normal')
             st.caption(f'Base de comparação: {periodo_mod.rotulo(tipo_mg, ref_ant_mg)}')
         else:
-            st.info('Sem dado suficiente no período anterior para comparar.')
+            st.info('Sem dado suficiente no período atual para comparar.')
 
         # ── Evolução ──────────────────────────────────────────────────────────
         st.subheader('📈 Evolução')
@@ -1871,6 +1932,15 @@ def _render_metas_gerais():
 # ── Auth ──────────────────────────────────────────────────────────────────────
 if not _check_auth():
     st.stop()
+
+# Mesmo padrão usado em todas as outras páginas (ex.: pages/metas_semanais.py,
+# pages/4_Quebra_OTHIL.py) -- sem isso, qualquer gravação feita a partir desta
+# página (ex.: "Salvar meta" em Metas Gerais) ficava com usuario="não
+# identificado" no histórico versionado sempre que a Gerência era a primeira
+# página aberta na sessão (não passando antes por nenhuma outra página que já
+# define este valor).
+st.session_state.setdefault('usuario_nome', 'Ingrid')
+
 
 def _render_rentabilidade_resumo():
     st.header('💰 Rentabilidade e Margens — Resumo')
