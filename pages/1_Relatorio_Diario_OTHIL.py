@@ -31,6 +31,23 @@ _GERENCIA_DIR = os.path.join(os.path.dirname(__file__), '..', 'gerencia_data')
 MODULO = 'relatorio_diario'
 
 
+# ── Formatação numérica em padrão brasileiro ────────────────────────────────
+# Mesmo idioma já usado em pdfgen.py, pages/3_Vendedor_Cliente_OTHIL.py,
+# pages/6_Rentabilidade_Margens_OTHIL.py, pages/7_Relatorios_Produtos_OTHIL.py
+# e pages/gerencia.py -- só esta página ainda usava o formato padrão do
+# Python (separador de milhar ',' e decimal '.', ex.: "R$ 12,345.67"), que
+# fica invertido em relação ao padrão brasileiro usado no resto do app e no
+# dashboard HTML embutido logo abaixo (que usa toLocaleString('pt-BR'),
+# ex.: "R$ 12.345,67") -- o mesmo número aparecia em dois formatos
+# diferentes na mesma tela.
+def _fmt_num(v, casas=0):
+    return f"{v:,.{casas}f}".replace(',', 'X').replace('.', ',').replace('X', '.')
+
+
+def _fmt_moeda(v):
+    return f"R$ {_fmt_num(v, 2)}"
+
+
 # ── Helpers de storage ───────────────────────────────────────────────────────
 
 def _dir_tipo(tipo):
@@ -249,20 +266,20 @@ def _exibir_metricas_resumo(resumo, tipo):
     if tipo == 'diario':
         r1, r2, r3, r4, r5, r6 = st.columns(6)
         cols_vals = [
-            (r1, 'Faturamento', f"R$ {resumo.get('faturamento', 0):,.2f}"),
-            (r2, 'MC R$', f"R$ {resumo.get('mc_rs', 0):,.2f}"),
-            (r3, 'MC %', f"{resumo.get('mc_pct', 0):.2f}%"),
-            (r4, 'Caixas', f"{resumo.get('caixas', 0):,.3f}"),
+            (r1, 'Faturamento', _fmt_moeda(resumo.get('faturamento', 0))),
+            (r2, 'MC R$', _fmt_moeda(resumo.get('mc_rs', 0))),
+            (r3, 'MC %', f"{resumo.get('mc_pct', 0):.2f}%".replace('.', ',')),
+            (r4, 'Caixas', _fmt_num(resumo.get('caixas', 0), 3)),
             (r5, 'Clientes', resumo.get('clientes', '-')),
             (r6, 'Vendedores', resumo.get('vendedores', '-')),
         ]
     else:
         r1, r2, r3, r4, r5 = st.columns(5)
         cols_vals = [
-            (r1, 'Faturamento', f"R$ {resumo.get('faturamento', 0):,.2f}"),
-            (r2, 'MC R$', f"R$ {resumo.get('mc_rs', 0):,.2f}"),
-            (r3, 'MC %', f"{resumo.get('mc_pct', 0):.2f}%"),
-            (r4, 'Caixas', f"{resumo.get('caixas', 0):,.3f}"),
+            (r1, 'Faturamento', _fmt_moeda(resumo.get('faturamento', 0))),
+            (r2, 'MC R$', _fmt_moeda(resumo.get('mc_rs', 0))),
+            (r3, 'MC %', f"{resumo.get('mc_pct', 0):.2f}%".replace('.', ',')),
+            (r4, 'Caixas', _fmt_num(resumo.get('caixas', 0), 3)),
             (r5, 'Clientes', resumo.get('clientes', '-')),
         ]
     for col, lab, val in cols_vals:
@@ -354,8 +371,8 @@ def _bloco_importar_historico(tipo, label_tipo, state_key, ref_sugerido=None):
                     clientes_h = len(set(it['cliente_codigo'] for it in itens_h))
                     mc_rs_h = fat_h - custo_h
                     mc_pct_h = mc_rs_h / custo_h * 100 if custo_h else 0.0
-                    st.caption(f"PDF lido: Faturamento R$ {fat_h:,.2f} · MC R$ {mc_rs_h:,.2f} · "
-                               f"Caixas {caixas_h:,.3f} · Clientes {clientes_h}")
+                    st.caption(f"PDF lido: Faturamento {_fmt_moeda(fat_h)} · MC {_fmt_moeda(mc_rs_h)} · "
+                               f"Caixas {_fmt_num(caixas_h, 3)} · Clientes {clientes_h}")
                     if st.button('💾 Salvar este período histórico', key=f'imp_salvar_pdf_{tipo}_{ctx}',
                                   type='primary', disabled=(ja_existe and not confirmar_dup)):
                         resumo_h = {'faturamento': round(fat_h, 2), 'mc_rs': round(mc_rs_h, 2),
@@ -475,6 +492,12 @@ def _navegar_e_exibir_historico(tipo, label_tipo):
                 key=f'quick_sel_{tipo}', index=None, placeholder='Selecione um período salvo...')
             if escolha_rapida:
                 st.session_state[state_key] = escolha_rapida
+                # Sem isto, o valor escolhido fica preso na key do widget e,
+                # como index=None só é aplicado na primeira criação dele, o
+                # próximo rerun recriaria o selectbox já com essa mesma opção
+                # selecionada -- disparando escolha_rapida verdadeiro de novo
+                # e um st.rerun() infinito (a página trava em "Running").
+                del st.session_state[f'quick_sel_{tipo}']
                 st.rerun()
 
     st.divider()
@@ -493,6 +516,24 @@ def _navegar_e_exibir_historico(tipo, label_tipo):
     st.caption(f'Período: {valores.get("periodo", "-")}  |  Salvo em: {gerado}' +
                (' · importado manualmente (sem PDF)' if origem == 'importacao_historica_manual' else ''))
 
+    _hist_versoes = ds.load_history(MODULO, tipo, ref_sel)
+    if _hist_versoes:
+        # data_store guarda TODAS as versões salvas para este período (ex.:
+        # o mesmo dia foi reenviado/corrigido mais de uma vez) -- antes isso
+        # ficava só no JSON do repositório, sem nenhum jeito de ver pela
+        # tela; aqui mostra ao menos quando cada versão anterior foi salva e
+        # por quem, para não ficar "invisível".
+        with st.expander(f'🕘 Versões anteriores deste período ({len(_hist_versoes)})'):
+            for _v in reversed(_hist_versoes):
+                _vres = (_v.get('valores', {}) or {}).get('resumo') or {}
+                _vquando = (_v.get('atualizado_em') or '')[:16].replace('T', ' ')
+                st.caption(
+                    f"Versão {_v.get('versao')} — salvo em {_vquando} por "
+                    f"{_v.get('usuario', 'não identificado')} — "
+                    f"Faturamento: {_fmt_moeda(_vres.get('faturamento', 0))}  |  "
+                    f"Caixas: {_fmt_num(_vres.get('caixas', 0), 3)}"
+                )
+
     _exibir_metricas_resumo(resumo, tipo)
 
     ref_ant = _periodo_anterior(tipo, ref_sel)
@@ -500,10 +541,18 @@ def _navegar_e_exibir_historico(tipo, label_tipo):
     st.subheader('📊 Comparativo vs período anterior')
     if reg_ant:
         resumo_ant = reg_ant.get('valores', {}).get('resumo') or {}
-        campos_cmp = [('Faturamento', 'faturamento', lambda x: f'R$ {x:,.2f}'),
-                      ('MC R$', 'mc_rs', lambda x: f'R$ {x:,.2f}'),
-                      ('Caixas', 'caixas', lambda x: f'{x:,.3f}'),
-                      ('Clientes', 'clientes', lambda x: f'{x:,.0f}')]
+        campos_cmp = [('Faturamento', 'faturamento', _fmt_moeda),
+                      ('MC R$', 'mc_rs', _fmt_moeda),
+                      ('MC %', 'mc_pct', lambda x: f'{x:.2f}%'.replace('.', ',')),
+                      ('Caixas', 'caixas', lambda x: _fmt_num(x, 3)),
+                      ('Clientes', 'clientes', lambda x: _fmt_num(x, 0))]
+        # MC % e Vendedores ficavam de fora deste comparativo, mesmo sendo
+        # mostrados nos cartões acima (_exibir_metricas_resumo) -- MC % é a
+        # métrica mais citada do negócio (margem de contribuição) e não
+        # tinha variação % nenhuma aqui. Vendedores só existe no resumo do
+        # Diário (não no Semanal/Mensal), por isso só entra quando presente.
+        if 'vendedores' in resumo and 'vendedores' in resumo_ant:
+            campos_cmp.append(('Vendedores', 'vendedores', lambda x: _fmt_num(x, 0)))
         cols_cmp = st.columns(len(campos_cmp))
         for col, (lab, chave, fmt) in zip(cols_cmp, campos_cmp):
             comp = comparativo.calcular(resumo.get(chave, 0), resumo_ant.get(chave))
@@ -586,10 +635,10 @@ def _render_tab(tipo, label_tipo):
 
         st.caption(f'Período: {periodo}  |  Emissão: {emissao}')
         c1, c2, c3, c4, c5 = st.columns(5)
-        c1.metric('Faturamento', f'R$ {fat_total:,.2f}')
-        c2.metric('MC R$',       f'R$ {mc_rs:,.2f}')
-        c3.metric('MC %',        f'{mc_pct:.2f}%')
-        c4.metric('Caixas',      f'{caixas_tot:,.3f}')
+        c1.metric('Faturamento', _fmt_moeda(fat_total))
+        c2.metric('MC R$',       _fmt_moeda(mc_rs))
+        c3.metric('MC %',        f'{mc_pct:.2f}%'.replace('.', ','))
+        c4.metric('Caixas',      _fmt_num(caixas_tot, 3))
         c5.metric('Clientes',    clientes)
 
         st.header(f'2. Gerar Dashboard {label_tipo}')
@@ -692,10 +741,10 @@ with tab_d:
         mc_pct = mc_rs / custo * 100 if custo else 0.0
 
         c1, c2, c3, c4, c5, c6 = st.columns(6)
-        c1.metric('Faturamento', f'R$ {faturamento:,.2f}')
-        c2.metric('MC R$', f'R$ {mc_rs:,.2f}')
-        c3.metric('MC %', f'{mc_pct:.2f}%')
-        c4.metric('Caixas', f'{caixas:,.3f}')
+        c1.metric('Faturamento', _fmt_moeda(faturamento))
+        c2.metric('MC R$', _fmt_moeda(mc_rs))
+        c3.metric('MC %', f'{mc_pct:.2f}%'.replace('.', ','))
+        c4.metric('Caixas', _fmt_num(caixas, 3))
         c5.metric('Clientes', clientes)
         c6.metric('Vendedores Ativos', vendedores)
 
