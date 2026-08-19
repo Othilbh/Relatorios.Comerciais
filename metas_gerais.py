@@ -24,14 +24,28 @@ trabalho duplicado de digitação):
 Somente a "Meta" (alvo) de cada indicador é configurada nesta tela — fica
 salva com histórico versionado via data_store (mudar a meta no meio do
 período não apaga o valor anterior).
+
+OnTrack Semanal (quebra da meta MENSAL): a meta mensal de Faturamento
+(empresa e, opcionalmente, de cada vendedor) pode ser acompanhada semana a
+semana sem nunca mudar de valor -- só a EXPECTATIVA de quanto dela já
+deveria ter sido vendida em cada semana muda, via percentuais incrementais
+configuráveis (padrão 30/28/25/25, acumulados: 30/58/83/108 -- pode passar
+de 100%, isso é esperado e nunca é limitado). O "vendido acumulado" real
+usa o histórico versionado do Vendedor-Cliente daquele mês (cada upload
+durante o mês vira uma versão datada) -- pega a versão mais recente até o
+fim de cada semana, sem inventar número. Só existe pra tipo_periodo
+'mensal' (não faz sentido quebrar um trimestre/ano em "semanas 1-4").
 """
-from datetime import timedelta
+from datetime import timedelta, date
 
 import periodo
 import on_track
 import data_store as ds
 
 MODULO_META = 'metas_gerais_config'
+MODULO_META_VENDEDORES = 'metas_gerais_config_vendedores'
+MODULO_PCTS_SEMANAIS = 'metas_gerais_pcts_semanais'
+PCTS_SEMANAIS_PADRAO = [30.0, 28.0, 25.0, 25.0]
 
 MOD_VENDEDOR_CLIENTE = 'vendedor_cliente'
 MOD_QUEBRA = 'quebra'
@@ -64,6 +78,135 @@ def historico_meta(tipo_periodo: str, periodo_ref: str) -> list:
     o histórico versionado do data_store -- salvar uma meta nova nunca
     apaga a anterior, ela só passa a aparecer aqui."""
     return ds.load_history(MODULO_META, tipo_periodo, periodo_ref)
+
+
+# ---------------------------------------------------------------------------
+# Meta fixa individual de cada vendedor (Faturamento, R$) -- independente da
+# meta da empresa (módulo separado), mas mesma mecânica: digitada uma vez
+# por período, versionada, nunca é a soma/fatia calculada de outra coisa.
+# ---------------------------------------------------------------------------
+
+def salvar_metas_vendedores(tipo_periodo: str, periodo_ref: str, metas: dict,
+                             usuario: str = None) -> dict:
+    """metas: {nome_vendedor: valor_faturamento_R$}."""
+    return ds.save_record(
+        modulo=MODULO_META_VENDEDORES, tipo_periodo=tipo_periodo, periodo_ref=periodo_ref,
+        valores={'metas': metas}, usuario=usuario,
+    )
+
+
+def carregar_metas_vendedores(tipo_periodo: str, periodo_ref: str) -> dict:
+    reg = ds.load_current(MODULO_META_VENDEDORES, tipo_periodo, periodo_ref)
+    return (reg['valores'].get('metas') if reg else None) or {}
+
+
+# ---------------------------------------------------------------------------
+# Percentuais semanais (quebra da meta mensal) -- configuração global,
+# reaproveitada em todos os meses até a Ingrid decidir mudar.
+# ---------------------------------------------------------------------------
+
+def carregar_pcts_semanais() -> list:
+    reg = ds.load_current(MODULO_PCTS_SEMANAIS, 'global', 'config')
+    valores = reg['valores'].get('percentuais') if reg else None
+    return list(valores) if valores else list(PCTS_SEMANAIS_PADRAO)
+
+
+def salvar_pcts_semanais(percentuais: list, usuario: str = None) -> dict:
+    return ds.save_record(
+        modulo=MODULO_PCTS_SEMANAIS, tipo_periodo='global', periodo_ref='config',
+        valores={'percentuais': percentuais}, usuario=usuario,
+    )
+
+
+# ---------------------------------------------------------------------------
+# OnTrack Semanal — quebra da meta MENSAL fixa (Faturamento) por semana
+# ---------------------------------------------------------------------------
+
+def _vendido_acumulado_ate(mes_ref: str, data_limite: date) -> dict:
+    """totais_dict (por vendedor: fat/vol/custo) do Vendedor-Cliente daquele
+    mês, na versão mais recente cujo timestamp seja <= data_limite -- ou
+    seja, 'o que já estava vendido' até aquele momento, reconstruído a
+    partir dos uploads reais já feitos (cada upload durante o mês gera uma
+    versão nova via data_store). Não inventa nem interpola nenhum número;
+    se não houver nenhuma versão até essa data, devolve {} (sem dado ainda
+    naquele momento)."""
+    versoes = ds.load_all_versions(MOD_VENDEDOR_CLIENTE, 'mensal', mes_ref)
+    melhor = None
+    for v in versoes:
+        ts = (v.get('atualizado_em') or v.get('criado_em') or '')[:10]
+        if not ts:
+            continue
+        try:
+            data_v = date.fromisoformat(ts)
+        except ValueError:
+            continue
+        if data_v <= data_limite and (melhor is None or data_v >= melhor[0]):
+            melhor = (data_v, v)
+    if melhor is None:
+        return {}
+    return (melhor[1].get('valores') or {}).get('totais_dict', {}) or {}
+
+
+def quebra_semanal_meta(mes_ref: str, meta_fixa, pcts_semanais: list = None,
+                         hoje: date = None, vendedor: str = None) -> list:
+    """Quebra a meta MENSAL fixa (Faturamento, R$) em checkpoints semanais.
+
+    A meta fixa NUNCA muda -- é sempre a referência de 100%. Os percentuais
+    semanais são incrementais e são ACUMULADOS pra saber quanto da meta fixa
+    já era esperado até cada semana (podem somar mais ou menos que 100%; o
+    acumulado e o atingimento NUNCA são limitados a 100%).
+
+    vendedor=None -> total da empresa (soma de todos os vendedores no
+    Vendedor-Cliente). vendedor='Nome' -> só aquele vendedor -- nesse caso
+    `meta_fixa` deve ser a meta fixa DELE (não a da empresa).
+
+    Retorna uma linha por semana do mês:
+      {'semana', 'periodo_ref', 'label', 'pct_semana', 'pct_acumulado',
+       'esperado_acumulado', 'vendido_acumulado' (None se a semana ainda
+       não começou), 'atingimento' (None se não dá pra calcular)}.
+    """
+    if pcts_semanais is None:
+        pcts_semanais = carregar_pcts_semanais()
+    meta_fixa = meta_fixa or 0
+    hoje = hoje or date.today()
+    semanas = _semanas_do_mes(mes_ref)
+
+    linhas = []
+    pct_acum = 0.0
+    for i, slug in enumerate(semanas):
+        pct_sem = pcts_semanais[i] if i < len(pcts_semanais) else 0.0
+        pct_acum += pct_sem
+        esperado = meta_fixa * pct_acum / 100
+
+        inicio_sem, fim_sem = periodo.intervalo_datas('semanal', slug)
+        if hoje < inicio_sem:
+            vendido = None  # semana ainda não começou -- não há como ter dado
+        else:
+            totais = _vendido_acumulado_ate(mes_ref, min(fim_sem, hoje))
+            # totais vazio cobre tanto "nenhuma publicação ainda" quanto
+            # "publicação existe mas sem vendedores" -- não dá pra distinguir
+            # dos dois "vendeu 0", então trata como sem dado (None) em vez de
+            # mostrar um 0 enganoso.
+            if not totais:
+                vendido = None
+            elif vendedor is None:
+                vendido = sum(v.get('fat', 0) or 0 for v in totais.values())
+            else:
+                vendido = (totais.get(vendedor) or {}).get('fat')
+
+        atingimento = (vendido / esperado * 100) if (vendido is not None and esperado) else None
+
+        linhas.append({
+            'semana': i + 1,
+            'periodo_ref': slug,
+            'label': periodo.rotulo('semanal', slug),
+            'pct_semana': pct_sem,
+            'pct_acumulado': pct_acum,
+            'esperado_acumulado': esperado,
+            'vendido_acumulado': vendido,
+            'atingimento': atingimento,
+        })
+    return linhas
 
 
 # ---------------------------------------------------------------------------
