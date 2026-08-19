@@ -28,6 +28,14 @@ try:
 except Exception:
     _GSHEETS_OK = False
 
+def _fmt_num(v, casas=0):
+    return f"{v:,.{casas}f}".replace(',', 'X').replace('.', ',').replace('X', '.')
+
+
+def _fmt_moeda(v):
+    return f"R$ {_fmt_num(v, 2)}"
+
+
 _GERENCIA_DIR = os.path.join(os.path.dirname(__file__), '..', 'gerencia_data')
 MODULO = 'recorrencia'
 TIPO_PERIODO_LEGADO = 'livre'  # período de texto livre usado antes desta versão -- mantido só
@@ -190,10 +198,10 @@ if 'resultado_rec' in st.session_state:
     st.caption(f'Periodo (texto do PDF): {periodo_pdf_texto}  |  Emissao: {emissao}  |  '
                f'{len(itens_validos)} itens (excluindo Luca)')
     c1, c2, c3, c4, c5, c6 = st.columns(6)
-    c1.metric('Faturamento', f'R$ {fat_total:,.2f}')
-    c2.metric('MC R$', f'R$ {mc_rs_total:,.2f}')
+    c1.metric('Faturamento', _fmt_moeda(fat_total))
+    c2.metric('MC R$', _fmt_moeda(mc_rs_total))
     c3.metric('MC %', f'{mc_pct_total:.2f}%')
-    c4.metric('Total CX', f'{cx_total:,.3f}')
+    c4.metric('Total CX', _fmt_num(cx_total, 3))
     c5.metric('Clientes', clientes)
     c6.metric('Vendedores', vendedores)
 
@@ -249,8 +257,8 @@ if 'resultado_rec' in st.session_state:
                 (cc4, 'Clientes', clientes, 'n_clientes'),
             ]:
                 _comp = comparativo.calcular(_atual_v, _tot_ant.get(_chave))
-                _fmt = (lambda x: f'R$ {x:,.2f}') if _chave in ('faturamento', 'mc_rs') else \
-                       (lambda x: f'{x:,.3f}') if _chave == 'caixas' else (lambda x: f'{x:,.0f}')
+                _fmt = (lambda x: _fmt_moeda(x)) if _chave in ('faturamento', 'mc_rs') else \
+                       (lambda x: _fmt_num(x, 3)) if _chave == 'caixas' else (lambda x: _fmt_num(x, 0))
                 _col.metric(_label, _fmt(_atual_v), delta=comparativo.formatar_variacao(_comp))
             st.caption(f'Base de comparação: {periodo.rotulo(tipo_periodo_rec, _ref_ant)} '
                        f'(emissão {_val_ant.get("emissao","-")})')
@@ -265,9 +273,9 @@ if 'resultado_rec' in st.session_state:
 
         # Formatação visual
         styled = df.style.format({
-            'Faturamento R$': 'R$ {:,.2f}',
-            'Caixas': '{:,.3f}',
-            'MC R$': 'R$ {:,.2f}',
+            'Faturamento R$': lambda v: _fmt_moeda(v),
+            'Caixas': lambda v: _fmt_num(v, 3),
+            'MC R$': lambda v: _fmt_moeda(v),
             'MC %': '{:.2f}%',
         })
 
@@ -337,10 +345,10 @@ if 'resultado_rec' in st.session_state:
         _ref_h, _val_h, _ts_h = _hist_todos[_idx_h]
         _tot_h = _val_h.get('totais', {})
         hc1, hc2, hc3, hc4, hc5 = st.columns(5)
-        hc1.metric('Faturamento', f"R$ {_tot_h.get('faturamento', 0):,.2f}")
-        hc2.metric('MC R$', f"R$ {_tot_h.get('mc_rs', 0):,.2f}")
+        hc1.metric('Faturamento', _fmt_moeda(_tot_h.get('faturamento', 0)))
+        hc2.metric('MC R$', _fmt_moeda(_tot_h.get('mc_rs', 0)))
         hc3.metric('MC %', f"{_tot_h.get('mc_pct', 0):.2f}%")
-        hc4.metric('Total CX', f"{_tot_h.get('caixas', 0):,.3f}")
+        hc4.metric('Total CX', _fmt_num(_tot_h.get('caixas', 0), 3))
         hc5.metric('Clientes', _tot_h.get('n_clientes', '-'))
 
         _clientes_h = _val_h.get('clientes', [])
@@ -348,9 +356,9 @@ if 'resultado_rec' in st.session_state:
             import pandas as pd
             df_h = pd.DataFrame(_clientes_h)
             styled_h = df_h.style.format({
-                'Faturamento R$': 'R$ {:,.2f}',
-                'Caixas': '{:,.3f}',
-                'MC R$': 'R$ {:,.2f}',
+                'Faturamento R$': lambda v: _fmt_moeda(v),
+                'Caixas': lambda v: _fmt_num(v, 3),
+                'MC R$': lambda v: _fmt_moeda(v),
                 'MC %': '{:.2f}%',
             })
             st.dataframe(styled_h, use_container_width=True, hide_index=True)
@@ -367,7 +375,7 @@ if 'resultado_rec' in st.session_state:
                     _quem = _v.get('usuario', 'não identificado')
                     _t = _v.get('valores', {}).get('totais', {})
                     st.caption(f"v{_v.get('versao','?')} — {_quando} — por {_quem} — "
-                               f"Faturamento R$ {_t.get('faturamento', 0):,.2f}")
+                               f"Faturamento {_fmt_moeda(_t.get('faturamento', 0))}")
 
     _hist_legado = _listar_recorrencias_legado()
     if _hist_legado:
@@ -383,7 +391,7 @@ if 'resultado_rec' in st.session_state:
                 _quando_l = (_ts_l or '')[:16].replace('T', ' ')
                 st.caption(
                     f"{_val_l.get('periodo','-')} — emissão {_val_l.get('emissao','-')} "
-                    f"({_quando_l}) — Faturamento R$ {_tot_l.get('faturamento', 0):,.2f}"
+                    f"({_quando_l}) — Faturamento {_fmt_moeda(_tot_l.get('faturamento', 0))}"
                 )
 
 else:
