@@ -107,6 +107,10 @@ def _brl(v: float) -> str:
     s = f"{abs(v):,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
     return f"R$ {'-' if v < 0 else ''}{s}"
 
+def _num(v, casas: int = 0) -> str:
+    """Formata número (não monetário) no padrão brasileiro: 1.234"""
+    return f"{v:,.{casas}f}".replace(',', 'X').replace('.', ',').replace('X', '.')
+
 def _ot_status(atual_pct: float, elapsed_pct: float):
     """Retorna (emoji, label, ratio) para status On Track — via lógica
     central (on_track.py), mesmos limiares 0,85/0,55 usados em todo o app."""
@@ -809,7 +813,7 @@ with tab_top50:
                     'Vendedor': vendedor, 'Cliente': cliente,
                     '_fat': fat, '_vol': vol, '_mc_rs': mc_rs, '_mc_pct': mc_pct,
                     '_pct_atg': pct_atg or 0, 'Faturamento': _brl(fat),
-                    'Volume (cx)': f'{vol:,.0f}', 'Margem (MC R$)': _brl(mc_rs),
+                    'Volume (cx)': _num(vol), 'Margem (MC R$)': _brl(mc_rs),
                     'Rentabilidade': f'{mc_pct:.1f}%',
                     'Comparativo': comparativo.formatar_variacao(comp),
                     '% Atingido': f'{pct_atg*100:.1f}%' if pct_atg is not None else '—',
@@ -897,7 +901,7 @@ with tab_por_vend:
 
             linhas_pv.append({
                 '_fat': fat,
-                'Cliente': cliente, 'Faturamento': _brl(fat), 'Volume (cx)': f'{vol:,.0f}',
+                'Cliente': cliente, 'Faturamento': _brl(fat), 'Volume (cx)': _num(vol),
                 'Margem (MC R$)': _brl(mc_rs), 'Rentabilidade': f'{mc_pct:.1f}%',
                 'Comparativo': comparativo.formatar_variacao(comp),
                 'Participação no vendedor': f'{participacao*100:.1f}%',
