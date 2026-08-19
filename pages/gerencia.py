@@ -656,8 +656,10 @@ def _render_ontrack_publicado():
 
     st.divider()
 
-    # KPIs gerais
-    total_meta = sum(l['meta']    for r in resultados for l in r.get('linhas', []))
+    # KPIs gerais -- meta geral = soma do 'estoque_total' real de cada
+    # produto, nunca a soma das metas individuais dos vendedores (essa soma
+    # é inflada pelo arredondamento pra cima de cada meta individual).
+    total_meta = sum(r.get('estoque_total', 0) for r in resultados)
     total_vend = sum(l['vendido'] for r in resultados for l in r.get('linhas', []))
     total_atg  = total_vend / total_meta if total_meta else 0
     proj_cx    = math.ceil(total_vend / dia * 5) if dia > 0 else total_vend
@@ -676,7 +678,7 @@ def _render_ontrack_publicado():
         r1, r2, r3 = st.columns(3)
         r1.metric('Faturamento', f"R$ {tg.get('fat', 0):,.2f}")
         r2.metric('MC R$',       f"R$ {tg.get('mc_rs', 0):,.2f}")
-        r3.metric('MC %',        f"{tg.get('mc_pct', 0):.2f}%")
+        r3.metric('MC %',        f"{tg.get('resultado_real', 0):.2f}%")
 
     # ── Comparativo vs semana anterior salva ────────────────────────────────
     if historico_ot and idx_ot + 1 < len(historico_ot):
@@ -705,7 +707,9 @@ def _render_ontrack_publicado():
     st.subheader('Por Produto')
     prow = []
     for r in resultados:
-        p_meta = sum(l['meta']    for l in r.get('linhas', []))
+        # Meta do produto = 'estoque_total' real, não a soma das metas
+        # individuais por vendedor (ver nota nos KPIs gerais acima).
+        p_meta = r.get('estoque_total', 0)
         p_vend = sum(l['vendido'] for l in r.get('linhas', []))
         p_atg  = p_vend / p_meta if p_meta else 0
         p_em, p_lb, _ = _on_track_status_ger(p_atg, dia)
@@ -842,7 +846,7 @@ def _render_fechamentos_semanais():
     st.caption(f"Período: {dados.get('periodo', '-')}  |  Salvo em: {gerado}")
 
     prods     = dados.get('produtos', [])
-    h_meta    = sum(l['meta']    for r in prods for l in r.get('linhas', []))
+    h_meta    = sum(r.get('estoque_total', 0) for r in prods)
     h_vend    = sum(l['vendido'] for r in prods for l in r.get('linhas', []))
     h_atg     = h_vend / h_meta if h_meta else 0
 
@@ -856,7 +860,7 @@ def _render_fechamentos_semanais():
         r1, r2, r3 = st.columns(3)
         r1.metric('Faturamento', f"R$ {tg.get('fat', 0):,.2f}")
         r2.metric('MC R$',       f"R$ {tg.get('mc_rs', 0):,.2f}")
-        r3.metric('MC %',        f"{tg.get('mc_pct', 0):.2f}%")
+        r3.metric('MC %',        f"{tg.get('resultado_real', 0):.2f}%")
 
     st.divider()
 
@@ -877,7 +881,7 @@ def _render_fechamentos_semanais():
         fat_anterior = None
         for s, d in historico_asc:
             dp    = d.get('produtos', [])
-            dm    = sum(l['meta']    for r in dp for l in r.get('linhas', []))
+            dm    = sum(r.get('estoque_total', 0) for r in dp)
             dv    = sum(l['vendido'] for r in dp for l in r.get('linhas', []))
             da    = dv / dm if dm else 0
             dtg   = d.get('totais_rs', {}).get('total_geral', {})
@@ -895,7 +899,7 @@ def _render_fechamentos_semanais():
                 '% Atingido':   f'{da*100:.1f}%',
                 'Fat R$':       f"R$ {fat:,.2f}" if fat is not None else '—',
                 'Δ Fat':        comparativo.formatar_variacao(comp_f, casas=1) if comp_f else 'n/d',
-                'MC %':         f"{dtg.get('mc_pct', 0):.2f}%" if dtg else '—',
+                'MC %':         f"{dtg.get('resultado_real', 0):.2f}%" if dtg else '—',
             })
             vend_anterior = dv
             fat_anterior = fat
