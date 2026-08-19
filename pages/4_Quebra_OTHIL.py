@@ -12,6 +12,14 @@ from parser_quebra import parse_quebra
 import comparativo
 import data_store as ds
 
+def _fmt_num(v, casas=0):
+    return f"{v:,.{casas}f}".replace(',', 'X').replace('.', ',').replace('X', '.')
+
+
+def _fmt_moeda(v):
+    return f"R$ {_fmt_num(v, 2)}"
+
+
 MODULO = 'quebra'
 
 _QUEBRA_DIR = os.path.join(os.path.dirname(__file__), '..', 'gerencia_data', 'quebra')
@@ -105,13 +113,13 @@ def _render_dashboard(dados: dict, tipo: str, slug: str, dados_ant: dict = None,
 
     # KPI principal
     col1, col2 = st.columns(2)
-    col1.metric('Total CX Quebradas', f"{total:,.0f} cx")
+    col1.metric('Total CX Quebradas', f"{_fmt_num(total, 0)} cx")
     categorias = dados.get('categorias', [])
     if categorias:
         top_cat = categorias[0]
         col2.metric(
             f'Maior Categoria: {top_cat["categoria"]}',
-            f"{top_cat['cx']:,.0f} cx"
+            f"{_fmt_num(top_cat['cx'], 0)} cx"
         )
 
     # ── Comparativo automático vs período anterior salvo (menor é melhor)
@@ -120,7 +128,7 @@ def _render_dashboard(dados: dict, tipo: str, slug: str, dados_ant: dict = None,
         comp_auto = comparativo.calcular(total, total_ant, menor_e_melhor=True)
         st.metric(
             f'📊 vs período anterior ({label_ant})',
-            f"{total:,.0f} cx",
+            f"{_fmt_num(total, 0)} cx",
             delta=comparativo.formatar_variacao(comp_auto, casas=1),
             delta_color='inverse',
         )
@@ -201,7 +209,7 @@ def _render_tab(tipo: str, label_tipo: str):
                         _salvar(dados, tipo, slug, usuario=st.session_state.get('usuario_nome'))
                         st.success(
                             f"✅ Salvo! {_label_slug(slug, tipo)} — "
-                            f"{dados['total_cx']:,.0f} CX quebradas  |  "
+                            f"{_fmt_num(dados['total_cx'], 0)} CX quebradas  |  "
                             f"Período: {dados.get('periodo', '-')}"
                         )
                         st.session_state[f'qbr_{tipo}_idx'] = 0
@@ -303,11 +311,11 @@ def _render_comparativo():
     comp = comparativo.calcular(total_b, total_a, menor_e_melhor=True)
 
     c1, c2, c3 = st.columns(3)
-    c1.metric(f'Total CX — {label_a}', f"{total_a:,.0f} cx")
-    c2.metric(f'Total CX — {label_b}', f"{total_b:,.0f} cx")
+    c1.metric(f'Total CX — {label_a}', f"{_fmt_num(total_a, 0)} cx")
+    c2.metric(f'Total CX — {label_b}', f"{_fmt_num(total_b, 0)} cx")
     c3.metric(
         'Variação (B − A)',
-        f"{comp['diferenca_absoluta']:+,.0f} cx",
+        f"{'+' if comp['diferenca_absoluta'] >= 0 else ''}{_fmt_num(comp['diferenca_absoluta'], 0)} cx",
         delta=comparativo.formatar_variacao(comp, casas=1),
         delta_color='inverse',   # vermelho = mais quebra = ruim
     )
@@ -336,9 +344,10 @@ def _render_comparativo():
         axis=1,
     )
     df_cat_tbl = df_cat_tbl.reset_index().rename(columns={'index': 'Categoria'})
-    df_cat_tbl[label_a]      = df_cat_tbl[label_a].map(lambda x: f"{x:,.0f}")
-    df_cat_tbl[label_b]      = df_cat_tbl[label_b].map(lambda x: f"{x:,.0f}")
-    df_cat_tbl['Δ (B − A)']  = df_cat_tbl['Δ (B − A)'].map(lambda x: f"{x:+,.0f}")
+    df_cat_tbl[label_a]      = df_cat_tbl[label_a].map(lambda x: _fmt_num(x, 0))
+    df_cat_tbl[label_b]      = df_cat_tbl[label_b].map(lambda x: _fmt_num(x, 0))
+    df_cat_tbl['Δ (B − A)']  = df_cat_tbl['Δ (B − A)'].map(
+        lambda x: f"{'+' if x >= 0 else ''}{_fmt_num(x, 0)}")
     st.dataframe(df_cat_tbl, use_container_width=True, hide_index=True)
 
     st.divider()
@@ -371,9 +380,10 @@ def _render_comparativo():
     else:
         df_grp = pd.DataFrame(rows).sort_values('Δ (B − A)', ascending=False)
         df_grp_fmt = df_grp.copy()
-        df_grp_fmt[label_a]     = df_grp_fmt[label_a].map(lambda x: f"{x:,.0f}")
-        df_grp_fmt[label_b]     = df_grp_fmt[label_b].map(lambda x: f"{x:,.0f}")
-        df_grp_fmt['Δ (B − A)'] = df_grp_fmt['Δ (B − A)'].map(lambda x: f"{x:+,.0f}")
+        df_grp_fmt[label_a]     = df_grp_fmt[label_a].map(lambda x: _fmt_num(x, 0))
+        df_grp_fmt[label_b]     = df_grp_fmt[label_b].map(lambda x: _fmt_num(x, 0))
+        df_grp_fmt['Δ (B − A)'] = df_grp_fmt['Δ (B − A)'].map(
+            lambda x: f"{'+' if x >= 0 else ''}{_fmt_num(x, 0)}")
         st.dataframe(df_grp_fmt, use_container_width=True, hide_index=True)
 
 
