@@ -392,28 +392,49 @@ def _render_on_track():
 
     st.divider()
 
-    # ── Detalhamento por Produto ──────────────────────────────────────────
-    st.subheader('Detalhamento por Produto')
+    # ── On Track por Produto ────────────────────────────────────────────────
+    # Mesmo padrão visual/estrutural do "On Track por Vendedor" acima (uma
+    # tabela via st.dataframe, não mais uma lista de accordions) -- pedido
+    # explícito da Ingrid pra deixar os dois blocos com a mesma cara. As
+    # colunas usam Meta/Vendido em CAIXAS (cx), não em R$: não existe hoje
+    # nenhum Faturamento/MC calculado por PRODUTO no app (só por vendedor,
+    # vindo do PDF de Lucratividade) -- confirmado com a Ingrid antes desta
+    # mudança, pra não inventar um valor em R$ que não existe de verdade.
+    st.subheader('On Track por Produto')
+
+    sort_by_prod = st.selectbox(
+        'Ordenar produtos por',
+        ['Maior % atingido', 'Maior volume (cx)', 'Alfabético'],
+        key='ont_sort_prod',
+    )
+
+    rows_prod = []
     for r in resultados:
-        prio  = r.get('prioridade', 'Normal')
-        badge = f' {prio}' if prio != 'Normal' else ''
         p_meta = sum(l['meta']    for l in r['linhas'])
         p_vend = sum(l['vendido'] for l in r['linhas'])
         p_atg  = p_vend / p_meta if p_meta else 0
         p_em, p_lb, _ = _on_track_status(p_atg, dia_semana)
+        rows_prod.append({
+            'Produto':      r['produto'],
+            'Meta (cx)':    p_meta,
+            'Vendido (cx)': p_vend,
+            '% Atingido':   p_atg,
+            'Status':       f'{p_em} {p_lb}',
+        })
 
-        with st.expander(
-            f"{r['produto']}{badge} — {r['estoque_total']:.0f} cx  |  "
-            f"{p_vend:,.0f}/{p_meta:,.0f} cx ({p_atg*100:.1f}%)  {p_em} {p_lb}"
-        ):
-            df_prod = pd.DataFrame([{
-                'Vendedor':     l['vendedor'],
-                'Meta (cx)':   f"{l['meta']:,.0f}",
-                'Vendido (cx)': f"{l['vendido']:,.0f}",
-                'Falta (cx)':  f"{l['falta']:,.0f}",
-                '% Atingido':  f"{l['atingido']*100:.1f}%",
-            } for l in r['linhas']])
-            st.dataframe(df_prod, use_container_width=True, hide_index=True)
+    if sort_by_prod == 'Maior % atingido':
+        rows_prod.sort(key=lambda r: r['% Atingido'], reverse=True)
+    elif sort_by_prod == 'Maior volume (cx)':
+        rows_prod.sort(key=lambda r: r['Vendido (cx)'], reverse=True)
+    else:
+        rows_prod.sort(key=lambda r: r['Produto'])
+
+    df_prod = pd.DataFrame(rows_prod)
+    df_prod['Meta (cx)']    = df_prod['Meta (cx)'].map(lambda x: f'{x:,.0f}')
+    df_prod['Vendido (cx)'] = df_prod['Vendido (cx)'].map(lambda x: f'{x:,.0f}')
+    df_prod['% Atingido']   = df_prod['% Atingido'].map(lambda x: f'{x*100:.1f}%')
+
+    st.dataframe(df_prod, use_container_width=True, hide_index=True)
 
 
 # ---------------------------------------------------------------------------
@@ -762,6 +783,20 @@ with tab_cfg:
 
     if remover_idx is not None:
         cfg['produtos'].pop(remover_idx)
+        # Mesma causa raiz do bug já corrigido na importação de configuração
+        # (ver comentário abaixo, em '_cfg_upload_processado'): as keys dos
+        # widgets (nome_i, cod_i, est_i, prio_i) são posicionais. Remover um
+        # produto do meio da lista desloca o índice de todos os que vêm
+        # depois, mas os widgets recriados nesses índices ignoram o novo
+        # `value=` porque a key já existe no session_state — cada produto
+        # após o removido passava a exibir os dados do produto anterior a
+        # ele (nome/código/estoque "grudados"), e esse valor errado podia
+        # até ser salvo de volta na configuração. Limpar aqui garante que
+        # cada widget reinicialize do zero com os dados corretos da lista já
+        # atualizada.
+        for _k in list(st.session_state.keys()):
+            if _k.startswith(('nome_', 'cod_', 'est_', 'prio_')):
+                del st.session_state[_k]
         st.rerun()
 
     cb1, cb2 = st.columns([1, 3])
@@ -792,24 +827,64 @@ with tab_cfg:
         # st.rerun() logo abaixo entrava em loop infinito assim que um
         # arquivo era importado (a página nunca terminava de "Running...").
         if up_cfg is not None and st.session_state.get('_cfg_upload_processado') != up_cfg.file_id:
-            st.session_state.config = json.load(up_cfg)
-            save_config(st.session_state.config, show_feedback=False)
-            st.session_state['_cfg_upload_processado'] = up_cfg.file_id
-            # Limpa o estado dos widgets por produto/vendedor (nome_i, cod_i,
-            # est_i, prio_i, pct_vend) guardado da config ANTERIOR. Sem isso,
-            # um widget com 'key' já existente ignora o `value=`/`index=` em
-            # reruns seguintes e continua mostrando o valor antigo -- então
-            # um produto que ocupa o mesmo índice na config antiga e na
-            # importada continuava exibindo nome/código antigos mesmo depois
-            # do import (e esse valor velho é que ia pro cálculo e podia até
-            # ser salvo de volta, sobrescrevendo o import). Isso combina
-            # exatamente com "alguns códigos não puxam, e outros puxaram
-            # errado" -- limpar aqui garante que cada widget reinicialize do
-            # zero com os dados recém-importados.
-            for _k in list(st.session_state.keys()):
-                if _k.startswith(('nome_', 'cod_', 'est_', 'prio_', 'pct_')):
-                    del st.session_state[_k]
-            st.rerun()
+            # Valida/normaliza o conteúdo importado ANTES de aceitar. Sem
+            # isso, um JSON editado à mão, exportado de uma versão antiga do
+            # app, ou simplesmente inválido, derrubava a página inteira com
+            # um traceback técnico (ex.: "vendedor_pcts" vazio/ausente vira
+            # st.columns(0) mais abaixo -> StreamlitInvalidColumnSpecError;
+            # um produto sem "nome"/"codigos_texto" vira KeyError na hora de
+            # renderizar) em vez de avisar a Ingrid de forma compreensível.
+            try:
+                bruto = json.load(up_cfg)
+                if not isinstance(bruto, dict) or not isinstance(bruto.get('produtos'), list) \
+                        or not bruto['produtos']:
+                    raise ValueError('o arquivo precisa ter uma lista "produtos" com pelo menos 1 item')
+                produtos_importados = []
+                for item in bruto['produtos']:
+                    if not isinstance(item, dict):
+                        continue
+                    prioridade = item.get('prioridade')
+                    produtos_importados.append({
+                        'nome': str(item.get('nome', '')),
+                        'codigos_texto': str(item.get('codigos_texto', '')),
+                        'estoque': int(item.get('estoque') or 0),
+                        'prioridade': prioridade if prioridade in _PRIORIDADES else 'Normal',
+                    })
+                if not produtos_importados:
+                    raise ValueError('nenhum produto válido encontrado no arquivo')
+                vendedor_pcts_importado = bruto.get('vendedor_pcts')
+                if not isinstance(vendedor_pcts_importado, dict) or not vendedor_pcts_importado:
+                    # Sem "vendedor_pcts" válido, cai para o padrão em vez de
+                    # travar a tela (dict vazio -> st.columns(0) mais abaixo).
+                    vendedor_pcts_importado = dict(VENDEDORES_PADRAO)
+                else:
+                    vendedor_pcts_importado = {str(k): int(v or 0)
+                                                for k, v in vendedor_pcts_importado.items()}
+            except (json.JSONDecodeError, ValueError, TypeError, AttributeError) as e:
+                st.error(f'Não foi possível importar este arquivo: {e}. Verifique se é um JSON de '
+                         'configuração exportado por este mesmo app (botão "⬇️ Exportar configuração").')
+            else:
+                st.session_state.config = {
+                    'produtos': produtos_importados,
+                    'vendedor_pcts': vendedor_pcts_importado,
+                }
+                save_config(st.session_state.config, show_feedback=False)
+                st.session_state['_cfg_upload_processado'] = up_cfg.file_id
+                # Limpa o estado dos widgets por produto/vendedor (nome_i, cod_i,
+                # est_i, prio_i, pct_vend) guardado da config ANTERIOR. Sem isso,
+                # um widget com 'key' já existente ignora o `value=`/`index=` em
+                # reruns seguintes e continua mostrando o valor antigo -- então
+                # um produto que ocupa o mesmo índice na config antiga e na
+                # importada continuava exibindo nome/código antigos mesmo depois
+                # do import (e esse valor velho é que ia pro cálculo e podia até
+                # ser salvo de volta, sobrescrevendo o import). Isso combina
+                # exatamente com "alguns códigos não puxam, e outros puxaram
+                # errado" -- limpar aqui garante que cada widget reinicialize do
+                # zero com os dados recém-importados.
+                for _k in list(st.session_state.keys()):
+                    if _k.startswith(('nome_', 'cod_', 'est_', 'prio_', 'pct_')):
+                        del st.session_state[_k]
+                st.rerun()
 
     st.divider()
 
@@ -866,6 +941,13 @@ with tab_cfg:
                             'senha e tente enviar novamente.'
                         )
                         vendas_rows = None
+                        # Não apaga um 'resultados' de um cálculo anterior bem-sucedido
+                        # (evita perder o último trabalho válido), mas marca que ele está
+                        # desatualizado -- sem isso, a seção "Resultados" mais abaixo
+                        # continuava mostrando os números antigos como se fossem deste
+                        # envio, sem nenhum aviso de que o PDF atual falhou.
+                        if 'resultados' in st.session_state:
+                            st.session_state['_resultados_desatualizados'] = True
 
                 # Tenta extrair dados em R$ do mesmo PDF (Lucratividade por Vendedor)
                 if vendas_rows is not None:
@@ -894,11 +976,18 @@ with tab_cfg:
                 st.session_state['vendas_bytes']    = vendas_bytes
                 st.session_state['resultados']      = resultados
                 st.session_state['produtos_config'] = produtos_config
+                st.session_state['_resultados_desatualizados'] = False
                 save_config(cfg, show_feedback=False)
                 st.success('Cálculo concluído. Confira a aba **📊 On Track** para o dashboard.')
 
     # ── Resultados ────────────────────────────────────────────────────────
     if 'resultados' in st.session_state:
+        if st.session_state.get('_resultados_desatualizados'):
+            st.warning(
+                '⚠️ O último PDF enviado não pôde ser lido. Os resultados abaixo são de um '
+                'cálculo anterior e NÃO refletem o arquivo mais recente — corrija/reenvie o '
+                'PDF e clique em "▶️ Calcular metas" novamente antes de usar estes números.'
+            )
         resultados      = st.session_state['resultados']
         estoque_rows    = st.session_state['estoque_rows']
         vendas_rows_diag = st.session_state.get('vendas_rows', [])
@@ -1043,6 +1132,16 @@ with tab_cfg:
 
         # ── Publicar para Gerência ────────────────────────────────────────
         st.divider()
+        st.caption(
+            'Semana de referência para a publicação — deixe em hoje para a semana atual. '
+            'Se estiver calculando/publicando com atraso (PDFs de uma semana anterior), '
+            'escolha uma data dentro daquela semana para o On Track não ser gravado por '
+            'engano sob a semana de hoje.'
+        )
+        data_ref_pub = st.date_input(
+            'Semana a publicar (data de referência)', value=datetime.date.today(),
+            format='DD/MM/YYYY', key='ontrack_pub_data_ref',
+        )
         pub_col, _ = st.columns([2, 4])
         with pub_col:
             if st.button('📤 Publicar On Track para Gerência', use_container_width=True):
@@ -1058,8 +1157,12 @@ with tab_cfg:
                     # Arquivo atual (compatibilidade)
                     with open(_ONTRACK_PUB_FILE, 'w', encoding='utf-8') as f:
                         json.dump(snapshot, f, ensure_ascii=False, indent=2)
-                    # Histórico por semana ISO (arquivo local — compatibilidade)
-                    slug_sem = periodo.periodo_atual('semanal')
+                    # Histórico por semana ISO (arquivo local — compatibilidade).
+                    # Usa a semana ESCOLHIDA acima, não periodo.periodo_atual('semanal')
+                    # (que sempre seria a semana de hoje, mesmo publicando com atraso
+                    # dados de uma semana anterior -- sobrescrevendo por engano o On
+                    # Track real da semana corrente).
+                    slug_sem = _slug_semana(data_ref_pub)
                     hist_path = os.path.join(_ONTRACK_META_DIR, f'{slug_sem}.json')
                     with open(hist_path, 'w', encoding='utf-8') as f:
                         json.dump(snapshot, f, ensure_ascii=False, indent=2)
