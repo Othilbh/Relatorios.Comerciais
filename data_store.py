@@ -88,23 +88,38 @@ def _now_iso() -> str:
 # ---------------------------------------------------------------------------
 
 def _github_get(rel_path: str):
+    """Retorna (obj, sha, erro).
+
+    erro é None quando a leitura foi conclusiva -- seja porque encontrou o
+    arquivo (obj preenchido), seja porque o GitHub confirmou (404) que ele
+    ainda não existe (obj=None, erro=None: "não existe" é uma resposta
+    válida, não uma falha).
+
+    erro é preenchido (string) quando a leitura foi AMBÍGUA -- falha de
+    rede, timeout, token sem permissão (401/403), rate limit (429), erro
+    do lado do GitHub (5xx) ou conteúdo que veio mas não pôde ser
+    decodificado. Nesses casos NÃO dá pra saber se o arquivo existe ou
+    não -- quem chama não deve tratar isso como "não existe ainda".
+    """
     headers = _headers()
     if not headers:
-        return None, None
+        return None, None, None
     repo, branch = _repo_branch()
     url = f"https://api.github.com/repos/{repo}/contents/{DATA_ROOT}/{rel_path}"
     try:
         resp = requests.get(url, headers=headers, params={"ref": branch}, timeout=10)
-    except requests.RequestException:
-        return None, None
+    except requests.RequestException as e:
+        return None, None, f"falha de rede ao consultar o GitHub: {e}"
+    if resp.status_code == 404:
+        return None, None, None
     if resp.status_code != 200:
-        return None, None
+        return None, None, f"GitHub respondeu {resp.status_code} ao consultar {rel_path}"
     data = resp.json()
     try:
         content = base64.b64decode(data["content"]).decode("utf-8")
-        return json.loads(content), data.get("sha")
-    except Exception:
-        return None, data.get("sha")
+        return json.loads(content), data.get("sha"), None
+    except Exception as e:
+        return None, data.get("sha"), f"conteúdo remoto ilegível em {rel_path}: {e}"
 
 
 def _github_put(rel_path: str, obj: dict, sha, mensagem: str):
@@ -188,20 +203,27 @@ def _local_list_dir(rel_dir: str):
 # ---------------------------------------------------------------------------
 
 def _read_file(rel_path: str):
+    """Retorna (obj, erro) -- ver docstring de _github_get para o
+    significado de erro (None = leitura conclusiva; string = ambígua)."""
     if is_remoto():
-        obj, sha = _github_get(rel_path)
+        obj, sha, erro = _github_get(rel_path)
         if obj is not None:
             _local_put(rel_path, obj)  # mantém cache local em dia
-            return obj
-        # não existe remotamente ainda (ou falha de rede) -> tenta cache local
-        return _local_get(rel_path)
-    return _local_get(rel_path)
+            return obj, None
+        if erro is not None:
+            # Leitura ambígua: não sabemos se existe ou não. Devolvemos o
+            # cache local (se houver) só para exibição, mas propagamos o
+            # erro -- quem grava não pode tratar isso como "arquivo novo".
+            return _local_get(rel_path), erro
+        # Confirmado (404): não existe remotamente ainda.
+        return _local_get(rel_path), None
+    return _local_get(rel_path), None
 
 
 def _write_file(rel_path: str, obj: dict, mensagem: str):
     _local_put(rel_path, obj)  # grava local sempre (cache/dev)
     if is_remoto():
-        _, sha = _github_get(rel_path)
+        _, sha, _erro = _github_get(rel_path)
         return _github_put(rel_path, obj, sha, mensagem)
     return True, None
 
@@ -215,7 +237,7 @@ def _write_file(rel_path: str, obj: dict, mensagem: str):
 @st.cache_data(ttl=30, show_spinner=False)
 def _load_current_cached(modulo: str, tipo_periodo: str, periodo_ref: str):
     rel_path = _path_for(modulo, tipo_periodo, periodo_ref)
-    obj = _read_file(rel_path)
+    obj, _erro = _read_file(rel_path)
     return obj.get('current') if obj else None
 
 
@@ -239,7 +261,7 @@ def save_record(modulo: str, tipo_periodo: str, periodo_ref: str, valores: dict,
     Retorna o registro recém-salvo (com id, versao, criado_em, atualizado_em).
     """
     rel_path = _path_for(modulo, tipo_periodo, periodo_ref)
-    existing = _read_file(rel_path)
+    existing, erro_leitura = _read_file(rel_path)
 
     agora = _now_iso()
     if existing and existing.get('current'):
@@ -270,6 +292,29 @@ def save_record(modulo: str, tipo_periodo: str, periodo_ref: str, valores: dict,
 
     obj = {'current': novo, 'history': history}
     mensagem = f"{modulo}: atualiza {tipo_periodo} {periodo_ref} (v{versao})"
+
+    if erro_leitura is not None:
+        # Não conseguimos confirmar com certeza, antes de gravar, se já
+        # existe um registro remoto para este período (leitura ambígua:
+        # rede, GitHub fora do ar, token sem permissão, etc. -- ver
+        # _github_get). 'existing' acima pode ter vindo do cache local
+        # (possivelmente desatualizado ou vazio), então 'history'/'versao'
+        # calculados a partir dele NÃO são confiáveis. Gravar no GitHub
+        # nessa condição arriscaria apagar histórico real que não
+        # conseguimos ler. Por segurança, guardamos apenas no cache local
+        # (não perde o dado desta gravação) e NÃO tocamos no GitHub --
+        # sinalizamos o erro para o chamador avisar a usuária e permitir
+        # tentar de novo.
+        _local_put(rel_path, obj)
+        _invalidate_cache()
+        novo = dict(novo)
+        novo['_erro_persistencia_remota'] = (
+            f"Não foi possível confirmar o histórico já salvo antes de gravar "
+            f"({erro_leitura}). Para não arriscar apagar dados antigos, esta "
+            f"gravação ficou só no cache local -- tente novamente em instantes."
+        )
+        return novo
+
     ok, err = _write_file(rel_path, obj, mensagem)
     _invalidate_cache()
 
@@ -292,7 +337,7 @@ def load_history(modulo: str, tipo_periodo: str, periodo_ref: str) -> list:
     """Retorna as versões anteriores (mais antiga -> mais recente), sem
     incluir a versão atual."""
     rel_path = _path_for(modulo, tipo_periodo, periodo_ref)
-    obj = _read_file(rel_path)
+    obj, _erro = _read_file(rel_path)
     return obj.get('history', []) if obj else []
 
 
