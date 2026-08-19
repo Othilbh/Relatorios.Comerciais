@@ -51,7 +51,10 @@ def _fmt_pct(v):
 
 
 def _totais(metas_results):
-    meta_total = sum(l['meta'] for r in metas_results for l in r['linhas'])
+    # Meta geral = soma do 'estoque_total' real de cada produto, NUNCA a
+    # soma das metas individuais por vendedor (essa soma é inflada pelo
+    # arredondamento pra cima de cada meta individual -- ver calc.compute_metas).
+    meta_total = sum(r.get('estoque_total', 0) for r in metas_results)
     vendido_total = sum(l['vendido'] for r in metas_results for l in r['linhas'])
     falta_total = soma_falta([l for r in metas_results for l in r['linhas']])
     pct_total = (vendido_total / meta_total) if meta_total else 0.0
@@ -59,7 +62,9 @@ def _totais(metas_results):
 
 
 def _produto_totais(produto_result):
-    meta = sum(l['meta'] for l in produto_result['linhas'])
+    # Meta do produto = 'estoque_total' real, não a soma das metas
+    # individuais dos vendedores (mesma regra de _totais acima).
+    meta = produto_result.get('estoque_total', 0)
     vendido = sum(l['vendido'] for l in produto_result['linhas'])
     falta = soma_falta(produto_result['linhas'])
     pct = (vendido / meta) if meta else 0.0
@@ -463,6 +468,10 @@ def _build_resumo_geral(periodo: str, data_emissao: str, metas_results: list,
         return row
 
     def _subtotal_row(label, group):
+        # 'est' (Qtde) e a meta do grupo/TOTAL usam a mesma base: soma do
+        # 'estoque_total' real dos produtos, não a soma das metas
+        # individuais (m_v continua individual -- meta do próprio vendedor
+        # somada nos produtos do grupo, isso está correto).
         est = sum(r['estoque_total'] for r in group)
         row = [Paragraph(label, sub_style), f"{est:.0f}"]
         for v in vendedores:
@@ -470,7 +479,7 @@ def _build_resumo_geral(periodo: str, data_emissao: str, metas_results: list,
             m_v  = sum(l['meta']    for r in group for l in r['linhas'] if l['vendedor'] == v)
             row += [f"{ve_v:.1f}", _fmt_pct(ve_v / m_v if m_v else 0)]
         ve_g = sum(l['vendido'] for r in group for l in r['linhas'])
-        m_g  = sum(l['meta']    for r in group for l in r['linhas'])
+        m_g  = est
         row += [f"{ve_g:.1f}", _fmt_pct(ve_g / m_g if m_g else 0)]
         return row
 
