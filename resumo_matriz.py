@@ -28,8 +28,14 @@ def _vendedores_de(resultados: list) -> list:
 
 
 def render_matriz_produto_vendedor(resultados: list, titulo: str = 'Resumo Geral — Matriz Produto × Vendedor'):
-    """Renderiza a matriz Produto × Vendedor (Vendido/Meta/%), agrupada por
-    prioridade com linha de SUBTOTAL por grupo -- igual ao PDF Resumo Geral."""
+    """Renderiza a matriz Produto × Vendedor, agrupada por prioridade com
+    linha de SUBTOTAL por grupo -- igual ao PDF Resumo Geral.
+
+    Cada célula de vendedor mostra SÓ o vendido (pedido explícito da
+    Ingrid: célula com vendido/meta/% junto ficava poluída). Meta e % só
+    aparecem nas colunas 'Qtde' e 'TOTAL' de cada linha/subtotal -- e essas
+    sempre usam a meta REAL do produto ('estoque_total'), nunca a soma das
+    metas individuais dos vendedores (ver correção de meta geral)."""
     if not resultados:
         st.info('Sem dados para montar o Resumo Geral.')
         return
@@ -68,7 +74,7 @@ def render_matriz_produto_vendedor(resultados: list, titulo: str = 'Resumo Geral
             for v in vendedores:
                 l = linhas_por_vend.get(v)
                 if l:
-                    row[v] = f"{l['vendido']:.0f}/{l['meta']:.0f} ({l['atingido']*100:.0f}%)"
+                    row[v] = f"{l['vendido']:.0f}"
                     p_vend += l['vendido']
                 else:
                     row[v] = '-'
@@ -84,8 +90,7 @@ def render_matriz_produto_vendedor(resultados: list, titulo: str = 'Resumo Geral
         sub = {'Produto': 'SUBTOTAL', 'Qtde': f"{gm:.0f}"}
         for v in vendedores:
             sv = sum(l['vendido'] for r in grupo for l in r.get('linhas', []) if l['vendedor'] == v)
-            sm = sum(l['meta']    for r in grupo for l in r.get('linhas', []) if l['vendedor'] == v)
-            sub[v] = f"{sv:.0f}/{sm:.0f} ({sv/sm*100:.0f}%)" if sm else '—'
+            sub[v] = f"{sv:.0f}"
         gv = sum(l['vendido'] for r in grupo for l in r.get('linhas', []))
         sub['TOTAL'] = f"{gv:.0f}/{gm:.0f} ({gv/gm*100:.0f}%)" if gm else '—'
         rows_m.append(sub)
@@ -99,8 +104,7 @@ def render_matriz_produto_vendedor(resultados: list, titulo: str = 'Resumo Geral
     tot = {'Produto': 'TOTAL GERAL', 'Qtde': f"{gm_all:.0f}"}
     for v in vendedores:
         tv = sum(l['vendido'] for r in resultados for l in r.get('linhas', []) if l['vendedor'] == v)
-        tm = sum(l['meta']    for r in resultados for l in r.get('linhas', []) if l['vendedor'] == v)
-        tot[v] = f"{tv:.0f}/{tm:.0f} ({tv/tm*100:.0f}%)" if tm else '—'
+        tot[v] = f"{tv:.0f}"
     gv_all = sum(l['vendido'] for r in resultados for l in r.get('linhas', []))
     tot['TOTAL'] = f"{gv_all:.0f}/{gm_all:.0f} ({gv_all/gm_all*100:.0f}%)" if gm_all else '—'
     st.dataframe(pd.DataFrame([tot]), use_container_width=True, hide_index=True)
