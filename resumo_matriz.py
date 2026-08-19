@@ -55,41 +55,52 @@ def render_matriz_produto_vendedor(resultados: list, titulo: str = 'Resumo Geral
 
         rows_m = []
         for r in grupo:
-            row = {'Produto': r['produto'], 'Qtde': f"{r.get('estoque_total', 0):.0f}"}
-            p_meta = 0.0
+            # Meta do produto (coluna TOTAL da linha) = 'estoque_total' real,
+            # igual à coluna 'Qtde' -- NUNCA a soma das metas individuais dos
+            # vendedores (essa soma é inflada pelo arredondamento pra cima
+            # de cada meta individual, e antes ficava divergente da 'Qtde'
+            # na mesma linha, o que não faz sentido: as duas são a mesma
+            # meta do produto).
+            p_meta = r.get('estoque_total', 0)
+            row = {'Produto': r['produto'], 'Qtde': f"{p_meta:.0f}"}
             p_vend = 0.0
             linhas_por_vend = {l['vendedor']: l for l in r.get('linhas', [])}
             for v in vendedores:
                 l = linhas_por_vend.get(v)
                 if l:
                     row[v] = f"{l['vendido']:.0f}/{l['meta']:.0f} ({l['atingido']*100:.0f}%)"
-                    p_meta += l['meta']
                     p_vend += l['vendido']
                 else:
                     row[v] = '-'
             row['TOTAL'] = f"{p_vend:.0f}/{p_meta:.0f} ({p_vend/p_meta*100:.0f}%)" if p_meta else '—'
             rows_m.append(row)
 
-        # Linha de subtotal
-        sub = {'Produto': 'SUBTOTAL', 'Qtde': f"{sum(r.get('estoque_total', 0) for r in grupo):.0f}"}
+        # Linha de subtotal -- mesma regra: a meta do grupo (coluna TOTAL)
+        # usa a soma do 'estoque_total' real dos produtos do grupo (igual à
+        # 'Qtde' do subtotal), não a soma das metas individuais. Já a meta
+        # de CADA vendedor (sm) continua sendo a soma das metas dele mesmo
+        # nos produtos do grupo -- isso é o total individual dele, correto.
+        gm = sum(r.get('estoque_total', 0) for r in grupo)
+        sub = {'Produto': 'SUBTOTAL', 'Qtde': f"{gm:.0f}"}
         for v in vendedores:
             sv = sum(l['vendido'] for r in grupo for l in r.get('linhas', []) if l['vendedor'] == v)
             sm = sum(l['meta']    for r in grupo for l in r.get('linhas', []) if l['vendedor'] == v)
             sub[v] = f"{sv:.0f}/{sm:.0f} ({sv/sm*100:.0f}%)" if sm else '—'
         gv = sum(l['vendido'] for r in grupo for l in r.get('linhas', []))
-        gm = sum(l['meta']    for r in grupo for l in r.get('linhas', []))
         sub['TOTAL'] = f"{gv:.0f}/{gm:.0f} ({gv/gm*100:.0f}%)" if gm else '—'
         rows_m.append(sub)
 
         st.dataframe(pd.DataFrame(rows_m), use_container_width=True, hide_index=True)
 
-    # Total Geral -- soma de todos os grupos de prioridade juntos
-    tot = {'Produto': 'TOTAL GERAL', 'Qtde': f"{sum(r.get('estoque_total', 0) for r in resultados):.0f}"}
+    # Total Geral -- soma de todos os grupos de prioridade juntos. Mesma
+    # regra: meta geral = soma do 'estoque_total' real de todos os produtos,
+    # não a soma das metas individuais dos vendedores.
+    gm_all = sum(r.get('estoque_total', 0) for r in resultados)
+    tot = {'Produto': 'TOTAL GERAL', 'Qtde': f"{gm_all:.0f}"}
     for v in vendedores:
         tv = sum(l['vendido'] for r in resultados for l in r.get('linhas', []) if l['vendedor'] == v)
         tm = sum(l['meta']    for r in resultados for l in r.get('linhas', []) if l['vendedor'] == v)
         tot[v] = f"{tv:.0f}/{tm:.0f} ({tv/tm*100:.0f}%)" if tm else '—'
     gv_all = sum(l['vendido'] for r in resultados for l in r.get('linhas', []))
-    gm_all = sum(l['meta']    for r in resultados for l in r.get('linhas', []))
     tot['TOTAL'] = f"{gv_all:.0f}/{gm_all:.0f} ({gv_all/gm_all*100:.0f}%)" if gm_all else '—'
     st.dataframe(pd.DataFrame([tot]), use_container_width=True, hide_index=True)
