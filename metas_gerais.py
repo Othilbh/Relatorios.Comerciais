@@ -25,6 +25,8 @@ Somente a "Meta" (alvo) de cada indicador é configurada nesta tela — fica
 salva com histórico versionado via data_store (mudar a meta no meio do
 período não apaga o valor anterior).
 """
+from datetime import timedelta
+
 import periodo
 import on_track
 import data_store as ds
@@ -54,6 +56,14 @@ def salvar_meta(tipo_periodo: str, periodo_ref: str, faturamento: float, volume:
 def carregar_meta(tipo_periodo: str, periodo_ref: str):
     reg = ds.load_current(MODULO_META, tipo_periodo, periodo_ref)
     return reg['valores'] if reg else None
+
+
+def historico_meta(tipo_periodo: str, periodo_ref: str) -> list:
+    """Versões ANTERIORES da meta deste período (mais antiga -> mais
+    recente; não inclui a versão atual, que já vem de carregar_meta). Usa
+    o histórico versionado do data_store -- salvar uma meta nova nunca
+    apaga a anterior, ela só passa a aparecer aqui."""
+    return ds.load_history(MODULO_META, tipo_periodo, periodo_ref)
 
 
 # ---------------------------------------------------------------------------
@@ -123,22 +133,58 @@ def realizado_vendas(tipo_periodo: str, periodo_ref: str) -> dict:
     }
 
 
+def _semanas_do_mes(mes_ref: str) -> list:
+    """Lista (sem repetição, em ordem) das semanas ISO ('YYYY-Www') que
+    tocam o mês `mes_ref` ('YYYY-MM'). Uma semana ISO pode começar num mês
+    e terminar no seguinte -- nesse caso ela conta para os dois meses (não
+    há como fatiar uma semana ao meio sem dado diário, que este app não
+    guarda; é a mesma aproximação usada em periodo_ano_anterior)."""
+    ini, fim = periodo.intervalo_datas('mensal', mes_ref)
+    semanas = []
+    d = ini
+    while d <= fim:
+        s = periodo.periodo_ref('semanal', d)
+        if s not in semanas:
+            semanas.append(s)
+        d += timedelta(days=1)
+    return semanas
+
+
+def _quebra_mes(mes_ref: str):
+    """Total de Quebra (CX) de um mês, ou None se não houver nenhum dado.
+
+    O módulo de Quebra (pages/4_Quebra_OTHIL.py) permite publicar tanto em
+    modo Semanal quanto Mensal (a Ingrid escolhe a aba na hora do upload).
+    Na prática, o uso real tem sido sempre pela aba Semanal -- então exigir
+    um registro 'mensal' aqui (como este módulo fazia antes) deixava o
+    indicador de Quebra sempre "Sem dado" no painel de Meta Geral,
+    mesmo com quebra publicada normalmente todo período. Por isso: usa o
+    registro mensal direto se existir (compatível com quem publica em modo
+    Mensal); senão, soma as semanas ISO que tocam o mês."""
+    reg = ds.load_current(MOD_QUEBRA, 'mensal', mes_ref)
+    if reg and reg['valores'].get('total_cx') is not None:
+        return reg['valores'].get('total_cx', 0) or 0
+
+    total = 0.0
+    alguma_semana_com_dado = False
+    for semana in _semanas_do_mes(mes_ref):
+        reg_sem = ds.load_current(MOD_QUEBRA, 'semanal', semana)
+        if reg_sem and reg_sem['valores'].get('total_cx') is not None:
+            alguma_semana_com_dado = True
+            total += reg_sem['valores'].get('total_cx', 0) or 0
+    return total if alguma_semana_com_dado else None
+
+
 def realizado_quebra(tipo_periodo: str, periodo_ref: str) -> dict:
     """{total_cx, completude, meses_com_dado?, meses_total?}."""
-    if tipo_periodo == 'mensal':
-        reg = ds.load_current(MOD_QUEBRA, tipo_periodo, periodo_ref)
-        if reg and reg['valores'].get('total_cx') is not None:
-            return {'total_cx': reg['valores'].get('total_cx', 0), 'completude': 'completo'}
-        return {'total_cx': None, 'completude': 'sem_dado'}
-
     meses = _meses_do_periodo(tipo_periodo, periodo_ref)
     total = 0.0
     meses_com_dado = []
     for mes in meses:
-        reg = ds.load_current(MOD_QUEBRA, 'mensal', mes)
-        if reg and reg['valores'].get('total_cx') is not None:
+        total_mes = _quebra_mes(mes)
+        if total_mes is not None:
             meses_com_dado.append(mes)
-            total += reg['valores'].get('total_cx', 0) or 0
+            total += total_mes
     if not meses_com_dado:
         completude = 'sem_dado'
     elif len(meses_com_dado) < len(meses):
