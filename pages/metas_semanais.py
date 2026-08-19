@@ -26,6 +26,21 @@ import on_track
 import data_store as ds
 import resumo_matriz
 
+# ── Formatação numérica em padrão brasileiro ────────────────────────────────
+# Mesmo idioma já usado em pdfgen.py, pages/1_Relatorio_Diario_OTHIL.py,
+# pages/3_Vendedor_Cliente_OTHIL.py e pages/gerencia.py -- esta página ainda
+# usava o formato padrão do Python (separador de milhar ',' e decimal '.',
+# ex.: "R$ 12,345.67"), que fica invertido em relação ao padrão brasileiro
+# usado no resto do app (ex.: "R$ 12.345,67") -- reclamação explícita da
+# Ingrid de que "fica horrível a visualização".
+def _fmt_num(v, casas=0):
+    return f"{v:,.{casas}f}".replace(',', 'X').replace('.', ',').replace('X', '.')
+
+
+def _fmt_moeda(v):
+    return f"R$ {_fmt_num(v, 2)}"
+
+
 MODULO = 'metas_semanais_fechamento'
 MODULO_ONTRACK = 'metas_semanais_ontrack'
 
@@ -319,13 +334,13 @@ def _render_on_track():
     )
 
     c1, c2, c3, c4, c5 = st.columns(5)
-    c1.metric('Meta total (cx)',  f'{total_meta:,.0f}')
-    c2.metric('Vendido (cx)',     f'{total_vend:,.0f}')
+    c1.metric('Meta total (cx)',  _fmt_num(total_meta, 0))
+    c2.metric('Vendido (cx)',     _fmt_num(total_vend, 0))
     c3.metric('% Atingido',      f'{ating_geral*100:.1f}%')
-    c4.metric('Falta (cx)',      f'{total_falta:,.0f}')
+    c4.metric('Falta (cx)',      _fmt_num(total_falta, 0))
     c5.metric(
-        'Projeção semana (cx)',   f'{proj_cx:,.0f}',
-        delta=f'{delta_proj:+,.0f} vs meta',
+        'Projeção semana (cx)',   _fmt_num(proj_cx, 0),
+        delta=f"{'+' if delta_proj >= 0 else ''}{_fmt_num(delta_proj, 0)} vs meta",
         delta_color='normal',
     )
 
@@ -334,8 +349,8 @@ def _render_on_track():
     if tg:
         st.subheader('Faturamento Geral (R$)')
         r1, r2, r3 = st.columns(3)
-        r1.metric('Faturamento', f"R$ {tg.get('fat', 0):,.2f}")
-        r2.metric('MC R$',       f"R$ {tg.get('mc_rs', 0):,.2f}")
+        r1.metric('Faturamento', _fmt_moeda(tg.get('fat', 0)))
+        r2.metric('MC R$',       _fmt_moeda(tg.get('mc_rs', 0)))
         r3.metric('MC %',        f"{tg.get('resultado_real', 0):.2f}%")
 
     st.divider()
@@ -386,12 +401,12 @@ def _render_on_track():
 
     df_vend = pd.DataFrame(rows)
     df_vend['% Atingido']    = df_vend['% Atingido'].map(lambda x: f'{x*100:.1f}%')
-    df_vend['Meta (cx)']     = df_vend['Meta (cx)'].map(lambda x: f'{x:,.0f}')
-    df_vend['Vendido (cx)']  = df_vend['Vendido (cx)'].map(lambda x: f'{x:,.0f}')
-    df_vend['Falta (cx)']    = df_vend['Falta (cx)'].map(lambda x: f'{x:,.0f}')
-    df_vend['Projeção (cx)'] = df_vend['Projeção (cx)'].map(lambda x: f'{x:,.0f}')
-    df_vend['Fat R$']  = df_vend['Fat R$'].map(lambda x: f'R$ {x:,.2f}' if x is not None else '—')
-    df_vend['MC R$']   = df_vend['MC R$'].map(lambda x: f'R$ {x:,.2f}' if x is not None else '—')
+    df_vend['Meta (cx)']     = df_vend['Meta (cx)'].map(lambda x: _fmt_num(x, 0))
+    df_vend['Vendido (cx)']  = df_vend['Vendido (cx)'].map(lambda x: _fmt_num(x, 0))
+    df_vend['Falta (cx)']    = df_vend['Falta (cx)'].map(lambda x: _fmt_num(x, 0))
+    df_vend['Projeção (cx)'] = df_vend['Projeção (cx)'].map(lambda x: _fmt_num(x, 0))
+    df_vend['Fat R$']  = df_vend['Fat R$'].map(lambda x: _fmt_moeda(x) if x is not None else '—')
+    df_vend['MC R$']   = df_vend['MC R$'].map(lambda x: _fmt_moeda(x) if x is not None else '—')
     df_vend['MC %']    = df_vend['MC %'].map(lambda x: f'{x:.2f}%' if x is not None else '—')
 
     st.dataframe(df_vend, use_container_width=True, hide_index=True)
@@ -439,8 +454,8 @@ def _render_on_track():
         rows_prod.sort(key=lambda r: r['Produto'])
 
     df_prod = pd.DataFrame(rows_prod)
-    df_prod['Meta (cx)']    = df_prod['Meta (cx)'].map(lambda x: f'{x:,.0f}')
-    df_prod['Vendido (cx)'] = df_prod['Vendido (cx)'].map(lambda x: f'{x:,.0f}')
+    df_prod['Meta (cx)']    = df_prod['Meta (cx)'].map(lambda x: _fmt_num(x, 0))
+    df_prod['Vendido (cx)'] = df_prod['Vendido (cx)'].map(lambda x: _fmt_num(x, 0))
     df_prod['% Atingido']   = df_prod['% Atingido'].map(lambda x: f'{x*100:.1f}%')
 
     st.dataframe(df_prod, use_container_width=True, hide_index=True)
@@ -471,17 +486,17 @@ def _render_resumo_geral_inline(resultados: list, totais_rs: dict, dia: int = 5)
         unsafe_allow_html=True,
     )
     c1, c2, c3, c4, c5 = st.columns(5)
-    c1.metric('Meta total (cx)',    f'{total_meta:,.0f}')
-    c2.metric('Vendido (cx)',       f'{total_vend:,.0f}')
+    c1.metric('Meta total (cx)',    _fmt_num(total_meta, 0))
+    c2.metric('Vendido (cx)',       _fmt_num(total_vend, 0))
     c3.metric('% Atingido',        f'{ating_geral*100:.1f}%')
-    c4.metric('Falta (cx)',        f"{soma_falta([l for r in resultados for l in r['linhas']]):,.0f}")
-    c5.metric('Projeção semana (cx)', f'{proj_cx:,.0f}')
+    c4.metric('Falta (cx)',        _fmt_num(soma_falta([l for r in resultados for l in r['linhas']]), 0))
+    c5.metric('Projeção semana (cx)', _fmt_num(proj_cx, 0))
 
     tg = totais_rs.get('total_geral', {})
     if tg:
         f1, f2, f3 = st.columns(3)
-        f1.metric('Faturamento', f"R$ {tg.get('fat', 0):,.2f}")
-        f2.metric('MC R$',       f"R$ {tg.get('mc_rs', 0):,.2f}")
+        f1.metric('Faturamento', _fmt_moeda(tg.get('fat', 0)))
+        f2.metric('MC R$',       _fmt_moeda(tg.get('mc_rs', 0)))
         f3.metric('MC %',        f"{tg.get('resultado_real', 0):.2f}%")
 
     st.divider()
@@ -508,11 +523,11 @@ def _render_resumo_geral_inline(resultados: list, totais_rs: dict, dia: int = 5)
         rs = vend_rs.get(v, {})
         vrows.append({
             'Vendedor':     v,
-            'Meta (cx)':   f'{meta_v:,.0f}',
-            'Vendido (cx)': f'{vend_v:,.0f}',
+            'Meta (cx)':   _fmt_num(meta_v, 0),
+            'Vendido (cx)': _fmt_num(vend_v, 0),
             '% Atingido':  f'{atg_v*100:.1f}%',
-            'Projeção (cx)': f'{proj_v:,.0f}',
-            'Fat R$':      f"R$ {rs['fat']:,.2f}" if rs.get('fat') is not None else '—',
+            'Projeção (cx)': _fmt_num(proj_v, 0),
+            'Fat R$':      _fmt_moeda(rs['fat']) if rs.get('fat') is not None else '—',
             'MC %':        f"{rs['resultado_real']:.2f}%" if rs.get('resultado_real') is not None else '—',
             'Status':      f'{em} {lb}',
         })
@@ -559,11 +574,11 @@ def _render_comparativo_semanal(resultados: list, totais_rs: dict, slug_atual: s
             st.caption('Ainda não há fechamento salvo da semana anterior para comparar.')
         else:
             comp_v = comparativo.calcular(total_vend_atual, vend_ant)
-            st.metric('Vendido (cx)', f'{total_vend_atual:,.0f}',
+            st.metric('Vendido (cx)', _fmt_num(total_vend_atual, 0),
                        delta=f"{comparativo.formatar_variacao(comp_v)} vs semana anterior")
             if fat_atual is not None and fat_ant is not None:
                 comp_f = comparativo.calcular(fat_atual, fat_ant)
-                st.metric('Faturamento', f'R$ {fat_atual:,.2f}',
+                st.metric('Faturamento', _fmt_moeda(fat_atual),
                            delta=f"{comparativo.formatar_variacao(comp_f)} vs semana anterior")
     with col2:
         st.markdown(f'**Semana atual × {periodo.rotulo("semanal", slug_ano_ant)} (ano anterior)**')
@@ -571,11 +586,11 @@ def _render_comparativo_semanal(resultados: list, totais_rs: dict, slug_atual: s
             st.caption('Ainda não há fechamento salvo da mesma semana no ano anterior.')
         else:
             comp_v2 = comparativo.calcular(total_vend_atual, vend_ano_ant)
-            st.metric('Vendido (cx)', f'{total_vend_atual:,.0f}',
+            st.metric('Vendido (cx)', _fmt_num(total_vend_atual, 0),
                        delta=f"{comparativo.formatar_variacao(comp_v2)} vs ano anterior")
             if fat_atual is not None and fat_ano_ant is not None:
                 comp_f2 = comparativo.calcular(fat_atual, fat_ano_ant)
-                st.metric('Faturamento', f'R$ {fat_atual:,.2f}',
+                st.metric('Faturamento', _fmt_moeda(fat_atual),
                            delta=f"{comparativo.formatar_variacao(comp_f2)} vs ano anterior")
 
 
@@ -675,7 +690,7 @@ def _render_fechamento_semanal():
                 v_quando = (v.get('atualizado_em') or '')[:16].replace('T', ' ')
                 st.markdown(
                     f"- **v{v.get('versao')}** — {v_quando} por {v.get('usuario', 'não identificado')} "
-                    f"— Meta {v_meta:,.0f} cx, Vendido {v_vend:,.0f} cx"
+                    f"— Meta {_fmt_num(v_meta, 0)} cx, Vendido {_fmt_num(v_vend, 0)} cx"
                 )
 
     prods      = dados.get('produtos', [])
@@ -684,15 +699,15 @@ def _render_fechamento_semanal():
     h_atg      = h_vend / h_meta if h_meta else 0
 
     h1, h2, h3 = st.columns(3)
-    h1.metric('Meta (cx)',  f'{h_meta:,.0f}')
-    h2.metric('Vendido (cx)', f'{h_vend:,.0f}')
+    h1.metric('Meta (cx)',  _fmt_num(h_meta, 0))
+    h2.metric('Vendido (cx)', _fmt_num(h_vend, 0))
     h3.metric('% Atingido', f'{h_atg*100:.1f}%')
 
     tg_h = dados.get('totais_rs', {}).get('total_geral', {})
     if tg_h:
         f1, f2, f3 = st.columns(3)
-        f1.metric('Faturamento', f"R$ {tg_h.get('fat', 0):,.2f}")
-        f2.metric('MC R$',      f"R$ {tg_h.get('mc_rs', 0):,.2f}")
+        f1.metric('Faturamento', _fmt_moeda(tg_h.get('fat', 0)))
+        f2.metric('MC R$',      _fmt_moeda(tg_h.get('mc_rs', 0)))
         f3.metric('MC %',       f"{tg_h.get('resultado_real', 0):.2f}%")
 
     st.divider()
@@ -1010,7 +1025,7 @@ with tab_cfg:
             total_nao_rec = sum(r['CX não reconhecidas'] for r in nao_rec)
             with st.expander(
                 f'⚠️ {len(nao_rec)} código(s) do PDF não reconhecido(s) '
-                f'— {total_nao_rec:,.0f} cx fora do cálculo',
+                f'— {_fmt_num(total_nao_rec, 0)} cx fora do cálculo',
                 expanded=True,
             ):
                 st.caption(
@@ -1020,7 +1035,7 @@ with tab_cfg:
                 )
                 df_diag = pd.DataFrame(nao_rec)
                 df_diag['CX não reconhecidas'] = df_diag['CX não reconhecidas'].map(
-                    lambda x: f'{x:,.0f}'
+                    lambda x: _fmt_num(x, 0)
                 )
                 st.dataframe(df_diag, use_container_width=True, hide_index=True)
         else:
@@ -1035,7 +1050,7 @@ with tab_cfg:
             total_vend_excl = sum(r['CX fora do cálculo'] for r in vend_excl)
             with st.expander(
                 f'⚠️ {len(vend_excl)} vendedor(es) reconhecido(s) mas sem meta configurada '
-                f'— {total_vend_excl:,.0f} cx fora do cálculo',
+                f'— {_fmt_num(total_vend_excl, 0)} cx fora do cálculo',
                 expanded=True,
             ):
                 st.caption(
@@ -1048,7 +1063,7 @@ with tab_cfg:
                 )
                 df_vend = pd.DataFrame(vend_excl)
                 df_vend['CX fora do cálculo'] = df_vend['CX fora do cálculo'].map(
-                    lambda x: f'{x:,.0f}'
+                    lambda x: _fmt_num(x, 0)
                 )
                 st.dataframe(df_vend, use_container_width=True, hide_index=True)
 
@@ -1094,7 +1109,7 @@ with tab_cfg:
                 )
                 df_typo = pd.DataFrame(possiveis_typos)
                 df_typo['Cx sob esse código'] = df_typo['Cx sob esse código'].map(
-                    lambda x: f'{x:,.0f}'
+                    lambda x: _fmt_num(x, 0)
                 )
                 st.dataframe(df_typo, use_container_width=True, hide_index=True)
 
