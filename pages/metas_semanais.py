@@ -294,7 +294,13 @@ def _render_on_track():
     st.divider()
 
     # ── KPIs Totais ───────────────────────────────────────────────────────
-    total_meta   = sum(l['meta']    for r in resultados for l in r['linhas'])
+    # IMPORTANTE: a meta GERAL nunca é a soma das metas individuais dos
+    # vendedores (cada uma é round_up(pct% do estoque), e a soma de vários
+    # arredondamentos pra cima estoura o total real). A meta geral é o
+    # 'estoque_total' de cada produto -- o valor real configurado -- somado
+    # entre os produtos. O vendido geral continua sendo a soma do que foi
+    # realmente vendido (isso sim é sempre correto somar).
+    total_meta   = sum(r.get('estoque_total', 0) for r in resultados)
     total_vend   = sum(l['vendido'] for r in resultados for l in r['linhas'])
     total_falta  = soma_falta([l for r in resultados for l in r['linhas']])
     ating_geral  = total_vend / total_meta if total_meta else 0
@@ -330,7 +336,7 @@ def _render_on_track():
         r1, r2, r3 = st.columns(3)
         r1.metric('Faturamento', f"R$ {tg.get('fat', 0):,.2f}")
         r2.metric('MC R$',       f"R$ {tg.get('mc_rs', 0):,.2f}")
-        r3.metric('MC %',        f"{tg.get('mc_pct', 0):.2f}%")
+        r3.metric('MC %',        f"{tg.get('resultado_real', 0):.2f}%")
 
     st.divider()
 
@@ -365,7 +371,7 @@ def _render_on_track():
             'Projeção (cx)': proj_v,
             'Fat R$':       rs.get('fat'),
             'MC R$':        rs.get('mc_rs'),
-            'MC %':         rs.get('mc_pct'),
+            'MC %':         rs.get('resultado_real'),
             'Status':       f'{em} {lb}',
         })
 
@@ -410,7 +416,10 @@ def _render_on_track():
 
     rows_prod = []
     for r in resultados:
-        p_meta = sum(l['meta']    for l in r['linhas'])
+        # Meta do produto = 'estoque_total' (o valor real configurado pra
+        # esse produto), NUNCA a soma das metas individuais por vendedor
+        # (essa soma é inflada pelo arredondamento pra cima de cada uma).
+        p_meta = r.get('estoque_total', 0)
         p_vend = sum(l['vendido'] for l in r['linhas'])
         p_atg  = p_vend / p_meta if p_meta else 0
         p_em, p_lb, _ = _on_track_status(p_atg, dia_semana)
@@ -447,7 +456,9 @@ def _render_resumo_geral_inline(resultados: list, totais_rs: dict, dia: int = 5)
         return
 
     # ── On Track KPIs ────────────────────────────────────────────────────
-    total_meta  = sum(l['meta']    for r in resultados for l in r['linhas'])
+    # Meta geral = soma do 'estoque_total' real de cada produto, não a soma
+    # das metas individuais por vendedor (ver nota em _render_ontrack acima).
+    total_meta  = sum(r.get('estoque_total', 0) for r in resultados)
     total_vend  = sum(l['vendido'] for r in resultados for l in r['linhas'])
     ating_geral = total_vend / total_meta if total_meta else 0
     proj_cx     = math.ceil(total_vend / dia * 5) if dia > 0 else 0
@@ -471,7 +482,7 @@ def _render_resumo_geral_inline(resultados: list, totais_rs: dict, dia: int = 5)
         f1, f2, f3 = st.columns(3)
         f1.metric('Faturamento', f"R$ {tg.get('fat', 0):,.2f}")
         f2.metric('MC R$',       f"R$ {tg.get('mc_rs', 0):,.2f}")
-        f3.metric('MC %',        f"{tg.get('mc_pct', 0):.2f}%")
+        f3.metric('MC %',        f"{tg.get('resultado_real', 0):.2f}%")
 
     st.divider()
 
@@ -502,7 +513,7 @@ def _render_resumo_geral_inline(resultados: list, totais_rs: dict, dia: int = 5)
             '% Atingido':  f'{atg_v*100:.1f}%',
             'Projeção (cx)': f'{proj_v:,.0f}',
             'Fat R$':      f"R$ {rs['fat']:,.2f}" if rs.get('fat') is not None else '—',
-            'MC %':        f"{rs['mc_pct']:.2f}%" if rs.get('mc_pct') is not None else '—',
+            'MC %':        f"{rs['resultado_real']:.2f}%" if rs.get('resultado_real') is not None else '—',
             'Status':      f'{em} {lb}',
         })
     st.dataframe(pd.DataFrame(vrows), use_container_width=True, hide_index=True)
@@ -659,7 +670,7 @@ def _render_fechamento_semanal():
         with st.expander(f'🕓 Ver {len(versoes_antigas)} versão(ões) anterior(es) desta semana'):
             for v in reversed(versoes_antigas):
                 v_prods = v.get('valores', {}).get('produtos', [])
-                v_meta = sum(l['meta'] for r in v_prods for l in r.get('linhas', []))
+                v_meta = sum(r.get('estoque_total', 0) for r in v_prods)
                 v_vend = sum(l['vendido'] for r in v_prods for l in r.get('linhas', []))
                 v_quando = (v.get('atualizado_em') or '')[:16].replace('T', ' ')
                 st.markdown(
@@ -668,7 +679,7 @@ def _render_fechamento_semanal():
                 )
 
     prods      = dados.get('produtos', [])
-    h_meta     = sum(l['meta']    for r in prods for l in r.get('linhas', []))
+    h_meta     = sum(r.get('estoque_total', 0) for r in prods)
     h_vend     = sum(l['vendido'] for r in prods for l in r.get('linhas', []))
     h_atg      = h_vend / h_meta if h_meta else 0
 
@@ -682,7 +693,7 @@ def _render_fechamento_semanal():
         f1, f2, f3 = st.columns(3)
         f1.metric('Faturamento', f"R$ {tg_h.get('fat', 0):,.2f}")
         f2.metric('MC R$',      f"R$ {tg_h.get('mc_rs', 0):,.2f}")
-        f3.metric('MC %',       f"{tg_h.get('mc_pct', 0):.2f}%")
+        f3.metric('MC %',       f"{tg_h.get('resultado_real', 0):.2f}%")
 
     st.divider()
     resumo_matriz.render_matriz_produto_vendedor(prods)
@@ -1180,17 +1191,19 @@ with tab_cfg:
 
         st.subheader('Resultado por produto')
 
-        # Tabela resumo compacta
+        # Tabela resumo compacta -- a meta do produto é sempre 'estoque_total'
+        # (o valor real configurado), nunca a soma das metas individuais dos
+        # vendedores (essa soma é inflada pelo arredondamento pra cima de
+        # cada uma). Falta segue usando essa mesma meta real como base.
         resumo_rows = []
         for r in resultados:
-            p_meta = sum(l['meta']    for l in r['linhas'])
+            p_meta = r.get('estoque_total', 0)
             p_vend = sum(l['vendido'] for l in r['linhas'])
             p_atg  = p_vend / p_meta * 100 if p_meta else 0
             p_falt = max(p_meta - p_vend, 0)
             resumo_rows.append({
                 'Produto':      r['produto'],
                 'Prioridade':   r.get('prioridade', 'Normal'),
-                'Qtde (cx)':    f"{r['estoque_total']:.0f}",
                 'Meta (cx)':    f"{p_meta:.0f}",
                 'Vendido (cx)': f"{p_vend:.0f}",
                 'Falta (cx)':   f"{p_falt:.0f}",
@@ -1201,13 +1214,13 @@ with tab_cfg:
         # Detalhe por vendedor (colapsado)
         st.caption('Clique em um produto para ver o detalhe por vendedor:')
         for r in resultados:
-            p_meta = sum(l['meta']    for l in r['linhas'])
+            p_meta = r.get('estoque_total', 0)
             p_vend = sum(l['vendido'] for l in r['linhas'])
             p_atg  = p_vend / p_meta * 100 if p_meta else 0
             prio   = r.get('prioridade', 'Normal')
             badge  = f' — {prio}' if prio != 'Normal' else ''
             with st.expander(
-                f"{r['produto']}{badge}  |  {p_vend:.0f}/{p_meta:.0f} cx ({p_atg:.1f}%)",
+                f"{r['produto']}{badge}  |  Meta {p_meta:.0f} cx — Vendido {p_vend:.0f} cx ({p_atg:.1f}%)",
                 expanded=False,
             ):
                 st.dataframe(
