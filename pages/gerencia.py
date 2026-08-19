@@ -698,32 +698,31 @@ def _render_ontrack_publicado():
 
     st.divider()
 
-    # Por produto
+    # Por produto -- mesmo padrão visual/estrutural do "Por Vendedor" logo
+    # abaixo (tabela via st.dataframe, não mais uma lista de accordions).
+    # Meta/Vendido seguem em CAIXAS (cx): não existe Faturamento/MC calculado
+    # por PRODUTO no app (só por vendedor, vindo do PDF de Lucratividade).
     st.subheader('Por Produto')
+    prow = []
     for r in resultados:
         p_meta = sum(l['meta']    for l in r.get('linhas', []))
         p_vend = sum(l['vendido'] for l in r.get('linhas', []))
         p_atg  = p_vend / p_meta if p_meta else 0
         p_em, p_lb, _ = _on_track_status_ger(p_atg, dia)
-        prio = r.get('prioridade', 'Normal')
-        badge = f' — {prio}' if prio != 'Normal' else ''
-        with st.expander(
-            f"{p_em} {r.get('produto', '')}{badge}  |  "
-            f"{p_vend:,.0f}/{p_meta:,.0f} cx ({p_atg*100:.1f}%)  —  {p_lb}",
-            expanded=False,
-        ):
-            vrows = []
-            for l in r.get('linhas', []):
-                v_atg = l['vendido'] / l['meta'] if l['meta'] else 0
-                v_em, v_lb, _ = _on_track_status_ger(v_atg, dia)
-                vrows.append({
-                    'Vendedor':     l.get('vendedor', ''),
-                    'Meta (cx)':   f"{l['meta']:,.0f}",
-                    'Vendido (cx)': f"{l['vendido']:,.0f}",
-                    '% Atingido':  f"{v_atg*100:.1f}%",
-                    'Status':      f'{v_em} {v_lb}',
-                })
-            st.dataframe(pd.DataFrame(vrows), use_container_width=True, hide_index=True)
+        prow.append({
+            'Produto':      r.get('produto', ''),
+            'Prioridade':   r.get('prioridade', 'Normal'),
+            'Meta (cx)':    p_meta,
+            'Vendido (cx)': p_vend,
+            '% Atingido':   p_atg,
+            'Status':       f'{p_em} {p_lb}',
+        })
+    df_prod = pd.DataFrame(prow)
+    if not df_prod.empty:
+        df_prod['Meta (cx)']    = df_prod['Meta (cx)'].map(lambda x: f'{x:,.0f}')
+        df_prod['Vendido (cx)'] = df_prod['Vendido (cx)'].map(lambda x: f'{x:,.0f}')
+        df_prod['% Atingido']   = df_prod['% Atingido'].map(lambda x: f'{x*100:.1f}%')
+    st.dataframe(df_prod, use_container_width=True, hide_index=True)
 
     st.divider()
 
