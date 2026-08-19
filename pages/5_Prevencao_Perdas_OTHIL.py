@@ -200,7 +200,7 @@ def _gerar_excel(df, titulo, emissao_str, periodo_str):
         ('Total Monitorado',   total),
         ('🔴 Críticos',        criticos),
         ('🟠 Alta Prioridade', alta),
-        ('💰 Valor em Risco',  f'R$ {valor_risco:,.2f}'),
+        ('💰 Valor em Risco',  f"R$ {valor_risco:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')),
         ('Sem Venda ≥ 7 dias', sem_v7),
         ('Estoque ≥ 30 dias',  est30),
     ]
