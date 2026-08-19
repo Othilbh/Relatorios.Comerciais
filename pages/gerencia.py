@@ -400,8 +400,8 @@ def _render_quebra_comparativo():
     delta_pct = (delta / total_a * 100) if total_a else 0
 
     c1, c2, c3 = st.columns(3)
-    c1.metric(f'Total CX — {label_a}', f"{total_a:,.0f} cx")
-    c2.metric(f'Total CX — {label_b}', f"{total_b:,.0f} cx")
+    c1.metric(f'Total CX — {label_a}', f"{_num_vc(total_a, 0)} cx")
+    c2.metric(f'Total CX — {label_b}', f"{_num_vc(total_b, 0)} cx")
     c3.metric('Variação (B − A)', f"{delta:+,.0f} cx",
               delta=f"{delta_pct:+.1f}%", delta_color='inverse')
 
@@ -423,8 +423,8 @@ def _render_quebra_comparativo():
     df_cat_tbl['Δ %'] = df_cat_tbl.apply(
         lambda r: f"{r['Δ (B − A)'] / r[label_a] * 100:+.1f}%" if r[label_a] else '—', axis=1)
     df_cat_tbl = df_cat_tbl.reset_index().rename(columns={'index': 'Categoria'})
-    df_cat_tbl[label_a]     = df_cat_tbl[label_a].map(lambda x: f"{x:,.0f}")
-    df_cat_tbl[label_b]     = df_cat_tbl[label_b].map(lambda x: f"{x:,.0f}")
+    df_cat_tbl[label_a]     = df_cat_tbl[label_a].map(lambda x: f"{_num_vc(x, 0)}")
+    df_cat_tbl[label_b]     = df_cat_tbl[label_b].map(lambda x: f"{_num_vc(x, 0)}")
     df_cat_tbl['Δ (B − A)'] = df_cat_tbl['Δ (B − A)'].map(lambda x: f"{x:+,.0f}")
     st.dataframe(df_cat_tbl, use_container_width=True, hide_index=True)
 
@@ -449,8 +449,8 @@ def _render_quebra_comparativo():
         st.info('Nenhum grupo de produto registrado nesses dois períodos.')
     else:
         df_grp = pd.DataFrame(rows).sort_values('Δ (B − A)', ascending=False)
-        df_grp[label_a]     = df_grp[label_a].map(lambda x: f"{x:,.0f}")
-        df_grp[label_b]     = df_grp[label_b].map(lambda x: f"{x:,.0f}")
+        df_grp[label_a]     = df_grp[label_a].map(lambda x: f"{_num_vc(x, 0)}")
+        df_grp[label_b]     = df_grp[label_b].map(lambda x: f"{_num_vc(x, 0)}")
         df_grp['Δ (B − A)'] = df_grp['Δ (B − A)'].map(lambda x: f"{x:+,.0f}")
         st.dataframe(df_grp, use_container_width=True, hide_index=True)
 
@@ -498,10 +498,10 @@ def _render_quebra_secao(tipo: str, titulo: str, emoji: str):
     grupos = dados.get('grupos', [])
 
     col1, col2 = st.columns(2)
-    col1.metric('Total CX Quebradas', f"{total:,.0f} cx")
+    col1.metric('Total CX Quebradas', f"{_num_vc(total, 0)} cx")
     if categorias:
         top = categorias[0]
-        col2.metric(f'Maior: {top["categoria"]}', f"{top['cx']:,.0f} cx")
+        col2.metric(f'Maior: {top["categoria"]}', f"{_num_vc(top['cx'], 0)} cx")
 
     # ── Comparativo automático vs período anterior salvo (menor é melhor)
     if idx + 1 < len(historico):
@@ -510,7 +510,7 @@ def _render_quebra_secao(tipo: str, titulo: str, emoji: str):
         comp_auto = comparativo.calcular(total, total_ant, menor_e_melhor=True)
         st.metric(
             f'📊 vs período anterior ({_qbr_label(slugs[idx + 1], tipo)})',
-            f"{total:,.0f} cx",
+            f"{_num_vc(total, 0)} cx",
             delta=comparativo.formatar_variacao(comp_auto, casas=1),
             delta_color='inverse',
         )
@@ -667,18 +667,18 @@ def _render_ontrack_publicado():
     em, lb, _  = _on_track_status_ger(total_atg, dia)
 
     k1, k2, k3, k4, k5 = st.columns(5)
-    k1.metric('Meta (cx)',     f'{total_meta:,.0f}')
-    k2.metric('Vendido (cx)',  f'{total_vend:,.0f}')
+    k1.metric('Meta (cx)',     f'{_num_vc(total_meta, 0)}')
+    k2.metric('Vendido (cx)',  f'{_num_vc(total_vend, 0)}')
     k3.metric('% Atingido',    f'{total_atg*100:.1f}%')
-    k4.metric('Projeção (cx)', f'{proj_cx:,.0f}')
+    k4.metric('Projeção (cx)', f'{_num_vc(proj_cx, 0)}')
     k5.metric('Status',        f'{em} {lb}')
 
     tg = totais_rs.get('total_geral', {})
     if tg:
         st.subheader('Faturamento Geral (R$)')
         r1, r2, r3 = st.columns(3)
-        r1.metric('Faturamento', f"R$ {tg.get('fat', 0):,.2f}")
-        r2.metric('MC R$',       f"R$ {tg.get('mc_rs', 0):,.2f}")
+        r1.metric('Faturamento', f"R$ {_num_vc(tg.get('fat', 0), 2)}")
+        r2.metric('MC R$',       f"R$ {_num_vc(tg.get('mc_rs', 0), 2)}")
         r3.metric('MC %',        f"{tg.get('resultado_real', 0):.2f}%")
 
     # ── Comparativo vs semana anterior salva ────────────────────────────────
@@ -691,12 +691,12 @@ def _render_ontrack_publicado():
         st.subheader('📊 Comparativo vs semana anterior')
         cc1, cc2, cc3 = st.columns(3)
         comp_vend = comparativo.calcular(total_vend, vend_ant_total)
-        cc1.metric('Vendido (cx)', f'{total_vend:,.0f}', delta=comparativo.formatar_variacao(comp_vend))
+        cc1.metric('Vendido (cx)', f'{_num_vc(total_vend, 0)}', delta=comparativo.formatar_variacao(comp_vend))
         if tg and tg_ant:
             comp_fat = comparativo.calcular(tg.get('fat', 0), tg_ant.get('fat'))
             comp_mc  = comparativo.calcular(tg.get('mc_rs', 0), tg_ant.get('mc_rs'))
-            cc2.metric('Faturamento', f"R$ {tg.get('fat', 0):,.2f}", delta=comparativo.formatar_variacao(comp_fat))
-            cc3.metric('MC R$', f"R$ {tg.get('mc_rs', 0):,.2f}", delta=comparativo.formatar_variacao(comp_mc))
+            cc2.metric('Faturamento', f"R$ {_num_vc(tg.get('fat', 0), 2)}", delta=comparativo.formatar_variacao(comp_fat))
+            cc3.metric('MC R$', f"R$ {_num_vc(tg.get('mc_rs', 0), 2)}", delta=comparativo.formatar_variacao(comp_mc))
         st.caption(f'Base de comparação: {_label_fech(historico_ot[idx_ot + 1][0])}')
 
     st.divider()
@@ -724,8 +724,8 @@ def _render_ontrack_publicado():
         })
     df_prod = pd.DataFrame(prow)
     if not df_prod.empty:
-        df_prod['Meta (cx)']    = df_prod['Meta (cx)'].map(lambda x: f'{x:,.0f}')
-        df_prod['Vendido (cx)'] = df_prod['Vendido (cx)'].map(lambda x: f'{x:,.0f}')
+        df_prod['Meta (cx)']    = df_prod['Meta (cx)'].map(lambda x: f'{_num_vc(x, 0)}')
+        df_prod['Vendido (cx)'] = df_prod['Vendido (cx)'].map(lambda x: f'{_num_vc(x, 0)}')
         df_prod['% Atingido']   = df_prod['% Atingido'].map(lambda x: f'{x*100:.1f}%')
     st.dataframe(df_prod, use_container_width=True, hide_index=True)
 
@@ -750,12 +750,12 @@ def _render_ontrack_publicado():
         rs = vend_rs.get(v, {})
         vrows_all.append({
             'Vendedor':     v,
-            'Meta (cx)':   f"{ag['meta']:,.0f}",
-            'Vendido (cx)': f"{ag['vendido']:,.0f}",
+            'Meta (cx)':   f"{_num_vc(ag['meta'], 0)}",
+            'Vendido (cx)': f"{_num_vc(ag['vendido'], 0)}",
             '% Atingido':  f"{v_atg*100:.1f}%",
             'Status':      f'{v_em} {v_lb}',
-            'Fat R$':      f"R$ {rs['fat']:,.2f}"   if rs.get('fat')    is not None else '—',
-            'MC R$':       f"R$ {rs['mc_rs']:,.2f}" if rs.get('mc_rs') is not None else '—',
+            'Fat R$':      f"R$ {_num_vc(rs['fat'], 2)}"   if rs.get('fat')    is not None else '—',
+            'MC R$':       f"R$ {_num_vc(rs['mc_rs'], 2)}" if rs.get('mc_rs') is not None else '—',
         })
     st.dataframe(pd.DataFrame(vrows_all), use_container_width=True, hide_index=True)
 
@@ -852,15 +852,15 @@ def _render_fechamentos_semanais():
     h_atg     = h_vend / h_meta if h_meta else 0
 
     c1, c2, c3 = st.columns(3)
-    c1.metric('Meta total (cx)', f'{h_meta:,.0f}')
-    c2.metric('Vendido (cx)',    f'{h_vend:,.0f}')
+    c1.metric('Meta total (cx)', f'{_num_vc(h_meta, 0)}')
+    c2.metric('Vendido (cx)',    f'{_num_vc(h_vend, 0)}')
     c3.metric('% Atingido',     f'{h_atg*100:.1f}%')
 
     tg = dados.get('totais_rs', {}).get('total_geral', {})
     if tg:
         r1, r2, r3 = st.columns(3)
-        r1.metric('Faturamento', f"R$ {tg.get('fat', 0):,.2f}")
-        r2.metric('MC R$',       f"R$ {tg.get('mc_rs', 0):,.2f}")
+        r1.metric('Faturamento', f"R$ {_num_vc(tg.get('fat', 0), 2)}")
+        r2.metric('MC R$',       f"R$ {_num_vc(tg.get('mc_rs', 0), 2)}")
         r3.metric('MC %',        f"{tg.get('resultado_real', 0):.2f}%")
 
     st.divider()
@@ -894,11 +894,11 @@ def _render_fechamentos_semanais():
             comp_rows.append({
                 'Semana':        _label_fech(s),
                 'Período':       d.get('periodo', '-'),
-                'Meta (cx)':    f'{dm:,.0f}',
-                'Vendido (cx)': f'{dv:,.0f}',
+                'Meta (cx)':    f'{_num_vc(dm, 0)}',
+                'Vendido (cx)': f'{_num_vc(dv, 0)}',
                 'Δ Vendido':    comparativo.formatar_variacao(comp_v, casas=1),
                 '% Atingido':   f'{da*100:.1f}%',
-                'Fat R$':       f"R$ {fat:,.2f}" if fat is not None else '—',
+                'Fat R$':       f"R$ {_num_vc(fat, 2)}" if fat is not None else '—',
                 'Δ Fat':        comparativo.formatar_variacao(comp_f, casas=1) if comp_f else 'n/d',
                 'MC %':         f"{dtg.get('resultado_real', 0):.2f}%" if dtg else '—',
             })
@@ -1113,6 +1113,11 @@ def _brl_vc(v):
     return f"R$ {'-' if v < 0 else ''}{s}"
 
 
+def _num_vc(v, casas=0):
+    v = v or 0.0
+    return f"{v:,.{casas}f}".replace(',', 'X').replace('.', ',').replace('X', '.')
+
+
 def _get_meta_fat_vc(historico_data: dict, vend: str, cli_key: str):
     """Busca meta de faturamento do cliente no histórico salvo -- mesma
     lógica de pages/3_Vendedor_Cliente_OTHIL.py (não duplica o cálculo,
@@ -1215,7 +1220,7 @@ def _render_top50_clientes_ger():
                 'Vendedor': vendedor, 'Cliente': cliente,
                 '_fat': fat, '_vol': vol, '_mc_rs': mc_rs, '_mc_pct': mc_pct,
                 '_pct_atg': pct_atg or 0, 'Faturamento': _brl_vc(fat),
-                'Volume (cx)': f'{vol:,.0f}', 'Margem (MC R$)': _brl_vc(mc_rs),
+                'Volume (cx)': f'{_num_vc(vol, 0)}', 'Margem (MC R$)': _brl_vc(mc_rs),
                 'Rentabilidade': f'{mc_pct:.1f}%',
                 'Comparativo': comparativo.formatar_variacao(comp),
                 '% Atingido': f'{pct_atg*100:.1f}%' if pct_atg is not None else '—',
@@ -1313,7 +1318,7 @@ def _render_clientes_por_vendedor_ger():
 
         linhas_pv.append({
             '_fat': fat,
-            'Cliente': cliente, 'Faturamento': _brl_vc(fat), 'Volume (cx)': f'{vol:,.0f}',
+            'Cliente': cliente, 'Faturamento': _brl_vc(fat), 'Volume (cx)': f'{_num_vc(vol, 0)}',
             'Margem (MC R$)': _brl_vc(mc_rs), 'Rentabilidade': f'{mc_pct:.1f}%',
             'Comparativo': comparativo.formatar_variacao(comp),
             'Participação no vendedor': f'{participacao*100:.1f}%',
@@ -1743,8 +1748,15 @@ def _render_metas_gerais():
                                                  value=float(meta_atual.get('margem_pct') or 0.0), step=1.0)
                     meta_qbr = st.number_input('Teto de Quebra (CX)', min_value=0.0,
                                                 value=float(meta_atual.get('quebra_max_cx') or 0.0), step=10.0)
+                    meta_qbr_rs = st.number_input(
+                        'Teto de Quebra (R$)', min_value=0.0,
+                        value=float(meta_atual.get('quebra_max_rs') or 0.0), step=1000.0,
+                        help='Opcional -- independente do Teto em CX acima (não converte um no outro). '
+                             'Usado só pra calcular quanto isso representa em % da Meta de Faturamento, '
+                             'exibido no indicador de Quebra abaixo.')
                 if st.form_submit_button('💾 Salvar meta', type='primary'):
                     _reg_meta = mg.salvar_meta(tipo_mg, ref_mg, meta_fat, meta_vol, meta_marg, meta_qbr,
+                                                quebra_max_rs=meta_qbr_rs or None,
                                                 usuario=st.session_state.get('usuario_nome'))
                     # data_store.save_record devolve '_erro_persistencia_remota' quando
                     # a gravação no GitHub falha (token expirado, instabilidade da API,
@@ -1775,10 +1787,12 @@ def _render_metas_gerais():
                         'Versão': _v.get('versao'),
                         'Salvo em': (_v.get('atualizado_em') or '')[:16].replace('T', ' '),
                         'Por': _v.get('usuario', 'não identificado'),
-                        'Faturamento': f"R$ {_vals.get('faturamento', 0):,.0f}",
-                        'Volume (CX)': f"{_vals.get('volume', 0):,.0f}",
+                        'Faturamento': f"R$ {_num_vc(_vals.get('faturamento', 0), 0)}",
+                        'Volume (CX)': f"{_num_vc(_vals.get('volume', 0), 0)}",
                         'Margem (%)': f"{_vals.get('margem_pct', 0):.2f}%",
-                        'Teto Quebra (CX)': f"{_vals.get('quebra_max_cx', 0):,.0f}",
+                        'Teto Quebra (CX)': f"{_num_vc(_vals.get('quebra_max_cx', 0), 0)}",
+                        'Teto Quebra (R$)': (f"R$ {_num_vc(_vals.get('quebra_max_rs'), 2)}"
+                                              if _vals.get('quebra_max_rs') else '—'),
                     })
                 st.dataframe(pd.DataFrame(_linhas_hist), hide_index=True, use_container_width=True)
 
@@ -1801,13 +1815,13 @@ def _render_metas_gerais():
             # dado real publicado ainda.
             ot_fat = on_track.calcular(meta_atual.get('faturamento') or 0, rv.get('faturamento'),
                                         tipo_mg, ref_mg, pct_tempo_decorrido=pct_tempo_mg)
-            _render_indicador_mg('Faturamento', lambda x: f'R$ {x:,.0f}',
+            _render_indicador_mg('Faturamento', lambda x: f'R$ {_num_vc(x, 0)}',
                                   meta_atual.get('faturamento'), rv.get('faturamento'), ot_fat,
                                   _completude_msgs.get(rv['completude']))
         with ic2:
             ot_vol = on_track.calcular(meta_atual.get('volume') or 0, rv.get('volume'),
                                         tipo_mg, ref_mg, pct_tempo_decorrido=pct_tempo_mg)
-            _render_indicador_mg('Volume (CX)', lambda x: f'{x:,.0f} cx',
+            _render_indicador_mg('Volume (CX)', lambda x: f'{_num_vc(x, 0)} cx',
                                   meta_atual.get('volume'), rv.get('volume'), ot_vol,
                                   _completude_msgs.get(rv['completude']))
         with ic3:
@@ -1818,17 +1832,25 @@ def _render_metas_gerais():
                                   _completude_msgs.get(rv['completude']))
         with ic4:
             ot_qbr = mg.status_quebra(meta_atual.get('quebra_max_cx'), rq.get('total_cx'), tipo_mg, ref_mg)
-            _render_indicador_mg('Quebra (CX)', lambda x: f'{x:,.0f} cx',
+            _render_indicador_mg('Quebra (CX)', lambda x: f'{_num_vc(x, 0)} cx',
                                   meta_atual.get('quebra_max_cx'), rq.get('total_cx'), ot_qbr,
                                   _completude_msgs.get(rq['completude']))
+            _qbr_rs = meta_atual.get('quebra_max_rs')
+            if _qbr_rs:
+                _qbr_pct = mg.quebra_pct_faturamento(_qbr_rs, meta_atual.get('faturamento'))
+                st.caption(
+                    f'Teto também em R$: R$ {_num_vc(_qbr_rs, 2)}'
+                    + (f' → {_num_vc(_qbr_pct, 2)}% da Meta de Faturamento' if _qbr_pct is not None
+                       else ' (defina a Meta de Faturamento acima para calcular o %)')
+                )
 
         # ── Comparativo vs período anterior ──────────────────────────────────
         st.subheader('📊 Comparativo vs período anterior')
         _linhas_comp = [
-            ('Faturamento', rv.get('faturamento'), rv_ant.get('faturamento'), lambda x: f'R$ {x:,.0f}', False),
-            ('Volume (CX)', rv.get('volume'), rv_ant.get('volume'), lambda x: f'{x:,.0f}', False),
+            ('Faturamento', rv.get('faturamento'), rv_ant.get('faturamento'), lambda x: f'R$ {_num_vc(x, 0)}', False),
+            ('Volume (CX)', rv.get('volume'), rv_ant.get('volume'), lambda x: f'{_num_vc(x, 0)}', False),
             ('Margem (%)', rv.get('margem_pct'), rv_ant.get('margem_pct'), lambda x: f'{x:.2f}%', False),
-            ('Quebra (CX)', rq.get('total_cx'), rq_ant.get('total_cx'), lambda x: f'{x:,.0f}', True),
+            ('Quebra (CX)', rq.get('total_cx'), rq_ant.get('total_cx'), lambda x: f'{_num_vc(x, 0)}', True),
         ]
         # Antes, este bloco inteiro só aparecia se FATURAMENTO especificamente
         # tivesse dado no período atual e no anterior -- então, se só o
@@ -1922,11 +1944,11 @@ def _render_metas_gerais():
                 _quebra_emp = mg.quebra_semanal_meta(ref_mg, _meta_fat_mg)
                 _rows_quebra = [{
                     'Semana':             f"{l['semana']}ª — {l['label']}",
-                    'Meta fixa (R$)':     f"R$ {_meta_fat_mg:,.2f}",
+                    'Meta fixa (R$)':     f"R$ {_num_vc(_meta_fat_mg, 2)}",
                     '% semanal':          f"{l['pct_semana']:.0f}%",
                     '% acumulado':        f"{l['pct_acumulado']:.0f}%",
-                    'Esperado acumulado': f"R$ {l['esperado_acumulado']:,.2f}",
-                    'Vendido acumulado':  f"R$ {l['vendido_acumulado']:,.2f}" if l['vendido_acumulado'] is not None else '—',
+                    'Esperado acumulado': f"R$ {_num_vc(l['esperado_acumulado'], 2)}",
+                    'Vendido acumulado':  f"R$ {_num_vc(l['vendido_acumulado'], 2)}" if l['vendido_acumulado'] is not None else '—',
                     'Atingimento':        f"{l['atingimento']:.0f}%" if l['atingimento'] is not None else '—',
                 } for l in _quebra_emp]
                 st.dataframe(pd.DataFrame(_rows_quebra), use_container_width=True, hide_index=True)
@@ -1959,7 +1981,7 @@ def _render_metas_gerais():
                 r['#'] = i
             df_rank = pd.DataFrame(rows_rank)[['#', 'Vendedor', 'Faturamento', 'Volume (CX)', 'Margem %', 'Participação']]
             styled_rank = df_rank.style.format({
-                'Faturamento': 'R$ {:,.2f}', 'Volume (CX)': '{:,.3f}',
+                'Faturamento': lambda v: f"R$ {_num_vc(v, 2)}", 'Volume (CX)': lambda v: _num_vc(v, 3),
                 'Margem %': '{:.2f}%', 'Participação': '{:.1f}%',
             })
             st.dataframe(styled_rank, use_container_width=True, hide_index=True)
@@ -1971,8 +1993,8 @@ def _render_metas_gerais():
             v_sel = vendedores_mg.get(vend_sel_mg, {})
             vend_ant = (rv_ant.get('vendedores') or {}).get(vend_sel_mg, {})
             dc1, dc2, dc3, dc4 = st.columns(4)
-            dc1.metric('Faturamento', f"R$ {v_sel.get('fat', 0):,.2f}")
-            dc2.metric('Volume (CX)', f"{v_sel.get('vol', 0):,.3f}")
+            dc1.metric('Faturamento', f"R$ {_num_vc(v_sel.get('fat', 0), 2)}")
+            dc2.metric('Volume (CX)', f"{_num_vc(v_sel.get('vol', 0), 3)}")
             dc3.metric('Margem %', f"{v_sel.get('mc_pct', 0):.2f}%")
             dc4.metric('Participação na empresa',
                        f"{(v_sel.get('fat', 0) / fat_total_emp * 100) if fat_total_emp else 0:.1f}%")
@@ -1981,9 +2003,9 @@ def _render_metas_gerais():
                 comp_fat_v = comparativo.calcular(v_sel.get('fat', 0), vend_ant.get('fat'))
                 comp_vol_v = comparativo.calcular(v_sel.get('vol', 0), vend_ant.get('vol'))
                 dcc1, dcc2 = st.columns(2)
-                dcc1.metric('Faturamento', f"R$ {v_sel.get('fat', 0):,.2f}",
+                dcc1.metric('Faturamento', f"R$ {_num_vc(v_sel.get('fat', 0), 2)}",
                             delta=comparativo.formatar_variacao(comp_fat_v))
-                dcc2.metric('Volume (CX)', f"{v_sel.get('vol', 0):,.3f}",
+                dcc2.metric('Volume (CX)', f"{_num_vc(v_sel.get('vol', 0), 3)}",
                             delta=comparativo.formatar_variacao(comp_vol_v))
 
         # ── OnTrack Semanal por Vendedor — quebra da meta MENSAL fixa dele ──
@@ -2027,11 +2049,11 @@ def _render_metas_gerais():
                 _quebra_v = mg.quebra_semanal_meta(ref_mg, _meta_fixa_v, vendedor=_vend_sel_sem)
                 _rows_quebra_v = [{
                     'Semana':             f"{l['semana']}ª — {l['label']}",
-                    'Meta fixa (R$)':     f"R$ {_meta_fixa_v:,.2f}",
+                    'Meta fixa (R$)':     f"R$ {_num_vc(_meta_fixa_v, 2)}",
                     '% semanal':          f"{l['pct_semana']:.0f}%",
                     '% acumulado':        f"{l['pct_acumulado']:.0f}%",
-                    'Esperado acumulado': f"R$ {l['esperado_acumulado']:,.2f}",
-                    'Vendido acumulado':  f"R$ {l['vendido_acumulado']:,.2f}" if l['vendido_acumulado'] is not None else '—',
+                    'Esperado acumulado': f"R$ {_num_vc(l['esperado_acumulado'], 2)}",
+                    'Vendido acumulado':  f"R$ {_num_vc(l['vendido_acumulado'], 2)}" if l['vendido_acumulado'] is not None else '—',
                     'Atingimento':        f"{l['atingimento']:.0f}%" if l['atingimento'] is not None else '—',
                 } for l in _quebra_v]
                 st.dataframe(pd.DataFrame(_rows_quebra_v), use_container_width=True, hide_index=True)
@@ -2093,13 +2115,13 @@ def _render_rentabilidade_resumo():
         return comparativo.calcular(kpi[chave], kpi_ant[chave]) if kpi_ant else None
 
     c1, c2, c3, c4 = st.columns(4)
-    c1.metric('Faturamento', f"R$ {kpi['faturamento']:,.2f}",
+    c1.metric('Faturamento', f"R$ {_num_vc(kpi['faturamento'], 2)}",
               delta=comparativo.formatar_variacao(_c('faturamento')) if kpi_ant else None)
-    c2.metric('Margem R$', f"R$ {kpi['margem_rs']:,.2f}",
+    c2.metric('Margem R$', f"R$ {_num_vc(kpi['margem_rs'], 2)}",
               delta=comparativo.formatar_variacao(_c('margem_rs')) if kpi_ant else None)
     c3.metric('Margem %', f"{kpi['margem_pct']:.2f}%",
               delta=comparativo.formatar_variacao(_c('margem_pct')) if kpi_ant else None)
-    c4.metric('Ticket Médio', f"R$ {kpi['ticket_medio']:,.2f}",
+    c4.metric('Ticket Médio', f"R$ {_num_vc(kpi['ticket_medio'], 2)}",
               delta=comparativo.formatar_variacao(_c('ticket_medio')) if kpi_ant else None)
 
     rcol1, rcol2, rcol3 = st.columns(3)
@@ -2179,11 +2201,11 @@ def _render_produtos_resumo():
     c1, c2, c3, c4 = st.columns(4)
     c1.metric('Produtos Trabalhados', kpi.get('skus', 0),
               delta=comparativo.formatar_variacao(_c('skus')) if kpi_ant else None)
-    c2.metric('Faturamento', f"R$ {kpi['faturamento']:,.2f}",
+    c2.metric('Faturamento', f"R$ {_num_vc(kpi['faturamento'], 2)}",
               delta=comparativo.formatar_variacao(_c('faturamento')) if kpi_ant else None)
-    c3.metric('Volume (cx)', f"{kpi['volume']:,.3f}",
+    c3.metric('Volume (cx)', f"{_num_vc(kpi['volume'], 3)}",
               delta=comparativo.formatar_variacao(_c('volume')) if kpi_ant else None)
-    c4.metric('Margem de Contribuição', f"R$ {kpi['margem_rs']:,.2f}",
+    c4.metric('Margem de Contribuição', f"R$ {_num_vc(kpi['margem_rs'], 2)}",
               delta=comparativo.formatar_variacao(_c('margem_rs')) if kpi_ant else None)
 
     c5, c6, c7 = st.columns(3)
@@ -2279,12 +2301,12 @@ def _render_recorrencia_resumo():
                 return comparativo.calcular(totais_rc.get(chave), tot_ant_rc.get(chave)) if tot_ant_rc else None
 
             c1, c2, c3, c4, c5 = st.columns(5)
-            c1.metric('Faturamento', f"R$ {totais_rc.get('faturamento', 0):,.2f}",
+            c1.metric('Faturamento', f"R$ {_num_vc(totais_rc.get('faturamento', 0), 2)}",
                       delta=comparativo.formatar_variacao(_c_rc('faturamento')) if tot_ant_rc else None)
-            c2.metric('MC R$', f"R$ {totais_rc.get('mc_rs', 0):,.2f}",
+            c2.metric('MC R$', f"R$ {_num_vc(totais_rc.get('mc_rs', 0), 2)}",
                       delta=comparativo.formatar_variacao(_c_rc('mc_rs')) if tot_ant_rc else None)
             c3.metric('MC %', f"{totais_rc.get('mc_pct', 0):.2f}%")
-            c4.metric('Total CX', f"{totais_rc.get('caixas', 0):,.3f}",
+            c4.metric('Total CX', f"{_num_vc(totais_rc.get('caixas', 0), 3)}",
                       delta=comparativo.formatar_variacao(_c_rc('caixas')) if tot_ant_rc else None)
             c5.metric('Clientes', totais_rc.get('n_clientes', '-'),
                       delta=comparativo.formatar_variacao(_c_rc('n_clientes')) if tot_ant_rc else None)
@@ -2299,9 +2321,9 @@ def _render_recorrencia_resumo():
                 st.bar_chart(top30_rc, color='#2D6A4F')
                 with st.expander(f'Todos os clientes ({len(df_rc)})'):
                     styled_rc = df_rc.style.format({
-                        'Faturamento R$': 'R$ {:,.2f}',
-                        'Caixas': '{:,.3f}',
-                        'MC R$': 'R$ {:,.2f}',
+                        'Faturamento R$': lambda v: f"R$ {_num_vc(v, 2)}",
+                        'Caixas': lambda v: _num_vc(v, 3),
+                        'MC R$': lambda v: f"R$ {_num_vc(v, 2)}",
                         'MC %': '{:.2f}%',
                     })
                     st.dataframe(styled_rc, use_container_width=True, hide_index=True)
@@ -2314,7 +2336,7 @@ def _render_recorrencia_resumo():
                 _tot_lrc = _val_lrc.get('totais', {})
                 st.caption(
                     f"{_val_lrc.get('periodo','-')} — emissão {_val_lrc.get('emissao','-')} "
-                    f"— Faturamento R$ {_tot_lrc.get('faturamento', 0):,.2f}"
+                    f"— Faturamento R$ {_num_vc(_tot_lrc.get('faturamento', 0), 2)}"
                 )
 
 
