@@ -46,6 +46,10 @@ def _fmt_money(v):
     return f"R$ {v:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
 
 
+def _num(v, casas=0):
+    return f"{v:,.{casas}f}".replace(',', 'X').replace('.', ',').replace('X', '.')
+
+
 def _fmt_pct(v):
     return f"{v*100:.1f}%"
 
@@ -286,7 +290,7 @@ def _build_dashboard(periodo: str, metas_results: list, vendedor_pcts: dict,
 
     card = Table([
         ['Meta Total', 'Vendido', 'Falta', '% Atingido', 'Criticos <50%', 'Produtos'],
-        [f"{meta_total:,.0f} cx", f"{vendido_total:,.0f} cx", f"{falta_total:,.0f} cx",
+        [f"{_num(meta_total)} cx", f"{_num(vendido_total)} cx", f"{_num(falta_total)} cx",
          _fmt_pct(pct_total), str(len(criticos)), str(len(metas_results))],
     ], colWidths=[4*cm]*6)
     card.setStyle(TableStyle([
@@ -541,10 +545,10 @@ def _build_resumo_geral(periodo: str, data_emissao: str, metas_results: list,
     elems = [Paragraph(
         f"OTHIL — RESUMO GERAL DE METAS | {periodo} | {data_emissao}", title_sty)]
     elems.append(Paragraph(
-        f"Quantidade Total: {estoque_total:,.0f} cx &nbsp;&nbsp; "
-        f"Meta Total: {meta_total:,.0f} cx &nbsp;&nbsp; "
-        f"Vendido Total: {vendido_total:,.0f} cx &nbsp;&nbsp; "
-        f"Falta: {falta_total:,.0f} cx &nbsp;&nbsp; "
+        f"Quantidade Total: {_num(estoque_total)} cx &nbsp;&nbsp; "
+        f"Meta Total: {_num(meta_total)} cx &nbsp;&nbsp; "
+        f"Vendido Total: {_num(vendido_total)} cx &nbsp;&nbsp; "
+        f"Falta: {_num(falta_total)} cx &nbsp;&nbsp; "
         f"% Geral Atingido: {_fmt_pct(pct_total)}",
         sub_info_sty))
     elems.append(Spacer(1, spacer * 0.8))
