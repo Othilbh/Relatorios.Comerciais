@@ -56,15 +56,36 @@ MOD_QUEBRA = 'quebra'
 # ---------------------------------------------------------------------------
 
 def salvar_meta(tipo_periodo: str, periodo_ref: str, faturamento: float, volume: float,
-                 margem_pct: float, quebra_max_cx: float, usuario: str = None) -> dict:
+                 margem_pct: float, quebra_max_cx: float, quebra_max_rs: float = None,
+                 usuario: str = None) -> dict:
+    """quebra_max_rs (opcional): teto de Quebra também expresso em R$ (pedido
+    Ingrid, 19/08/2026) -- ela pensa/define esse teto em valor, não em
+    caixas. É um campo INDEPENDENTE de quebra_max_cx: não converte um no
+    outro (não há preço médio por caixa confiável pra isso) -- os dois
+    convivem. quebra_max_cx continua sendo o único usado no status On
+    Track de Quebra (compara com o realizado, que só vem em CX dos
+    relatórios de Quebra); quebra_max_rs só alimenta o cálculo de
+    'quanto isso representa em % do faturamento' (ver
+    quebra_pct_faturamento abaixo)."""
     return ds.save_record(
         modulo=MODULO_META, tipo_periodo=tipo_periodo, periodo_ref=periodo_ref,
         valores={
             'faturamento': faturamento, 'volume': volume,
             'margem_pct': margem_pct, 'quebra_max_cx': quebra_max_cx,
+            'quebra_max_rs': quebra_max_rs,
         },
         usuario=usuario,
     )
+
+
+def quebra_pct_faturamento(quebra_rs, faturamento_rs):
+    """Quanto um valor de Quebra (R$) representa em % do Faturamento (R$).
+    Ex.: quebra R$ 80.000,00 sobre meta de faturamento R$ 18.000.000,00 =
+    0,44%. None se faltar faturamento ou quebra (evita divisão por zero e
+    não inventa um percentual sem as duas pontas)."""
+    if not faturamento_rs or quebra_rs is None:
+        return None
+    return quebra_rs / faturamento_rs * 100
 
 
 def carregar_meta(tipo_periodo: str, periodo_ref: str):
