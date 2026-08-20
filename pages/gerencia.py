@@ -1699,6 +1699,46 @@ def _render_indicador_mg(titulo, unidade_fmt, meta, realizado, ot, completude_ms
         st.caption(completude_msg)
 
 
+def _render_indicador_quebra(meta_cx, realizado_cx, meta_rs, faturamento_meta, ot, completude_msg=None):
+    """Card de Quebra -- ao contrário dos outros indicadores (onde o número
+    principal é o REALIZADO), aqui o número principal é o TETO em R$ e
+    quanto ele representa em % da Meta de Faturamento. Motivo: o único
+    dado REALIZADO (medido de verdade) que este módulo tem é em cx -- o
+    relatório de Quebra hoje só registra caixas descartadas, não custo por
+    quebra, então não dá pra mostrar um "realizado em R$" sem inventar um
+    número. Até isso ser resolvido (extraindo o custo do relatório em
+    PDF), cx fica como detalhe secundário (realizado E teto), e o Teto em
+    R$/% fica em destaque -- que é como a Ingrid pediu pra visualizar."""
+    bg, fg = _GER_STATUS_LABEL_COR[ot['status']]
+    if meta_rs:
+        pct_fat = mg.quebra_pct_faturamento(meta_rs, faturamento_meta)
+        linha_principal = f'R$ {_num_vc(meta_rs, 2)}' + (
+            f' ({_num_vc(pct_fat, 2)}% da Meta de Faturamento)' if pct_fat is not None else ''
+        )
+    else:
+        linha_principal = '—'
+    html = f"""
+    <div style="background:{bg}; color:{fg}; border-radius:10px; padding:0.9rem 1rem; margin-bottom:0.5rem;">
+        <div style="font-weight:600; font-size:0.95rem;">{ot['emoji']} Quebra (Teto)</div>
+        <div style="font-size:1.4rem; font-weight:700; margin-top:0.2rem;">
+            {linha_principal}
+        </div>
+        <div style="font-size:0.82rem; opacity:0.85;">
+            Realizado: {_num_vc(realizado_cx, 0) + ' cx' if realizado_cx is not None else '—'}
+            {'  |  Teto: ' + _num_vc(meta_cx, 0) + ' cx' if meta_cx else ''}
+            {'  |  ' + ot['label'] if meta_cx else ''}
+            {f"  |  {ot['pct_atingido']*100:.0f}% do teto em cx" if ot.get('pct_atingido') is not None else ''}
+        </div>
+        {f'<div style="font-size:0.78rem; opacity:0.75; margin-top:0.2rem;">Projeção de fechamento (cx): {_num_vc(ot["projecao_fechamento"], 0)}</div>' if ot.get('projecao_fechamento') is not None else ''}
+        {'' if meta_rs else '<div style="font-size:0.78rem; opacity:0.7; margin-top:0.2rem;">Defina o Teto de Quebra em R$ acima pra ver valor/% aqui.</div>'}
+    </div>
+    """
+    html = '\n'.join(line for line in html.split('\n') if line.strip())
+    st.markdown(html, unsafe_allow_html=True)
+    if completude_msg:
+        st.caption(completude_msg)
+
+
 def _render_metas_gerais():
     st.header('🌐 Meta Geral')
     st.caption(
@@ -1832,17 +1872,9 @@ def _render_metas_gerais():
                                   _completude_msgs.get(rv['completude']))
         with ic4:
             ot_qbr = mg.status_quebra(meta_atual.get('quebra_max_cx'), rq.get('total_cx'), tipo_mg, ref_mg)
-            _render_indicador_mg('Quebra (CX)', lambda x: f'{_num_vc(x, 0)} cx',
-                                  meta_atual.get('quebra_max_cx'), rq.get('total_cx'), ot_qbr,
-                                  _completude_msgs.get(rq['completude']))
-            _qbr_rs = meta_atual.get('quebra_max_rs')
-            if _qbr_rs:
-                _qbr_pct = mg.quebra_pct_faturamento(_qbr_rs, meta_atual.get('faturamento'))
-                st.caption(
-                    f'Teto também em R$: R$ {_num_vc(_qbr_rs, 2)}'
-                    + (f' → {_num_vc(_qbr_pct, 2)}% da Meta de Faturamento' if _qbr_pct is not None
-                       else ' (defina a Meta de Faturamento acima para calcular o %)')
-                )
+            _render_indicador_quebra(meta_atual.get('quebra_max_cx'), rq.get('total_cx'),
+                                      meta_atual.get('quebra_max_rs'), meta_atual.get('faturamento'),
+                                      ot_qbr, _completude_msgs.get(rq['completude']))
 
         # ── Comparativo vs período anterior ──────────────────────────────────
         st.subheader('📊 Comparativo vs período anterior')
