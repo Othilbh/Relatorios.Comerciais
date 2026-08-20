@@ -295,7 +295,13 @@ def realizado_vendas(tipo_periodo: str, periodo_ref: str) -> dict:
     else:
         completude = 'completo'
 
-    margem_pct = ((fat - custo) / custo * 100) if (custo and meses_com_dado) else None
+    # +15pp: mesmo ajuste "Resultado Real" aplicado em todo o resto do app
+    # (parsers_vendedor._agg, dashboard_diario, xlsx_diario) -- a MC bruta
+    # (faturamento - custo) subestima a margem real porque já cobre parte
+    # das despesas administrativas/frete/seguro que não aparecem no custo
+    # do produto. Sem isso, esta era a única tela mostrando a margem "crua"
+    # (ex.: -0,63%) enquanto o resto do app já mostra a versão +15pp.
+    margem_pct = ((fat - custo) / custo * 100 + 15) if (custo and meses_com_dado) else None
     return {
         'faturamento': fat if meses_com_dado else None,
         'volume': vol if meses_com_dado else None,
