@@ -126,15 +126,20 @@ def carregar_metas_vendedores(tipo_periodo: str, periodo_ref: str) -> dict:
 # reaproveitada em todos os meses até a Ingrid decidir mudar.
 # ---------------------------------------------------------------------------
 
-def carregar_pcts_semanais() -> list:
-    reg = ds.load_current(MODULO_PCTS_SEMANAIS, 'global', 'config')
+def carregar_pcts_semanais(mes_ref: str) -> list:
+    """Percentuais semanais configurados para ESSE mês especificamente
+    (cada mês tem seu próprio conjunto -- meses diferentes tocam
+    quantidades diferentes de semanas ISO, então não faz sentido usar um
+    único conjunto global pra todos). Se a Ingrid ainda não configurou
+    nada pra esse mês, cai no padrão de 4 semanas (30/28/25/25)."""
+    reg = ds.load_current(MODULO_PCTS_SEMANAIS, 'mensal', mes_ref)
     valores = reg['valores'].get('percentuais') if reg else None
     return list(valores) if valores else list(PCTS_SEMANAIS_PADRAO)
 
 
-def salvar_pcts_semanais(percentuais: list, usuario: str = None) -> dict:
+def salvar_pcts_semanais(mes_ref: str, percentuais: list, usuario: str = None) -> dict:
     return ds.save_record(
-        modulo=MODULO_PCTS_SEMANAIS, tipo_periodo='global', periodo_ref='config',
+        modulo=MODULO_PCTS_SEMANAIS, tipo_periodo='mensal', periodo_ref=mes_ref,
         valores={'percentuais': percentuais}, usuario=usuario,
     )
 
@@ -185,12 +190,18 @@ def quebra_semanal_meta(mes_ref: str, meta_fixa, pcts_semanais: list = None,
       {'semana', 'periodo_ref', 'label', 'pct_semana', 'pct_acumulado',
        'esperado_acumulado', 'vendido_acumulado' (None se a semana ainda
        não começou), 'atingimento' (None se não dá pra calcular)}.
+
+    O 'label' é a posição da semana DENTRO do mês (ex.: "Semana 01 do mês
+    08"), não o número da semana ISO (ex.: "Semana 31/2026") -- uma semana
+    ISO pode pertencer a dois meses (começar num, terminar no outro), e
+    numerar pela semana ISO ficava confuso pra acompanhar mês a mês.
     """
     if pcts_semanais is None:
-        pcts_semanais = carregar_pcts_semanais()
+        pcts_semanais = carregar_pcts_semanais(mes_ref)
     meta_fixa = meta_fixa or 0
     hoje = hoje or date.today()
     semanas = _semanas_do_mes(mes_ref)
+    mes_num = int(mes_ref.split('-')[1])
 
     linhas = []
     pct_acum = 0.0
@@ -220,7 +231,7 @@ def quebra_semanal_meta(mes_ref: str, meta_fixa, pcts_semanais: list = None,
         linhas.append({
             'semana': i + 1,
             'periodo_ref': slug,
-            'label': periodo.rotulo('semanal', slug),
+            'label': f'Semana {i + 1:02d} do mês {mes_num:02d}',
             'pct_semana': pct_sem,
             'pct_acumulado': pct_acum,
             'esperado_acumulado': esperado,
