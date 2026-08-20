@@ -1948,16 +1948,16 @@ def _render_metas_gerais():
             with st.expander('⚙️ Configurar percentuais semanais'):
                 st.caption(
                     f'Percentuais específicos de {periodo_mod.rotulo(tipo_mg, ref_mg)} -- cada '
-                    f'mês tem o seu próprio conjunto (meses diferentes tocam quantidades '
-                    f'diferentes de semanas, então um único conjunto pra todos os meses não '
-                    f'funciona).'
+                    f'mês tem o seu próprio conjunto. As "semanas" aqui são 4 blocos '
+                    f'sequenciais de dias corridos a partir do dia 1 do mês (dias 1-7, 8-14, '
+                    f'15-21 e 22-fim) -- não são semanas ISO do calendário, por isso todo mês '
+                    f'sempre tem a mesma quantidade de semanas (4).'
                 )
                 _pcts_atuais = mg.carregar_pcts_semanais(ref_mg)
-                _n_semanas_mes = len(mg._semanas_do_mes(ref_mg))
                 with st.form(key='mg_form_pcts_semanais'):
                     _n_sem_cfg = st.number_input(
                         'Quantidade de semanas configuradas', min_value=1, max_value=8,
-                        value=max(len(_pcts_atuais), _n_semanas_mes), step=1, key='mg_pcts_n',
+                        value=len(_pcts_atuais), step=1, key='mg_pcts_n',
                     )
                     _pcts_inputs = []
                     _cols_pct = st.columns(int(_n_sem_cfg))
