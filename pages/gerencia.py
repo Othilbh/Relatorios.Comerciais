@@ -1914,11 +1914,18 @@ def _render_metas_gerais():
                 'com o vendido real acumulado até aquele ponto.'
             )
             with st.expander('⚙️ Configurar percentuais semanais'):
-                _pcts_atuais = mg.carregar_pcts_semanais()
+                st.caption(
+                    f'Percentuais específicos de {periodo_mod.rotulo(tipo_mg, ref_mg)} -- cada '
+                    f'mês tem o seu próprio conjunto (meses diferentes tocam quantidades '
+                    f'diferentes de semanas, então um único conjunto pra todos os meses não '
+                    f'funciona).'
+                )
+                _pcts_atuais = mg.carregar_pcts_semanais(ref_mg)
+                _n_semanas_mes = len(mg._semanas_do_mes(ref_mg))
                 with st.form(key='mg_form_pcts_semanais'):
                     _n_sem_cfg = st.number_input(
                         'Quantidade de semanas configuradas', min_value=1, max_value=8,
-                        value=len(_pcts_atuais), step=1, key='mg_pcts_n',
+                        value=max(len(_pcts_atuais), _n_semanas_mes), step=1, key='mg_pcts_n',
                     )
                     _pcts_inputs = []
                     _cols_pct = st.columns(int(_n_sem_cfg))
@@ -1926,15 +1933,15 @@ def _render_metas_gerais():
                         _valor_padrao = _pcts_atuais[_i] if _i < len(_pcts_atuais) else 0.0
                         with _cols_pct[_i]:
                             _pcts_inputs.append(st.number_input(
-                                f'Semana {_i + 1} (%)', min_value=0.0,
+                                f'Semana {_i + 1:02d} do mês (%)', min_value=0.0,
                                 value=float(_valor_padrao), step=1.0, key=f'mg_pct_sem_{_i}',
                             ))
                     _soma_pcts = sum(_pcts_inputs)
                     st.caption(f'Soma dos percentuais: {_soma_pcts:.0f}% — pode ser diferente '
                                f'de 100% (maior ou menor), isso é permitido de propósito.')
                     if st.form_submit_button('💾 Salvar percentuais', type='primary'):
-                        mg.salvar_pcts_semanais(_pcts_inputs, usuario=st.session_state.get('usuario_nome'))
-                        st.success('Percentuais semanais salvos.')
+                        mg.salvar_pcts_semanais(ref_mg, _pcts_inputs, usuario=st.session_state.get('usuario_nome'))
+                        st.success(f'Percentuais semanais de {periodo_mod.rotulo(tipo_mg, ref_mg)} salvos.')
                         st.rerun()
 
             _meta_fat_mg = meta_atual.get('faturamento')
@@ -1943,7 +1950,7 @@ def _render_metas_gerais():
             else:
                 _quebra_emp = mg.quebra_semanal_meta(ref_mg, _meta_fat_mg)
                 _rows_quebra = [{
-                    'Semana':             f"{l['semana']}ª — {l['label']}",
+                    'Semana':             l['label'],
                     'Meta fixa (R$)':     f"R$ {_num_vc(_meta_fat_mg, 2)}",
                     '% semanal':          f"{l['pct_semana']:.0f}%",
                     '% acumulado':        f"{l['pct_acumulado']:.0f}%",
@@ -2048,7 +2055,7 @@ def _render_metas_gerais():
                 _meta_fixa_v = _vend_com_meta[_vend_sel_sem]
                 _quebra_v = mg.quebra_semanal_meta(ref_mg, _meta_fixa_v, vendedor=_vend_sel_sem)
                 _rows_quebra_v = [{
-                    'Semana':             f"{l['semana']}ª — {l['label']}",
+                    'Semana':             l['label'],
                     'Meta fixa (R$)':     f"R$ {_num_vc(_meta_fixa_v, 2)}",
                     '% semanal':          f"{l['pct_semana']:.0f}%",
                     '% acumulado':        f"{l['pct_acumulado']:.0f}%",
