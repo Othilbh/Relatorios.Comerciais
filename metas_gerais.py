@@ -173,6 +173,36 @@ def _vendido_acumulado_ate(mes_ref: str, data_limite: date) -> dict:
     return (melhor[1].get('valores') or {}).get('totais_dict', {}) or {}
 
 
+def _blocos_semanais_do_mes(mes_ref: str, n_semanas: int = 4) -> list:
+    """Divide o mês em `n_semanas` blocos SEQUENCIAIS de dias corridos a
+    partir do dia 1 (NÃO são semanas ISO -- não dependem de qual dia da
+    semana cai o dia 1). Os primeiros n_semanas-1 blocos têm 7 dias cada;
+    o último absorve os dias restantes até o fim do mês (pode ter mais ou
+    menos que 7 dias, dependendo do tamanho do mês).
+
+    Isso é de propósito diferente de `_semanas_do_mes` (que usa semanas
+    ISO reais e é usado por `_quebra_mes` pra somar relatórios semanais
+    publicados por semana ISO -- não pode mudar). Aqui o objetivo é outro:
+    dividir o mês em N pedaços de acompanhamento simples e sempre com a
+    MESMA quantidade (4, por padrão) independente de como o calendário se
+    alinha -- ex.: agosto/2026 tem 4 semanas "completas" nesse sentido
+    (dias 1-7, 8-14, 15-21, 22-31), não 6 como semanas ISO reais dariam
+    (a semana ISO 31 começa em julho e a 36 termina em setembro)."""
+    ini, fim = periodo.intervalo_datas('mensal', mes_ref)
+    blocos = []
+    inicio_bloco = ini
+    for i in range(n_semanas):
+        if i == n_semanas - 1:
+            fim_bloco = fim  # último bloco absorve o resto do mês
+        else:
+            fim_bloco = min(inicio_bloco + timedelta(days=6), fim)
+        blocos.append((inicio_bloco, fim_bloco))
+        inicio_bloco = fim_bloco + timedelta(days=1)
+        if inicio_bloco > fim:
+            break
+    return blocos
+
+
 def quebra_semanal_meta(mes_ref: str, meta_fixa, pcts_semanais: list = None,
                          hoje: date = None, vendedor: str = None) -> list:
     """Quebra a meta MENSAL fixa (Faturamento, R$) em checkpoints semanais.
@@ -192,25 +222,26 @@ def quebra_semanal_meta(mes_ref: str, meta_fixa, pcts_semanais: list = None,
        não começou), 'atingimento' (None se não dá pra calcular)}.
 
     O 'label' é a posição da semana DENTRO do mês (ex.: "Semana 01 do mês
-    08"), não o número da semana ISO (ex.: "Semana 31/2026") -- uma semana
-    ISO pode pertencer a dois meses (começar num, terminar no outro), e
-    numerar pela semana ISO ficava confuso pra acompanhar mês a mês.
+    08"). As semanas em si NÃO são semanas ISO -- são blocos sequenciais
+    de 7 dias a partir do dia 1 do mês (ver `_blocos_semanais_do_mes`),
+    então todo mês sempre tem a mesma quantidade de semanas (4 por
+    padrão), em vez de variar conforme o alinhamento do calendário.
     """
     if pcts_semanais is None:
         pcts_semanais = carregar_pcts_semanais(mes_ref)
     meta_fixa = meta_fixa or 0
     hoje = hoje or date.today()
-    semanas = _semanas_do_mes(mes_ref)
+    n_semanas = len(pcts_semanais) or 4
+    blocos = _blocos_semanais_do_mes(mes_ref, n_semanas)
     mes_num = int(mes_ref.split('-')[1])
 
     linhas = []
     pct_acum = 0.0
-    for i, slug in enumerate(semanas):
+    for i, (inicio_sem, fim_sem) in enumerate(blocos):
         pct_sem = pcts_semanais[i] if i < len(pcts_semanais) else 0.0
         pct_acum += pct_sem
         esperado = meta_fixa * pct_acum / 100
 
-        inicio_sem, fim_sem = periodo.intervalo_datas('semanal', slug)
         if hoje < inicio_sem:
             vendido = None  # semana ainda não começou -- não há como ter dado
         else:
@@ -230,7 +261,7 @@ def quebra_semanal_meta(mes_ref: str, meta_fixa, pcts_semanais: list = None,
 
         linhas.append({
             'semana': i + 1,
-            'periodo_ref': slug,
+            'periodo_ref': f'{mes_ref}-s{i + 1}',
             'label': f'Semana {i + 1:02d} do mês {mes_num:02d}',
             'pct_semana': pct_sem,
             'pct_acumulado': pct_acum,
