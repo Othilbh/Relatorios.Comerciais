@@ -1,0 +1,196 @@
+{
+  "current": {
+    "id": "14e22f26-2b67-4f04-b657-25bdbbc680a9",
+    "modulo_origem": "prevencao_perdas",
+    "tipo_periodo": "diario",
+    "periodo_ref": "2026-08-21_mes_estoque",
+    "data_referencia": "2026-08-21",
+    "criado_em": "2026-08-21T18:46:29+00:00",
+    "atualizado_em": "2026-08-21T18:46:29+00:00",
+    "usuario": "Ingrid",
+    "versao": 1,
+    "valores": {
+      "publicado_em": "2026-08-21T18:46:28.810218",
+      "emissao": "21/08/2026",
+      "periodo": "21/08/2026",
+      "tipo": "mes_estoque",
+      "resumo": {
+        "total": 15,
+        "criticos": 11,
+        "alta_prioridade": 2,
+        "atencao": 2,
+        "valor_risco": 554699.1,
+        "sem_venda_7d": 0,
+        "estoque_30d": 15
+      },
+      "produtos": [
+        {
+          "prioridade": "🔴 Crítico",
+          "produto": "TAMARA KHOUET ALIG BDJ 200GR",
+          "responsavel": "REGINALDO",
+          "dias_estoque": 52,
+          "dias_sem_venda": 0,
+          "saldo_cx": 6492.0,
+          "qtd_vendida": 1.0,
+          "valor_estoque": 452817.0,
+          "acao": "Promoção urgente / Vender urgente"
+        },
+        {
+          "prioridade": "🔴 Crítico",
+          "produto": "TAMARA KHAJUR BDJ 200GR",
+          "responsavel": "AFANAIS",
+          "dias_estoque": 151,
+          "dias_sem_venda": 0,
+          "saldo_cx": 842.0,
+          "qtd_vendida": 44.0,
+          "valor_estoque": 62223.8,
+          "acao": "Promoção urgente / Vender urgente"
+        },
+        {
+          "prioridade": "🔴 Crítico",
+          "produto": "GRAN SMITH 113 VERFRUT",
+          "responsavel": "FARLEY",
+          "dias_estoque": 72,
+          "dias_sem_venda": 1,
+          "saldo_cx": 34.0,
+          "qtd_vendida": 0.0,
+          "valor_estoque": 5828.62,
+          "acao": "Promoção urgente / Vender urgente"
+        },
+        {
+          "prioridade": "🔴 Crítico",
+          "produto": "GALA 165 EXPRESSA",
+          "responsavel": "AFANAIS",
+          "dias_estoque": 38,
+          "dias_sem_venda": 1,
+          "saldo_cx": 73.0,
+          "qtd_vendida": 0.0,
+          "valor_estoque": 5228.99,
+          "acao": "Promoção urgente / Vender urgente"
+        },
+        {
+          "prioridade": "🔴 Crítico",
+          "produto": "TAMARA GOLDEN EXPORT",
+          "responsavel": "FARLEY",
+          "dias_estoque": 254,
+          "dias_sem_venda": 0,
+          "saldo_cx": 28.0,
+          "qtd_vendida": 5.0,
+          "valor_estoque": 2512.72,
+          "acao": "Promoção urgente / Vender urgente"
+        },
+        {
+          "prioridade": "🔴 Crítico",
+          "produto": "GALA 180 HOSHI",
+          "responsavel": "AFANAIS",
+          "dias_estoque": 53,
+          "dias_sem_venda": 1,
+          "saldo_cx": 25.0,
+          "qtd_vendida": 0.0,
+          "valor_estoque": 1385.25,
+          "acao": "Promoção urgente / Vender urgente"
+        },
+        {
+          "prioridade": "🔴 Crítico",
+          "produto": "8KG ITALIA OURO VERDE",
+          "responsavel": "DORA",
+          "dias_estoque": 39,
+          "dias_sem_venda": 1,
+          "saldo_cx": 12.0,
+          "qtd_vendida": 0.0,
+          "valor_estoque": 1311.0,
+          "acao": "Promoção urgente / Vender urgente"
+        },
+        {
+          "prioridade": "🔴 Crítico",
+          "produto": "PORTUGUESA 60/65 SABOR",
+          "responsavel": "JULIANA",
+          "dias_estoque": 37,
+          "dias_sem_venda": 1,
+          "saldo_cx": 8.0,
+          "qtd_vendida": 0.0,
+          "valor_estoque": 1086.88,
+          "acao": "Promoção urgente / Vender urgente"
+        },
+        {
+          "prioridade": "🔴 Crítico",
+          "produto": "FUJI 150 EXPRESSA",
+          "responsavel": "AFANAIS",
+          "dias_estoque": 38,
+          "dias_sem_venda": 1,
+          "saldo_cx": 10.0,
+          "qtd_vendida": 0.0,
+          "valor_estoque": 697.2,
+          "acao": "Promoção urgente / Vender urgente"
+        },
+        {
+          "prioridade": "🔴 Crítico",
+          "produto": "MIRTILO CRUNCH",
+          "responsavel": "DORA",
+          "dias_estoque": 80,
+          "dias_sem_venda": 1,
+          "saldo_cx": 1.0,
+          "qtd_vendida": 0.0,
+          "valor_estoque": 116.6,
+          "acao": "Promoção urgente / Vender urgente"
+        },
+        {
+          "prioridade": "🔴 Crítico",
+          "produto": "MIRTILO DOLE",
+          "responsavel": "RONISTONIS",
+          "dias_estoque": 63,
+          "dias_sem_venda": 1,
+          "saldo_cx": 1.0,
+          "qtd_vendida": 0.0,
+          "valor_estoque": 99.43,
+          "acao": "Promoção urgente / Vender urgente"
+        },
+        {
+          "prioridade": "🟠 Alta Prioridade",
+          "produto": "PINK LADY 1/2",
+          "responsavel": "REGINALDO",
+          "dias_estoque": 57,
+          "dias_sem_venda": 0,
+          "saldo_cx": 101.0,
+          "qtd_vendida": 8.0,
+          "valor_estoque": 8521.37,
+          "acao": "Priorizar venda / Contatar vendedor"
+        },
+        {
+          "prioridade": "🟠 Alta Prioridade",
+          "produto": "TANGERINA IMP CX PARDA COMPOSOL",
+          "responsavel": "JULIANA",
+          "dias_estoque": 46,
+          "dias_sem_venda": 0,
+          "saldo_cx": 23.0,
+          "qtd_vendida": 5.0,
+          "valor_estoque": 1845.52,
+          "acao": "Priorizar venda / Contatar vendedor"
+        },
+        {
+          "prioridade": "🟡 Atenção",
+          "produto": "ARGENTINA 110 BREVI AZUL",
+          "responsavel": "RONISTONIS",
+          "dias_estoque": 37,
+          "dias_sem_venda": 0,
+          "saldo_cx": 42.0,
+          "qtd_vendida": 2.0,
+          "valor_estoque": 8999.76,
+          "acao": "Monitorar / Ação preventiva"
+        },
+        {
+          "prioridade": "🟡 Atenção",
+          "produto": "CUMB CRINSON CHERRY BELLA",
+          "responsavel": "AFANAIS",
+          "dias_estoque": 31,
+          "dias_sem_venda": 0,
+          "saldo_cx": 28.0,
+          "qtd_vendida": 8.0,
+          "valor_estoque": 2024.96,
+          "acao": "Monitorar / Ação preventiva"
+        }
+      ]
+    }
+  },
+  "history": []
+}
