@@ -20,7 +20,6 @@ from calc import (compute_metas, VENDEDORES_PADRAO, parse_codigos_input, map_ven
                    codigo_matches, soma_falta, sugestao_codigo_por_nome)
 from pdfgen import generate_relatorio_vendedor, generate_dashboard, generate_resumo_geral
 import storage
-import periodo
 import comparativo
 import on_track
 import data_store as ds
@@ -93,15 +92,75 @@ def save_config(cfg, show_feedback=True):
 # ---------------------------------------------------------------------------
 
 def _slug_semana(data: datetime.date) -> str:
-    """periodo_ref padrão (semana ISO) da semana que contém `data`."""
-    return periodo.periodo_ref('semanal', data)
+    """periodo_ref da semana COMERCIAL desta página: sexta a sexta (8 dias
+    corridos, contando as duas sextas -- a que abre e a que fecha/já abre
+    a semana seguinte), pedido explícito da Ingrid só para o módulo Metas
+    Semanais ("Hj na meta semanal, nossa semana vai de segunda a sexta,
+    preciso que passe a ser de sexta a sexta... na sexta encerra a semana
+    e na sexta mesmo, já será definido as metas da proxima semana").
+    ISSO É LOCAL A ESTA PÁGINA -- não usa nem altera periodo.py (que
+    continua semana ISO segunda-domingo, usado por Quebra, Vendedor-
+    Cliente e outros módulos; ela confirmou o escopo: "Só Metas Semanais").
+
+    O identificador é a data (ISO, "AAAA-MM-DD") da sexta-feira de
+    ABERTURA da semana. Se `data` cair numa sexta-feira, ela é tratada
+    como a sexta de abertura da semana que começa NAQUELA data (mesmo dia
+    em que a semana anterior fecha e as novas metas são definidas) -- ela
+    confirmou que essa sexta conta "das duas ao mesmo tempo", mas pra
+    decidir default de tela numa data ambígua o app assume a semana que
+    está abrindo."""
+    dias_desde_sexta = (data.weekday() - 4) % 7  # segunda=0 ... sexta=4 -> 0
+    sexta_abertura = data - datetime.timedelta(days=dias_desde_sexta)
+    return sexta_abertura.isoformat()
+
+
+def _intervalo_semana(slug: str):
+    """(sexta_abertura, sexta_fechamento) da semana `slug` -- 8 dias
+    corridos, incluindo as duas sextas (confirmado com a Ingrid: "8 dias
+    corridos, porém 07 [dias de venda] pq no domingo não tem venda")."""
+    inicio = datetime.date.fromisoformat(slug)
+    fim = inicio + datetime.timedelta(days=7)
+    return inicio, fim
 
 
 def _label_semana(slug: str) -> str:
     try:
-        return periodo.rotulo('semanal', slug)
+        inicio, fim = _intervalo_semana(slug)
+        return f"Semana {inicio.strftime('%d/%m')} a {fim.strftime('%d/%m')}"
     except Exception:
         return slug
+
+
+def _semana_anterior(slug: str) -> str:
+    """periodo_ref da semana comercial imediatamente anterior."""
+    inicio, _ = _intervalo_semana(slug)
+    return (inicio - datetime.timedelta(days=7)).isoformat()
+
+
+def _semana_ano_anterior(slug: str) -> str:
+    """periodo_ref da mesma semana comercial um ano antes -- aproximação
+    por 364 dias (52 semanas exatas) em vez de 365/366, pra preservar a
+    sexta-feira como dia da semana (mesma lógica de aproximação que
+    periodo.periodo_ano_anterior já usa pro tipo 'semanal')."""
+    inicio, _ = _intervalo_semana(slug)
+    return (inicio - datetime.timedelta(days=364)).isoformat()
+
+
+def _dia_semana_atual(data: datetime.date = None) -> int:
+    """Dia de venda (1..7) dentro da semana sexta-a-sexta que contém
+    `data` (hoje, por padrão) -- pula domingo, que não tem venda. Substitui
+    o antigo conceito de 'dia útil 1..5 (segunda a sexta)', que deixou de
+    fazer sentido com a semana agora começando na sexta-feira."""
+    if data is None:
+        data = datetime.date.today()
+    inicio, _ = _intervalo_semana(_slug_semana(data))
+    dia = 0
+    d = inicio
+    while d <= data:
+        if d.weekday() != 6:  # domingo
+            dia += 1
+        d += datetime.timedelta(days=1)
+    return max(1, min(dia, 7))
 
 
 def _salvar_fechamento(resultados: list, totais_rs: dict, periodo_txt: str, slug: str,
@@ -261,11 +320,12 @@ _STATUS_COR = {
 }
 
 
-def _on_track_status(atingido: float, dia: int, total_dias: int = 5):
+def _on_track_status(atingido: float, dia: int, total_dias: int = 7):
     """Retorna (emoji, label, hex_color) usando a lógica CENTRAL de On Track
     (on_track.py — a mesma usada por todos os módulos do app), com o tempo
-    decorrido calculado em dias úteis da semana comercial (1..total_dias),
-    que é a convenção já usada aqui (em vez de dias corridos do calendário).
+    decorrido calculado em dias de venda da semana comercial (1..total_dias,
+    sexta a sexta, sem domingo -- ver `_dia_semana_atual`), que é a
+    convenção já usada aqui (em vez de dias corridos do calendário).
     `atingido` já vem como fração (vendido/meta) calculada pelo chamador."""
     pct_tempo = (dia / total_dias) if total_dias else 0.0
     r = on_track.calcular(
@@ -293,10 +353,12 @@ def _render_on_track():
     with col_dia:
         dia_semana = st.slider(
             'Dia da semana atual',
-            min_value=1, max_value=5,
-            value=min(datetime.date.today().weekday() + 1, 5),
-            format='Dia %d de 5',
-            help='Segunda=1  Terça=2  Quarta=3  Quinta=4  Sexta=5',
+            min_value=1, max_value=7,
+            value=_dia_semana_atual(),
+            format='Dia %d de 7',
+            help='Semana comercial sexta a sexta (sem domingo, que não tem '
+                 'venda): Sexta=1  Sábado=2  Segunda=3  Terça=4  Quarta=5  '
+                 'Quinta=6  Sexta (fecha a semana)=7',
             key='ont_dia',
         )
     with col_sort:
@@ -319,7 +381,7 @@ def _render_on_track():
     total_vend   = sum(l['vendido'] for r in resultados for l in r['linhas'])
     total_falta  = soma_falta([l for r in resultados for l in r['linhas']])
     ating_geral  = total_vend / total_meta if total_meta else 0
-    proj_cx      = math.ceil(total_vend / dia_semana * 5) if dia_semana > 0 else 0
+    proj_cx      = math.ceil(total_vend / dia_semana * 7) if dia_semana > 0 else 0
     delta_proj   = proj_cx - total_meta
 
     on_em, on_lb, on_cor = _on_track_status(ating_geral, dia_semana)
@@ -328,7 +390,7 @@ def _render_on_track():
         f'<div style="background:{on_cor}; color:white; padding:0.55rem 1.2rem; '
         f'border-radius:10px; display:inline-block; margin-bottom:0.8rem; '
         f'font-size:1.05rem; font-weight:600;">'
-        f'{on_em} {on_lb} — {ating_geral*100:.1f}% atingido (dia {dia_semana}/5)'
+        f'{on_em} {on_lb} — {ating_geral*100:.1f}% atingido (dia {dia_semana}/7)'
         f'</div>',
         unsafe_allow_html=True,
     )
@@ -374,7 +436,7 @@ def _render_on_track():
         meta_v = ag['meta']
         vend_v = ag['vendido']
         atg_v  = vend_v / meta_v if meta_v else 0
-        proj_v = math.ceil(vend_v / dia_semana * 5) if dia_semana > 0 else 0
+        proj_v = math.ceil(vend_v / dia_semana * 7) if dia_semana > 0 else 0
         em, lb, _ = _on_track_status(atg_v, dia_semana)
         rs = vend_rs.get(v, {})
         rows.append({
@@ -465,7 +527,7 @@ def _render_on_track():
 # Render: Fechamento Semanal
 # ---------------------------------------------------------------------------
 
-def _render_resumo_geral_inline(resultados: list, totais_rs: dict, dia: int = 5):
+def _render_resumo_geral_inline(resultados: list, totais_rs: dict, dia: int = 7):
     """Exibe o Resumo Geral (On Track + matriz produto × vendedor) inline."""
     if not resultados:
         return
@@ -476,7 +538,7 @@ def _render_resumo_geral_inline(resultados: list, totais_rs: dict, dia: int = 5)
     total_meta  = sum(r.get('estoque_total', 0) for r in resultados)
     total_vend  = sum(l['vendido'] for r in resultados for l in r['linhas'])
     ating_geral = total_vend / total_meta if total_meta else 0
-    proj_cx     = math.ceil(total_vend / dia * 5) if dia > 0 else 0
+    proj_cx     = math.ceil(total_vend / dia * 7) if dia > 0 else 0
     on_em, on_lb, on_cor = _on_track_status(ating_geral, dia)
 
     st.markdown(
@@ -518,7 +580,7 @@ def _render_resumo_geral_inline(resultados: list, totais_rs: dict, dia: int = 5)
         meta_v = ag['meta']
         vend_v = ag['vendido']
         atg_v  = vend_v / meta_v if meta_v else 0
-        proj_v = math.ceil(vend_v / dia * 5) if dia > 0 else 0
+        proj_v = math.ceil(vend_v / dia * 7) if dia > 0 else 0
         em, lb, _ = _on_track_status(atg_v, dia)
         rs = vend_rs.get(v, {})
         vrows.append({
@@ -559,8 +621,8 @@ def _render_comparativo_semanal(resultados: list, totais_rs: dict, slug_atual: s
         fat = registro['valores'].get('totais_rs', {}).get('total_geral', {}).get('fat')
         return vend, fat
 
-    slug_ant = periodo.periodo_anterior('semanal', slug_atual)
-    slug_ano_ant = periodo.periodo_ano_anterior('semanal', slug_atual)
+    slug_ant = _semana_anterior(slug_atual)
+    slug_ano_ant = _semana_ano_anterior(slug_atual)
 
     reg_ant = ds.load_current(MODULO, 'semanal', slug_ant)
     reg_ano_ant = ds.load_current(MODULO, 'semanal', slug_ano_ant)
@@ -569,7 +631,7 @@ def _render_comparativo_semanal(resultados: list, totais_rs: dict, slug_atual: s
 
     col1, col2 = st.columns(2)
     with col1:
-        st.markdown(f'**Semana atual × {periodo.rotulo("semanal", slug_ant)}**')
+        st.markdown(f'**Semana atual × {_label_semana(slug_ant)}**')
         if vend_ant is None:
             st.caption('Ainda não há fechamento salvo da semana anterior para comparar.')
         else:
@@ -581,7 +643,7 @@ def _render_comparativo_semanal(resultados: list, totais_rs: dict, slug_atual: s
                 st.metric('Faturamento', _fmt_moeda(fat_atual),
                            delta=f"{comparativo.formatar_variacao(comp_f)} vs semana anterior")
     with col2:
-        st.markdown(f'**Semana atual × {periodo.rotulo("semanal", slug_ano_ant)} (ano anterior)**')
+        st.markdown(f'**Semana atual × {_label_semana(slug_ano_ant)} (ano anterior)**')
         if vend_ano_ant is None:
             st.caption('Ainda não há fechamento salvo da mesma semana no ano anterior.')
         else:
@@ -618,14 +680,21 @@ def _render_fechamento_semanal():
         retroativo  = data_ref != datetime.date.today()
 
         st.subheader(f'Fechar: {label_atual}' + (' (retroativo)' if retroativo else ''))
+        st.caption(
+            'Semana comercial: sexta a sexta (8 dias corridos, sem contar domingo, '
+            'que não tem venda) — a sexta é o dia de fechar a semana atual e já '
+            'abrir a próxima. Se hoje for sexta e você quiser fechar a semana que '
+            'está terminando (em vez de já abrir a nova), escolha ontem (quinta) '
+            'como data de referência acima.'
+        )
         st.caption(f'Período configurado: **{periodo_texto or "(não informado)"}**')
 
         # Dia da semana (para o On Track inline) -- se for retroativo, assume
-        # semana inteira decorrida (dia 5) por padrão, já que já passou.
+        # semana inteira decorrida (dia 7) por padrão, já que já passou.
         dia_fech = st.slider(
-            'Dia da semana (para projeção)', 1, 5,
-            value=5 if retroativo else min(datetime.date.today().weekday() + 1, 5),
-            format='Dia %d de 5',
+            'Dia da semana (para projeção)', 1, 7,
+            value=7 if retroativo else _dia_semana_atual(),
+            format='Dia %d de 7',
             key='fech_dia',
         )
 
