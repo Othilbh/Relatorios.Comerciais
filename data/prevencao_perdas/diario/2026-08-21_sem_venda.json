@@ -1,0 +1,174 @@
+{
+  "current": {
+    "id": "78f6e853-d397-4a04-9c13-bb4913d69dca",
+    "modulo_origem": "prevencao_perdas",
+    "tipo_periodo": "diario",
+    "periodo_ref": "2026-08-21_sem_venda",
+    "data_referencia": "2026-08-21",
+    "criado_em": "2026-08-21T18:46:12+00:00",
+    "atualizado_em": "2026-08-21T18:46:12+00:00",
+    "usuario": "Ingrid",
+    "versao": 1,
+    "valores": {
+      "publicado_em": "2026-08-21T18:46:12.378619",
+      "emissao": "21/08/2026",
+      "periodo": "14/08/2026",
+      "tipo": "sem_venda",
+      "resumo": {
+        "total": 13,
+        "criticos": 4,
+        "alta_prioridade": 3,
+        "atencao": 6,
+        "valor_risco": 63770.649999999994,
+        "sem_venda_7d": 13,
+        "estoque_30d": 4
+      },
+      "produtos": [
+        {
+          "prioridade": "🔴 Crítico",
+          "produto": "GRAN SMITH 113 VERFRUT",
+          "responsavel": "FARLEY",
+          "dias_estoque": 72,
+          "dias_sem_venda": 7,
+          "saldo_cx": 34.0,
+          "qtd_vendida": 0.0,
+          "valor_estoque": 5828.62,
+          "acao": "Promoção urgente / Vender urgente"
+        },
+        {
+          "prioridade": "🔴 Crítico",
+          "produto": "PORTUGUESA 60/65 SABOR",
+          "responsavel": "JULIANA",
+          "dias_estoque": 37,
+          "dias_sem_venda": 7,
+          "saldo_cx": 8.0,
+          "qtd_vendida": 0.0,
+          "valor_estoque": 1086.88,
+          "acao": "Promoção urgente / Vender urgente"
+        },
+        {
+          "prioridade": "🔴 Crítico",
+          "produto": "MIRTILO CRUNCH",
+          "responsavel": "DORA",
+          "dias_estoque": 80,
+          "dias_sem_venda": 7,
+          "saldo_cx": 1.0,
+          "qtd_vendida": 0.0,
+          "valor_estoque": 116.6,
+          "acao": "Promoção urgente / Vender urgente"
+        },
+        {
+          "prioridade": "🔴 Crítico",
+          "produto": "MIRTILO DOLE",
+          "responsavel": "RONISTONIS",
+          "dias_estoque": 63,
+          "dias_sem_venda": 7,
+          "saldo_cx": 1.0,
+          "qtd_vendida": 0.0,
+          "valor_estoque": 99.43,
+          "acao": "Promoção urgente / Vender urgente"
+        },
+        {
+          "prioridade": "🟠 Alta Prioridade",
+          "produto": "CUMB THOMPSON GRANDVALLE",
+          "responsavel": "JULIANA",
+          "dias_estoque": 10,
+          "dias_sem_venda": 7,
+          "saldo_cx": 220.0,
+          "qtd_vendida": 0.0,
+          "valor_estoque": 15947.8,
+          "acao": "Priorizar venda / Contatar vendedor"
+        },
+        {
+          "prioridade": "🟠 Alta Prioridade",
+          "produto": "CAQUI HOTH 20X1",
+          "responsavel": "RONISTONIS",
+          "dias_estoque": 21,
+          "dias_sem_venda": 7,
+          "saldo_cx": 10.0,
+          "qtd_vendida": 0.0,
+          "valor_estoque": 937.8,
+          "acao": "Priorizar venda / Contatar vendedor"
+        },
+        {
+          "prioridade": "🟠 Alta Prioridade",
+          "produto": "LARANJA IMP BAHIA CITRUS CX AZUL",
+          "responsavel": "RONISTONIS",
+          "dias_estoque": 22,
+          "dias_sem_venda": 7,
+          "saldo_cx": 1.0,
+          "qtd_vendida": 0.0,
+          "valor_estoque": 34.83,
+          "acao": "Priorizar venda / Contatar vendedor"
+        },
+        {
+          "prioridade": "🟡 Atenção",
+          "produto": "CUMB VITORIA VITACE",
+          "responsavel": "JULIANA",
+          "dias_estoque": 4,
+          "dias_sem_venda": 7,
+          "saldo_cx": 220.0,
+          "qtd_vendida": 0.0,
+          "valor_estoque": 9941.8,
+          "acao": "Monitorar / Ação preventiva"
+        },
+        {
+          "prioridade": "🟡 Atenção",
+          "produto": "GALA 135 HIRAGAMIS CX PARDA",
+          "responsavel": "LUCIANO",
+          "dias_estoque": 4,
+          "dias_sem_venda": 7,
+          "saldo_cx": 67.0,
+          "qtd_vendida": 0.0,
+          "valor_estoque": 8576.0,
+          "acao": "Monitorar / Ação preventiva"
+        },
+        {
+          "prioridade": "🟡 Atenção",
+          "produto": "GALA 165 HIRAGAMIS CX BRANCA",
+          "responsavel": "DORA",
+          "dias_estoque": 4,
+          "dias_sem_venda": 7,
+          "saldo_cx": 56.0,
+          "qtd_vendida": 0.0,
+          "valor_estoque": 7495.04,
+          "acao": "Monitorar / Ação preventiva"
+        },
+        {
+          "prioridade": "🟡 Atenção",
+          "produto": "CUMB VITORIA VALEXFRUIT",
+          "responsavel": "REGINALDO",
+          "dias_estoque": 4,
+          "dias_sem_venda": 7,
+          "saldo_cx": 110.0,
+          "qtd_vendida": 0.0,
+          "valor_estoque": 5614.4,
+          "acao": "Monitorar / Ação preventiva"
+        },
+        {
+          "prioridade": "🟡 Atenção",
+          "produto": "GALA 150 HIRAGAMIS CX PARDA",
+          "responsavel": "LUCIANO",
+          "dias_estoque": 4,
+          "dias_sem_venda": 7,
+          "saldo_cx": 45.0,
+          "qtd_vendida": 0.0,
+          "valor_estoque": 5234.85,
+          "acao": "Monitorar / Ação preventiva"
+        },
+        {
+          "prioridade": "🟡 Atenção",
+          "produto": "MELANCIA CEPI T4 14KG",
+          "responsavel": "FARLEY",
+          "dias_estoque": 4,
+          "dias_sem_venda": 7,
+          "saldo_cx": 54.0,
+          "qtd_vendida": 0.0,
+          "valor_estoque": 2856.6,
+          "acao": "Monitorar / Ação preventiva"
+        }
+      ]
+    }
+  },
+  "history": []
+}
