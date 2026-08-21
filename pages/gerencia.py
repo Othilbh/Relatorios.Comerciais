@@ -592,7 +592,7 @@ def _listar_ontrack_metas_hist():
     for slug, data in _listar_ontrack_hist(_ONTRACK_META_DIR):
         if slug not in items:
             items[slug] = data
-    return sorted(items.items(), key=lambda kv: kv[0], reverse=True)
+    return sorted(items.items(), key=lambda kv: _sort_key_semana_slug(kv[0]), reverse=True)
 
 
 def _listar_ontrack_clientes_hist():
@@ -794,13 +794,37 @@ def _listar_fechamentos():
         except Exception:
             pass
 
-    return sorted(items.items(), key=lambda kv: kv[0], reverse=True)
+    return sorted(items.items(), key=lambda kv: _sort_key_semana_slug(kv[0]), reverse=True)
 
 
 def _label_fech(slug: str) -> str:
     try:
         return periodo_mod.rotulo('semanal', slug)
     except Exception:
+        pass
+    # Formato novo (Metas Semanais passou a usar semana comercial sexta a
+    # sexta, local a essa página — ver pages/metas_semanais.py): o slug é a
+    # data ISO ("AAAA-MM-DD") da sexta de abertura, não mais "AAAA-Www".
+    try:
+        inicio = datetime.date.fromisoformat(slug)
+        fim = inicio + datetime.timedelta(days=7)
+        return f"Semana {inicio.strftime('%d/%m')} a {fim.strftime('%d/%m')}"
+    except Exception:
+        return slug
+
+
+def _sort_key_semana_slug(slug: str) -> str:
+    """Chave de ordenação cronológica pros slugs de semana de Metas
+    Semanais (MOD_FECHAMENTO / MOD_ONTRACK_METAS), que durante a transição
+    pra semana sexta-a-sexta podem estar em dois formatos: o antigo ISO
+    "AAAA-Www" e o novo "AAAA-MM-DD". Ordenar a string pura intercala os
+    dois formatos errado ('W' > dígito no ASCII) -- aqui os dois convergem
+    pra uma data real comparável (a segunda-feira ISO da semana, no
+    formato antigo)."""
+    try:
+        ano_s, semana_s = slug.split('-W')
+        return datetime.date.fromisocalendar(int(ano_s), int(semana_s), 1).isoformat()
+    except (ValueError, IndexError):
         return slug
 
 
@@ -876,7 +900,7 @@ def _render_fechamentos_semanais():
         st.subheader('Comparativo de Semanas')
         st.caption('Variação (Δ%) sempre em relação à semana anterior na lista (mais antiga primeiro).')
 
-        historico_asc = sorted(historico, key=lambda kv: kv[0])  # mais antiga primeiro p/ calcular Δ
+        historico_asc = sorted(historico, key=lambda kv: _sort_key_semana_slug(kv[0]))  # mais antiga primeiro p/ calcular Δ
         comp_rows = []
         vend_anterior = None
         fat_anterior = None
