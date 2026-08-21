@@ -363,7 +363,12 @@ def _semanas_do_mes(mes_ref: str) -> list:
 
 
 def _quebra_mes(mes_ref: str):
-    """Total de Quebra (CX) de um mês, ou None se não houver nenhum dado.
+    """{'cx': total_cx, 'custo': total_custo} de um mês, ou None se não
+    houver nenhum dado. 'custo' pode ser None mesmo com 'cx' preenchido --
+    PDFs de quebra salvos ANTES desta função existir não têm a coluna de
+    custo extraída (parser_quebra só passou a ler isso depois); nesses
+    casos não inventamos um valor, só não somamos custo pra esse mês (ver
+    realizado_quebra, que sinaliza quando isso acontece).
 
     O módulo de Quebra (pages/4_Quebra_OTHIL.py) permite publicar tanto em
     modo Semanal quanto Mensal (a Ingrid escolhe a aba na hora do upload).
@@ -375,35 +380,55 @@ def _quebra_mes(mes_ref: str):
     Mensal); senão, soma as semanas ISO que tocam o mês."""
     reg = ds.load_current(MOD_QUEBRA, 'mensal', mes_ref)
     if reg and reg['valores'].get('total_cx') is not None:
-        return reg['valores'].get('total_cx', 0) or 0
+        v = reg['valores']
+        return {'cx': v.get('total_cx', 0) or 0, 'custo': v.get('total_custo')}
 
-    total = 0.0
+    cx = 0.0
+    custo = 0.0
     alguma_semana_com_dado = False
+    algum_custo_lido = False
     for semana in _semanas_do_mes(mes_ref):
         reg_sem = ds.load_current(MOD_QUEBRA, 'semanal', semana)
         if reg_sem and reg_sem['valores'].get('total_cx') is not None:
             alguma_semana_com_dado = True
-            total += reg_sem['valores'].get('total_cx', 0) or 0
-    return total if alguma_semana_com_dado else None
+            cx += reg_sem['valores'].get('total_cx', 0) or 0
+            custo_sem = reg_sem['valores'].get('total_custo')
+            if custo_sem is not None:
+                algum_custo_lido = True
+                custo += custo_sem
+    if not alguma_semana_com_dado:
+        return None
+    return {'cx': cx, 'custo': custo if algum_custo_lido else None}
 
 
 def realizado_quebra(tipo_periodo: str, periodo_ref: str) -> dict:
-    """{total_cx, completude, meses_com_dado?, meses_total?}."""
+    """{total_cx, total_custo, completude, meses_com_dado?, meses_total?}.
+
+    total_custo é None se nenhum mês do período tinha a coluna de custo
+    extraída ainda (dado publicado antes dessa funcionalidade existir) --
+    nunca inventa um valor parcial silenciosamente."""
     meses = _meses_do_periodo(tipo_periodo, periodo_ref)
-    total = 0.0
+    total_cx = 0.0
+    total_custo = 0.0
+    algum_custo_lido = False
     meses_com_dado = []
     for mes in meses:
-        total_mes = _quebra_mes(mes)
-        if total_mes is not None:
+        m = _quebra_mes(mes)
+        if m is not None:
             meses_com_dado.append(mes)
-            total += total_mes
+            total_cx += m['cx']
+            if m['custo'] is not None:
+                algum_custo_lido = True
+                total_custo += m['custo']
     if not meses_com_dado:
         completude = 'sem_dado'
     elif len(meses_com_dado) < len(meses):
         completude = 'parcial'
     else:
         completude = 'completo'
-    return {'total_cx': total if meses_com_dado else None, 'completude': completude,
+    return {'total_cx': total_cx if meses_com_dado else None,
+            'total_custo': total_custo if (meses_com_dado and algum_custo_lido) else None,
+            'completude': completude,
             'meses_com_dado': meses_com_dado, 'meses_total': meses}
 
 
