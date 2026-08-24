@@ -13,6 +13,8 @@ import sys, pathlib
 sys.path.insert(0, str(pathlib.Path(__file__).parent.parent))
 from categorias import map_categoria
 from dashboard_diario import gerar_dashboard
+from dashboard_custo_real import gerar_dashboard as gerar_dashboard_custo_real
+import margem_produto as mp
 import periodo as periodo_mod
 import comparativo
 import on_track
@@ -40,6 +42,7 @@ _ONTRACK_CLI_FILE = os.path.join(_GERENCIA_DIR, 'ontrack_clientes_publicado.json
 _ONTRACK_META_DIR = os.path.join(_GERENCIA_DIR, 'ontrack_metas')
 _ONTRACK_CLI_DIR  = os.path.join(_GERENCIA_DIR, 'ontrack_clientes')
 _QUEBRA_DIR       = os.path.join(_GERENCIA_DIR, 'quebra')
+_MARGEM_REAL_DIR  = os.path.join(_GERENCIA_DIR, 'margem_real')
 _PREVPERDAS_DIR   = os.path.join(_GERENCIA_DIR, 'prevencao_perdas')
 _PERDAS_DIR       = os.path.join(_GERENCIA_DIR, 'perdas_realizadas')
 _MESES_QBR     = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez']
@@ -289,6 +292,141 @@ def _render_secao_dash(tipo, titulo_secao, emoji):
         file_name=f'dashboard_{tipo}_{ref_sel}_OTHIL.html',
         mime='text/html',
         key=f'ger_dl_{tipo}',
+    )
+
+
+# ── Margem Real (custo real por produto, sem despesa administrativa) ──────────
+# Reaproveita os MESMOS itens já salvos no histórico do Relatório Diário
+# (MOD_RELATORIO_DIARIO) -- sem nenhuma publicação própria -- e o cadastro
+# de percentuais por produto (margem_produto.py, editável na página
+# "Cadastro de Produtos"). Ao contrário de _listar_dashboards/_render_secao_dash
+# acima, o HTML aqui é SEMPRE regenerado na hora (nunca fica em cache no
+# disco) -- decisão explícita da Ingrid: a Margem Real de um dia antigo tem
+# que usar o percentual MAIS ATUAL do cadastro, não o que valia na época.
+
+def _dir_tipo_margem_real(tipo):
+    d = os.path.join(_MARGEM_REAL_DIR, tipo)
+    os.makedirs(d, exist_ok=True)
+    return d
+
+
+def _listar_periodos_margem_real(tipo):
+    """Períodos que têm itens salvos no Relatório Diário/Semanal/Mensal
+    (mesma fonte de dados do Dashboard Gerencial) -- usado só pro atalho de
+    seleção rápida, igual ao _listar_dashboards acima."""
+    try:
+        out = []
+        for slug in ds.list_periodos(MOD_RELATORIO_DIARIO, tipo):
+            registro = ds.load_current(MOD_RELATORIO_DIARIO, tipo, slug)
+            if registro and registro.get('valores', {}).get('itens'):
+                out.append((slug, registro['valores']))
+        return out
+    except Exception:
+        return []
+
+
+def _render_secao_margem_real(tipo, titulo_secao, emoji):
+    st.header(f'{emoji} {titulo_secao}')
+
+    state_key = f'_ger_periodo_sel_mr_{tipo}'
+    if state_key not in st.session_state:
+        st.session_state[state_key] = _periodo_atual_ref(tipo)
+
+    def _ir_anterior():
+        st.session_state[state_key] = _periodo_anterior(tipo, st.session_state[state_key])
+
+    def _ir_posterior():
+        st.session_state[state_key] = _periodo_posterior(tipo, st.session_state[state_key])
+
+    col_prev, col_atual, col_next = st.columns([1, 5, 1])
+    with col_prev:
+        st.button('◀', key=f'ger_prev_mr_{tipo}', help='Período anterior', on_click=_ir_anterior,
+                   use_container_width=True)
+    with col_next:
+        st.button('▶', key=f'ger_next_mr_{tipo}', help='Próximo período', on_click=_ir_posterior,
+                   use_container_width=True)
+
+    ref_sel = st.session_state[state_key]
+    ini, fim = _intervalo_periodo(tipo, ref_sel)
+    tem_dado = ds.has_data(MOD_RELATORIO_DIARIO, tipo, ref_sel)
+
+    with col_atual:
+        if tipo == 'diario':
+            st.markdown(f'**{_rotulo_periodo(tipo, ref_sel)}**')
+        else:
+            st.markdown(f'**{ini.strftime("%d/%m/%Y")} – {fim.strftime("%d/%m/%Y")}**  ·  '
+                        f'{_rotulo_periodo(tipo, ref_sel)}')
+        st.caption('🟢 Período salvo ✓' if tem_dado else '⚪ Nenhum dado cadastrado para este período.')
+
+    periodos_disponiveis = _listar_periodos_margem_real(tipo)
+    if periodos_disponiveis:
+        with st.expander(f'🔎 Períodos salvos ({len(periodos_disponiveis)}) — seleção rápida'):
+            st.caption('Atalho pra pular direto a um período que já tem dado. A navegação ◀ ▶ acima '
+                       'continua funcionando pra QUALQUER período, com ou sem dado.')
+            slugs_ord = [s for s, _ in periodos_disponiveis]
+            labels_map = {}
+            for s, v in periodos_disponiveis:
+                if tipo == 'diario':
+                    labels_map[s] = f"{v.get('emissao', s)}  —  {v.get('periodo','-')}"
+                else:
+                    labels_map[s] = _label_slug(s, tipo) + f"  ({v.get('periodo','-')})"
+            escolha_rapida = st.selectbox(
+                'Ir direto para', slugs_ord, format_func=lambda s: labels_map.get(s, s),
+                key=f'ger_quick_sel_mr_{tipo}', index=None, placeholder='Selecione um período salvo...')
+            if escolha_rapida:
+                st.session_state[state_key] = escolha_rapida
+                del st.session_state[f'ger_quick_sel_mr_{tipo}']
+                st.rerun()
+
+    st.divider()
+
+    if not tem_dado:
+        tipo_label = {'diario': 'Relatório Diário', 'semanal': 'aba Semanal', 'mensal': 'aba Mensal'}
+        st.info(f'Nenhum dado cadastrado para o período de {ini.strftime("%d/%m/%Y")} a '
+                f'{fim.strftime("%d/%m/%Y")}. Gere ou importe esse período na página '
+                f'**{tipo_label.get(tipo, tipo)}** (seção "Histórico" → "Importar dados históricos").')
+        return
+
+    registro = ds.load_current(MOD_RELATORIO_DIARIO, tipo, ref_sel)
+    valores = registro.get('valores', {}) or {}
+    if not valores.get('itens'):
+        st.warning('Este período foi salvo antes da persistência com histórico de itens, ou foi '
+                   'importado sem PDF — não dá pra calcular a Margem Real sem os itens originais. '
+                   'Gere novamente (ou reenvie o PDF) na página de origem.')
+        return
+
+    gerado = (registro.get('atualizado_em') or '')[:16].replace('T', ' ')
+    st.caption(f'Período: {valores.get("periodo","-")}  |  Dado original salvo em: {gerado}')
+
+    tabela = mp.carregar_tabela()
+    n_sem_cadastro = sum(1 for it in valores['itens'] if not mp.pct_admin(it.get('produto'), tabela)[1])
+    if n_sem_cadastro:
+        st.caption(
+            f'⚠️ {n_sem_cadastro} linha(s) deste período usam produtos sem % cadastrado — '
+            f'veja a lista no dashboard abaixo e cadastre em **Cadastro de Produtos**.'
+        )
+
+    html_path = os.path.join(_dir_tipo_margem_real(tipo), f'{ref_sel}.html')
+    try:
+        gerar_dashboard_custo_real(
+            {'itens': valores['itens'], 'periodo': valores.get('periodo'),
+             'data_emissao': valores.get('emissao')},
+            tabela, html_path, tipo=tipo,
+        )
+    except Exception as e:
+        st.error(f'Não foi possível calcular a Margem Real deste período: {e}')
+        return
+
+    with open(html_path, 'r', encoding='utf-8') as f:
+        html_text = f.read()
+
+    components.html(html_text, height=1400, scrolling=True)
+    st.download_button(
+        f'⬇️ Baixar Margem Real — {_label_slug(ref_sel, tipo) if tipo != "diario" else ref_sel}',
+        data=html_text.encode('utf-8'),
+        file_name=f'margem_real_{tipo}_{ref_sel}_OTHIL.html',
+        mime='text/html',
+        key=f'ger_dl_mr_{tipo}',
     )
 
 
@@ -2458,9 +2596,10 @@ if st.button('🔒 Sair', key='_gerencia_logout'):
 st.divider()
 
 # ── Grupos de abas ───────────────────────────────────────────────────────────
-(grp_vendas, grp_metas, grp_metas_gerais, grp_rentabilidade, grp_produtos,
+(grp_vendas, grp_margem_real, grp_metas, grp_metas_gerais, grp_rentabilidade, grp_produtos,
  grp_clientes, grp_recorrencia, grp_quebras, grp_prevperdas) = st.tabs([
     '📊 Dashboards',
+    '💵 Margem Real',
     '🎯 Metas Semanais',
     '🌐 Metas Gerais',
     '💰 Rentabilidade',
@@ -2484,6 +2623,27 @@ with grp_vendas:
         _render_secao_dash('semanal', 'Dashboards Semanais', '📆')
     with tab_m:
         _render_secao_dash('mensal', 'Dashboards Mensais', '🗓️')
+
+# ── MARGEM REAL ────────────────────────────────────────────────────────────────
+with grp_margem_real:
+    st.caption(
+        'Custo real = Custo do relatório ÷ (1 + % administrativo do produto) — retira do Custo '
+        'a despesa administrativa que já vem embutida nele (variável por produto, cadastrada em '
+        '**Cadastro de Produtos**). MC % real = MC R$ real ÷ Custo real × 100, sem o +15pp '
+        'operacional usado nos outros indicadores. Sempre recalculada com o percentual mais atual '
+        'do cadastro, mesmo para períodos antigos.'
+    )
+    tab_mr_d, tab_mr_s, tab_mr_m = st.tabs([
+        '📅 Diário',
+        '📆 Semanal',
+        '🗓️ Mensal',
+    ])
+    with tab_mr_d:
+        _render_secao_margem_real('diario', 'Margem Real — Diário', '📅')
+    with tab_mr_s:
+        _render_secao_margem_real('semanal', 'Margem Real — Semanal', '📆')
+    with tab_mr_m:
+        _render_secao_margem_real('mensal', 'Margem Real — Mensal', '🗓️')
 
 # ── METAS ─────────────────────────────────────────────────────────────────────
 with grp_metas:
