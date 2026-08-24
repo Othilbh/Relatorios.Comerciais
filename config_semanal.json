@@ -1,117 +1,123 @@
 {
   "produtos": [
     {
-      "nome": "PESSEGO FRUITS PONENT ",
-      "codigos_texto": "24010152",
-      "estoque": 112,
-      "prioridade": "🚨 Grande Urgência"
-    },
-    {
-      "nome": "NECTARINA",
-      "codigos_texto": "260100101\n260104801\n26010492\n",
-      "estoque": 264,
-      "prioridade": "🚨 Grande Urgência"
-    },
-    {
-      "nome": "CUMB RED GLOBE MANAIRA",
-      "codigos_texto": "830100530",
-      "estoque": 48,
-      "prioridade": "🚨 Grande Urgência"
-    },
-    {
-      "nome": "CUMB CRINSON CHERRY BELLA",
-      "codigos_texto": "830100696",
+      "nome": "WILLIANS 110 DOLE PONTO AZUL",
+      "codigos_texto": "0101100110\n",
       "estoque": 61,
       "prioridade": "🚨 Grande Urgência"
     },
     {
-      "nome": "PACKHAMS 80 FAENZA",
-      "codigos_texto": "010207280",
-      "estoque": 28,
+      "nome": "PACKHAMS PROFESOR",
+      "codigos_texto": "010207470\n010207480\n010207490\n",
+      "estoque": 272,
+      "prioridade": "🚨 Grande Urgência"
+    },
+    {
+      "nome": "PACKMANS LOS PIONEIROS",
+      "codigos_texto": "0102073100\n0102073110\n",
+      "estoque": 280,
       "prioridade": "🚨 Grande Urgência"
     },
     {
       "nome": "PACKMANS 1/2 MONO AZUL",
-      "codigos_texto": "020200501",
-      "estoque": 115,
+      "codigos_texto": "020200501\n",
+      "estoque": 23,
       "prioridade": "🚨 Grande Urgência"
     },
     {
-      "nome": "CUMB THOMPSON BELLA",
-      "codigos_texto": "830100811",
-      "estoque": 2634,
+      "nome": "MELAO DINO",
+      "codigos_texto": "8703807\n87038101\n87038102\n87038103\n",
+      "estoque": 304,
       "prioridade": "🚨 Grande Urgência"
     },
     {
-      "nome": "TANGERINA CAMPOSOL",
-      "codigos_texto": "390600180",
-      "estoque": 60,
-      "prioridade": "🚨 Grande Urgência"
-    },
-    {
-      "nome": "ROMA IMP POMICA",
-      "codigos_texto": "8704714",
+      "nome": "ROMA",
+      "codigos_texto": "8704714\n",
       "estoque": 300,
-      "prioridade": "🔥 Alta Prioridade"
+      "prioridade": "🚨 Grande Urgência"
     },
     {
-      "nome": "CUMB THOMPSON GURUVA",
-      "codigos_texto": "830100824",
-      "estoque": 628,
-      "prioridade": "🔥 Alta Prioridade"
+      "nome": "CUMB CRINSON CHERRY BELLA",
+      "codigos_texto": "830100696\n",
+      "estoque": 24,
+      "prioridade": "🚨 Grande Urgência"
     },
     {
       "nome": "AMEIXA 50-55 TANY",
-      "codigos_texto": "250100102",
-      "estoque": 345,
+      "codigos_texto": "250100102\n",
+      "estoque": 232,
+      "prioridade": "🚨 Grande Urgência"
+    },
+    {
+      "nome": "NECTARINA FRUITS PONENT BRANCO",
+      "codigos_texto": "26010492\n",
+      "estoque": 65,
+      "prioridade": "🚨 Grande Urgência"
+    },
+    {
+      "nome": "CUMB THOMPSON GURUVA",
+      "codigos_texto": "830100824\n",
+      "estoque": 623,
+      "prioridade": "🚨 Grande Urgência"
+    },
+    {
+      "nome": "CUMB THOMPSON FRUTIBRAS",
+      "codigos_texto": "830100820\n",
+      "estoque": 0,
+      "prioridade": "🚨 Grande Urgência"
+    },
+    {
+      "nome": "BERGAMOTA",
+      "codigos_texto": "390600146\n390600147\n390600137\n",
+      "estoque": 500,
       "prioridade": "🔥 Alta Prioridade"
     },
     {
-      "nome": "AMEIXA 65/70 TANY",
-      "codigos_texto": "250100105",
-      "estoque": 538,
+      "nome": "PIMETAO REI",
+      "codigos_texto": "8707103\n8707111\n8707112\n",
+      "estoque": 100,
       "prioridade": "🔥 Alta Prioridade"
     },
     {
-      "nome": "PINK LADY 1/2",
-      "codigos_texto": "050201332",
+      "nome": "8KG THOMPSON AUTUM CAPELLARO",
+      "codigos_texto": "830200705\n",
       "estoque": 150,
       "prioridade": "🔥 Alta Prioridade"
     },
     {
-      "nome": "ARGENTINA 125 DOLE",
-      "codigos_texto": "0501019125.2",
-      "estoque": 336,
+      "nome": "CUMB VITORIA HONEY",
+      "codigos_texto": "830100914\n",
+      "estoque": 1256,
       "prioridade": "🔥 Alta Prioridade"
     },
     {
-      "nome": "8KG ITALIA",
-      "codigos_texto": "830200113\n830200107\n",
-      "estoque": 25,
+      "nome": "BENITAKA",
+      "codigos_texto": "830200306\n",
+      "estoque": 169,
       "prioridade": "🔥 Alta Prioridade"
     },
     {
-      "nome": "WILLIANS DOLE",
-      "codigos_texto": "0101100*",
-      "estoque": 317,
-      "prioridade": "Normal"
+      "nome": "NUBIA/JUBILLE SPECIALE",
+      "codigos_texto": "830100716\n830201902\n\n",
+      "estoque": 698,
+      "prioridade": "🔥 Alta Prioridade"
     },
     {
-      "nome": "8KG THOMPSON AUTUM ",
-      "codigos_texto": "830200705",
-      "estoque": 120,
-      "prioridade": "Normal"
-    },
-    {
-      "nome": "MELAO CEPI",
-      "codigos_texto": "3102005*",
-      "estoque": 1200,
+      "nome": "MELAO PELE DE SAPO",
+      "codigos_texto": "3102010004\n3102010005\n3102010006\n",
+      "estoque": 227,
       "prioridade": "Normal"
     },
     {
       "nome": "MELAO REI",
       "codigos_texto": "3102009*",
       "estoque": 1400,
+      "prioridade": "Normal"
+    },
+    {
+      "nome": "MIRTILO",
+      "codigos_texto": "87005*",
+      "estoque": 300,
       "prioridade": "Normal"
     }
   ],
