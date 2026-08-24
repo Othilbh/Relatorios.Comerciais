@@ -1,25 +1,36 @@
-"""Tabela de referência de % administrativo (custo operacional) POR PRODUTO
-EXATO, usada só no Dashboard Gerencial (Relatório Diário / Semanal / Mensal)
-para calcular "MC com Adm".
+"""Cadastro do % de despesa administrativa POR PRODUTO EXATO, usado pelo
+dashboard "Margem Real" (pages/gerencia.py + dashboard_custo_real.py) pra
+retirar essa despesa do Custo do relatório e achar o custo real do produto:
 
-Antes, todo produto somava um "+15" fixo (uniforme) sobre a MC% pra chegar
-no indicador antigo "Resultado Real %". Agora cada produto tem o seu próprio
-percentual (ex.: a maioria é 15%, mas algumas variedades de Gala/Fuji são
-18%, e Rosada/Caqui são 17%) — vindo da tabela "PORCENTAGEM PARA MARGEM DE
-CUSTO" enviada pela Ingrid.
+  Custo real = Custo do relatório ÷ (1 + % do produto / 100)
 
-  MC com Adm % (por item)  = MC% + % do produto
-  MC com Adm % (agregado)  = MC% agregada + média do % dos produtos,
-                              ponderada pelo custo de cada item
-                              (ver dashboard_diario._agg)
+Esse % varia por produto (a maioria é 15% ou 17%, mas algumas variedades de
+Gala/Fuji são 18%, e Rosada/Caqui são 17%) -- vem da tabela "PORCENTAGEM
+PARA MARGEM DE CUSTO" que a Ingrid mantém e envia periodicamente.
 
-Produto não cadastrado na tabela -> usa PADRAO_PCT e fica sinalizado como
-"sem % cadastrado" no dashboard, pra Ingrid saber que precisa adicionar.
+A partir de 24/08/2026 esse cadastro passou a ficar salvo na persistência
+central (data_store.py, com histórico versionado) em vez de fixo neste
+arquivo -- editável pela própria Ingrid na página "Cadastro de Produtos"
+(pages/8_Cadastro_Produtos_OTHIL.py), sem precisar de alteração de código
+pra cada atualização de planilha. `_TABELA_SEED` abaixo é só o valor
+SEMENTE: usado como ponto de partida a primeira vez que a página de
+cadastro é aberta (antes de qualquer 'Salvar'), e como fallback se por
+algum motivo a persistência central não puder ser lida.
+
+Produto não cadastrado na tabela -> `pct_admin` retorna PADRAO_PCT e sinaliza
+`encontrado=False`, pra ficar visível no dashboard "Margem Real" que aquele
+produto precisa ser adicionado ao cadastro (nunca adivinha um % por conta
+própria -- decisão explícita da Ingrid: risco de errar em dado financeiro).
 """
+import data_store as ds
+
+MODULO = 'cadastro_produtos_margem'
+TIPO_PERIODO = 'global'
+PERIODO_REF = 'percentuais'
 
 PADRAO_PCT = 15.0
 
-_TABELA = {
+_TABELA_SEED = {
     'WILL 110 GAUCHO': 15,
     'WILL 100 BREVI VERDE': 15,
     'WILLIANS 100 DOLE PONTO AZUL': 15,
@@ -208,10 +219,55 @@ _TABELA = {
 }
 
 
-def pct_admin(produto_nome: str):
+def carregar_tabela() -> dict:
+    """Carrega o cadastro atual (produto normalizado em MAIÚSCULO -> %) da
+    persistência central. Se ainda não existir nenhum registro salvo
+    (página de cadastro nunca foi aberta/salva), devolve a tabela semente
+    (_TABELA_SEED) como ponto de partida -- não grava nada sozinho, quem
+    decide salvar é sempre uma ação explícita da Ingrid na tela."""
+    try:
+        registro = ds.load_current(MODULO, TIPO_PERIODO, PERIODO_REF)
+    except Exception:
+        registro = None
+    if registro and registro.get('valores', {}).get('produtos'):
+        return {str(k).strip().upper(): float(v)
+                for k, v in registro['valores']['produtos'].items()}
+    return dict(_TABELA_SEED)
+
+
+def salvar_tabela(tabela: dict, usuario: str = None):
+    """Salva o cadastro completo (substitui o anterior, mas o histórico de
+    versões antigas continua disponível via ds.load_history). `tabela` é um
+    dict {produto: pct} -- normaliza nome (strip+upper) e pct (float) antes
+    de gravar, e descarta linhas com produto vazio."""
+    produtos = {
+        str(k).strip().upper(): float(v)
+        for k, v in tabela.items() if str(k).strip()
+    }
+    return ds.save_record(
+        modulo=MODULO, tipo_periodo=TIPO_PERIODO, periodo_ref=PERIODO_REF,
+        valores={'produtos': produtos}, usuario=usuario,
+    )
+
+
+def historico_tabela() -> list:
+    """Versões anteriores do cadastro (mais recente primeiro), pra tela de
+    auditoria -- quem mudou o quê e quando."""
+    try:
+        return list(reversed(ds.load_history(MODULO, TIPO_PERIODO, PERIODO_REF)))
+    except Exception:
+        return []
+
+
+def pct_admin(produto_nome: str, tabela: dict = None):
     """Retorna (pct, encontrado). pct usa PADRAO_PCT se o produto não
-    estiver cadastrado na tabela (e encontrado vem False, pra sinalizar)."""
+    estiver cadastrado na tabela (e encontrado vem False, pra sinalizar).
+    `tabela` é opcional -- passe a tabela já carregada (carregar_tabela())
+    quando for chamar isso muitas vezes em loop, pra não ler a persistência
+    central a cada item; se omitido, carrega uma vez internamente."""
+    if tabela is None:
+        tabela = carregar_tabela()
     key = (produto_nome or '').strip().upper()
-    if key in _TABELA:
-        return float(_TABELA[key]), True
+    if key in tabela:
+        return float(tabela[key]), True
     return PADRAO_PCT, False
