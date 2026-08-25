@@ -116,7 +116,7 @@
     },
     {
       "nome": "MIRTILO",
-      "codigos_texto": "87005*",
+      "codigos_texto": "87005910\n87005909\n87005903\n87005904\n",
       "estoque": 300,
       "prioridade": "Normal"
     }
