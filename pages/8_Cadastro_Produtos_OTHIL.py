@@ -1,11 +1,18 @@
-"""OTHIL — Cadastro de Produtos (% de despesa administrativa)
+"""OTHIL — Cadastro de Marcas/Fornecedores (% de despesa administrativa)
 
 Tela pra Ingrid manter, sozinha e sem precisar de alteração de código, o
-percentual de despesa administrativa POR PRODUTO usado pelo dashboard
-"Margem Real" (aba dentro da Gerência) pra retirar essa despesa do Custo
-do relatório e achar o custo real do produto:
+percentual de despesa administrativa POR MARCA/FORNECEDOR/EMBALAGEM usado
+pelo dashboard "Margem Real" (aba dentro da Gerência) pra retirar essa
+despesa do Custo do relatório e achar o custo real do produto:
 
-    Custo real = Custo do relatório ÷ (1 + % do produto / 100)
+    Custo real = Custo do relatório ÷ (1 + % da marca do produto / 100)
+
+Até 25/08/2026 esse cadastro era por PRODUTO EXATO (185+ linhas). Análise
+da planilha real confirmou com a Ingrid que o percentual varia pela
+MARCA/FORNECEDOR/EMBALAGEM (ex.: VALENTINO, FRUTIMAR, POMERANA...), não
+pela fruta ou calibre — então agora o cadastro é por marca (bem mais
+enxuto), e um produto novo da mesma marca já sai certo sozinho: o sistema
+procura, no nome do produto, qual marca cadastrada aparece.
 
 Persistência central versionada (data_store.py — mesma usada em todo o
 app): toda vez que o cadastro é salvo, fica registrado quem mudou o quê e
@@ -16,20 +23,23 @@ import streamlit as st
 
 import margem_produto as mp
 
-st.title('📦 Cadastro de Produtos')
+st.title('🏷️ Cadastro de Marcas')
 st.caption(
-    'Percentual de despesa administrativa por produto, usado pelo dashboard '
-    '**Margem Real** (aba dentro da Gerência) pra calcular o custo real: '
-    '**Custo real = Custo do relatório ÷ (1 + % do produto)**.'
+    'Percentual de despesa administrativa por marca/fornecedor/embalagem, usado pelo '
+    'dashboard **Margem Real** (aba dentro da Gerência) pra calcular o custo real: '
+    '**Custo real = Custo do relatório ÷ (1 + % da marca)**. Um produto é associado à marca '
+    'quando o nome dela aparece dentro do nome do produto — ex.: a marca **VALENTINO** vale '
+    'pra "GALA 165 PRETA VALENTINO", "FUJI 100 PRETA VALENTINO" etc., sem precisar cadastrar '
+    'cada um.'
 )
 
 # ---------------------------------------------------------------------------
 # Estado inicial: carrega o cadastro salvo (ou a semente, se nunca foi salvo)
 # ---------------------------------------------------------------------------
-if 'cadastro_df' not in st.session_state:
-    tabela_inicial = mp.carregar_tabela()
-    st.session_state['cadastro_df'] = pd.DataFrame(
-        sorted(tabela_inicial.items()), columns=['Produto', 'Porcentagem']
+if 'marcas_df' not in st.session_state:
+    marcas_iniciais = mp.carregar_marcas()
+    st.session_state['marcas_df'] = pd.DataFrame(
+        sorted(marcas_iniciais.items()), columns=['Marca', 'Porcentagem']
     )
 
 registro_atual = None
@@ -47,8 +57,11 @@ if registro_atual:
 else:
     st.info(
         '⚠️ Este cadastro ainda não foi salvo na persistência central — está mostrando a '
-        'tabela padrão (a última que estava fixa no código). Revise/ajuste abaixo e clique '
-        'em **💾 Salvar cadastro** pra ele passar a valer de verdade.'
+        'tabela semente, montada automaticamente a partir da planilha de produtos que você '
+        'mandou (produto → marca detectada pelo nome). **Vale conferir** essa lista antes de '
+        'salvar pela primeira vez, principalmente as marcas mais curtas/genéricas (ex. "GI", '
+        '"Z", "TP") — se alguma não fizer sentido como marca, é só apagar a linha ou corrigir '
+        'o percentual. Depois de revisar, clique em **💾 Salvar cadastro** na seção 2.'
     )
 
 st.divider()
@@ -58,11 +71,10 @@ st.divider()
 # ---------------------------------------------------------------------------
 st.header('1. Importar planilha (opcional)')
 st.caption(
-    'Envie uma planilha (.xls, .xlsx ou .csv) com uma coluna de nome do produto e uma '
-    'coluna de porcentagem. A importação só ATUALIZA percentuais de produtos já existentes '
-    'e ADICIONA produtos novos — nunca remove um produto sozinha, mesmo que ele não apareça '
-    'na planilha enviada. Nada é salvo de verdade até você clicar em **💾 Salvar cadastro** '
-    'na seção 2.'
+    'Envie uma planilha (.xls, .xlsx ou .csv) com uma coluna de nome da marca e uma coluna de '
+    'porcentagem. A importação só ATUALIZA percentuais de marcas já existentes e ADICIONA '
+    'marcas novas — nunca remove uma marca sozinha, mesmo que ela não apareça na planilha '
+    'enviada. Nada é salvo de verdade até você clicar em **💾 Salvar cadastro** na seção 2.'
 )
 
 up = st.file_uploader('Planilha de percentuais', type=['xls', 'xlsx', 'csv'], key='cad_upload')
@@ -75,44 +87,47 @@ if up is not None and st.session_state.get('_cad_upload_processado') != up.file_
             df_novo = pd.read_excel(up)
 
         cols_norm = {str(c).strip().upper(): c for c in df_novo.columns}
-        col_prod = next((orig for norm, orig in cols_norm.items() if 'PRODUTO' in norm), None)
+        col_marca = next(
+            (orig for norm, orig in cols_norm.items() if 'MARCA' in norm or 'PRODUTO' in norm or 'FORNECEDOR' in norm),
+            None,
+        )
         col_pct = next(
             (orig for norm, orig in cols_norm.items()
              if 'PORCENT' in norm or 'PERCENT' in norm or norm.strip() == '%'),
             None,
         )
-        if not col_prod or not col_pct:
+        if not col_marca or not col_pct:
             raise ValueError(
-                'não encontrei colunas de produto e porcentagem nessa planilha — '
-                'esperado algo como "PRODUTO" e "PORCENTAGEM" no cabeçalho'
+                'não encontrei colunas de marca e porcentagem nessa planilha — '
+                'esperado algo como "MARCA" e "PORCENTAGEM" no cabeçalho'
             )
 
-        df_novo = df_novo[[col_prod, col_pct]].copy()
-        df_novo.columns = ['Produto', 'Porcentagem']
-        df_novo['Produto'] = df_novo['Produto'].astype(str).str.strip()
-        df_novo = df_novo[df_novo['Produto'] != '']
+        df_novo = df_novo[[col_marca, col_pct]].copy()
+        df_novo.columns = ['Marca', 'Porcentagem']
+        df_novo['Marca'] = df_novo['Marca'].astype(str).str.strip()
+        df_novo = df_novo[df_novo['Marca'] != '']
         df_novo['Porcentagem'] = pd.to_numeric(df_novo['Porcentagem'], errors='coerce')
 
         invalidas = df_novo[df_novo['Porcentagem'].isna()]
         if not invalidas.empty:
             st.warning(
                 f"{len(invalidas)} linha(s) com porcentagem não numérica foram ignoradas: "
-                + ', '.join(invalidas['Produto'].tolist())
+                + ', '.join(invalidas['Marca'].tolist())
             )
             df_novo = df_novo.dropna(subset=['Porcentagem'])
 
-        df_novo['_norm'] = df_novo['Produto'].str.upper()
+        df_novo['_norm'] = df_novo['Marca'].str.upper()
         dup_upload = df_novo[df_novo.duplicated('_norm', keep=False)]
         if not dup_upload.empty:
             st.warning(
-                f"{dup_upload['_norm'].nunique()} produto(s) aparecem mais de uma vez NA "
-                f"PRÓPRIA planilha enviada — usando a última linha de cada um."
+                f"{dup_upload['_norm'].nunique()} marca(s) aparecem mais de uma vez NA "
+                f"PRÓPRIA planilha enviada — usando a última linha de cada uma."
             )
         df_novo = df_novo.drop_duplicates('_norm', keep='last')
 
         atual_map = {
-            str(r['Produto']).strip().upper(): float(r['Porcentagem'])
-            for _, r in st.session_state['cadastro_df'].iterrows()
+            str(r['Marca']).strip().upper(): float(r['Porcentagem'])
+            for _, r in st.session_state['marcas_df'].iterrows()
         }
 
         mudou, novos = [], []
@@ -121,40 +136,40 @@ if up is not None and st.session_state.get('_cad_upload_processado') != up.file_
             pct_novo = float(r['Porcentagem'])
             if chave in atual_map:
                 if atual_map[chave] != pct_novo:
-                    mudou.append({'Produto': r['Produto'], '% Atual': atual_map[chave], '% Novo': pct_novo})
+                    mudou.append({'Marca': r['Marca'], '% Atual': atual_map[chave], '% Novo': pct_novo})
             else:
-                novos.append({'Produto': r['Produto'], '% Novo': pct_novo})
+                novos.append({'Marca': r['Marca'], '% Novo': pct_novo})
 
         if not mudou and not novos:
             st.success('✅ Planilha lida — nenhuma mudança em relação ao cadastro atual (tudo já está igual).')
         else:
             if mudou:
-                st.warning(f'{len(mudou)} produto(s) terão o percentual ATUALIZADO:')
+                st.warning(f'{len(mudou)} marca(s) terão o percentual ATUALIZADO:')
                 st.dataframe(pd.DataFrame(mudou), use_container_width=True, hide_index=True)
             if novos:
-                st.info(f'{len(novos)} produto(s) NOVO(s) serão adicionados ao cadastro:')
+                st.info(f'{len(novos)} marca(s) NOVA(s) serão adicionadas ao cadastro:')
                 st.dataframe(pd.DataFrame(novos), use_container_width=True, hide_index=True)
 
             # Aplica ao estado em memória (ainda não salvo de forma
             # permanente -- só a tabela editável abaixo é atualizada)
-            df_atual = st.session_state['cadastro_df'].copy()
-            df_atual['_norm'] = df_atual['Produto'].astype(str).str.strip().str.upper()
-            novo_map_completo = {r['_norm']: (r['Produto'], float(r['Porcentagem'])) for _, r in df_novo.iterrows()}
+            df_atual = st.session_state['marcas_df'].copy()
+            df_atual['_norm'] = df_atual['Marca'].astype(str).str.strip().str.upper()
+            novo_map_completo = {r['_norm']: (r['Marca'], float(r['Porcentagem'])) for _, r in df_novo.iterrows()}
 
             linhas_finais = []
             vistos = set()
             for _, r in df_atual.iterrows():
                 if r['_norm'] in novo_map_completo:
-                    prod, pct = novo_map_completo[r['_norm']]
-                    linhas_finais.append({'Produto': prod, 'Porcentagem': pct})
+                    marca, pct = novo_map_completo[r['_norm']]
+                    linhas_finais.append({'Marca': marca, 'Porcentagem': pct})
                     vistos.add(r['_norm'])
                 else:
-                    linhas_finais.append({'Produto': r['Produto'], 'Porcentagem': r['Porcentagem']})
-            for chave, (prod, pct) in novo_map_completo.items():
+                    linhas_finais.append({'Marca': r['Marca'], 'Porcentagem': r['Porcentagem']})
+            for chave, (marca, pct) in novo_map_completo.items():
                 if chave not in vistos:
-                    linhas_finais.append({'Produto': prod, 'Porcentagem': pct})
+                    linhas_finais.append({'Marca': marca, 'Porcentagem': pct})
 
-            st.session_state['cadastro_df'] = pd.DataFrame(linhas_finais).sort_values('Produto').reset_index(drop=True)
+            st.session_state['marcas_df'] = pd.DataFrame(linhas_finais).sort_values('Marca').reset_index(drop=True)
             st.success(
                 'Planilha aplicada à tabela abaixo (ainda em memória). Revise e clique em '
                 '**💾 Salvar cadastro** na seção 2 pra confirmar de verdade.'
@@ -169,21 +184,21 @@ st.divider()
 # ---------------------------------------------------------------------------
 # 2. Tabela editável + salvar
 # ---------------------------------------------------------------------------
-st.header('2. Produtos cadastrados')
+st.header('2. Marcas cadastradas')
 st.caption(
     'Edite direto na tabela: clique numa célula pra alterar, use o "+" no fim da tabela pra '
-    'adicionar um produto novo, ou selecione uma linha e aperte a lixeira pra remover. '
-    f'Produto sem % cadastrado usa {mp.PADRAO_PCT:g}% (padrão) no dashboard Margem Real, e '
-    'fica sinalizado lá até você adicioná-lo aqui.'
+    'adicionar uma marca nova, ou selecione uma linha e aperte a lixeira pra remover. '
+    f'Produto que não bater com nenhuma marca cadastrada usa {mp.PADRAO_PCT:g}% (padrão) no '
+    'dashboard Margem Real, e fica sinalizado lá até você adicionar a marca aqui.'
 )
 
 df_editado = st.data_editor(
-    st.session_state['cadastro_df'],
+    st.session_state['marcas_df'],
     num_rows='dynamic',
     use_container_width=True,
     hide_index=True,
     column_config={
-        'Produto': st.column_config.TextColumn('Produto', required=True, width='large'),
+        'Marca': st.column_config.TextColumn('Marca', required=True, width='large'),
         'Porcentagem': st.column_config.NumberColumn(
             'Porcentagem (%)', required=True, min_value=0, max_value=100, step=0.5, format='%.1f%%',
         ),
@@ -191,36 +206,36 @@ df_editado = st.data_editor(
     key='cad_editor',
 )
 
-st.session_state['cadastro_df'] = df_editado
+st.session_state['marcas_df'] = df_editado
 
 col_save, col_count = st.columns([1, 3])
 with col_count:
-    st.caption(f'{len(df_editado)} produto(s) na tabela.')
+    st.caption(f'{len(df_editado)} marca(s) na tabela.')
 with col_save:
     if st.button('💾 Salvar cadastro', type='primary', use_container_width=True):
-        df_valido = df_editado.dropna(subset=['Produto', 'Porcentagem'])
-        df_valido = df_valido[df_valido['Produto'].astype(str).str.strip() != '']
+        df_valido = df_editado.dropna(subset=['Marca', 'Porcentagem'])
+        df_valido = df_valido[df_valido['Marca'].astype(str).str.strip() != '']
 
-        # Detecta duplicados (mesmo produto normalizado aparecendo 2x na
-        # tabela) ANTES de salvar -- sem isso, um deles seria descartado
+        # Detecta duplicados (mesma marca normalizada aparecendo 2x na
+        # tabela) ANTES de salvar -- sem isso, uma delas seria descartada
         # silenciosamente ao virar dict, e a Ingrid não saberia qual valeu.
-        norm = df_valido['Produto'].astype(str).str.strip().str.upper()
+        norm = df_valido['Marca'].astype(str).str.strip().str.upper()
         dup_mask = norm.duplicated(keep=False)
         if dup_mask.any():
             dups = sorted(set(norm[dup_mask]))
             st.error(
-                f"Não salvei: {len(dups)} produto(s) aparecem mais de uma vez na tabela "
+                f"Não salvei: {len(dups)} marca(s) aparecem mais de uma vez na tabela "
                 f"(mesmo nome, ignorando maiúsculas/espaços): {', '.join(dups)}. "
                 f"Remova a linha duplicada e tente salvar de novo."
             )
         else:
-            tabela_nova = {
-                str(r['Produto']).strip(): float(r['Porcentagem'])
+            marcas_novas = {
+                str(r['Marca']).strip(): float(r['Porcentagem'])
                 for _, r in df_valido.iterrows()
             }
-            ok = mp.salvar_tabela(tabela_nova, usuario=st.session_state.get('usuario_nome', 'Ingrid'))
+            ok = mp.salvar_marcas(marcas_novas, usuario=st.session_state.get('usuario_nome', 'Ingrid'))
             if ok:
-                st.success(f'✅ Cadastro salvo — {len(tabela_nova)} produto(s). Já vale pro dashboard Margem Real.')
+                st.success(f'✅ Cadastro salvo — {len(marcas_novas)} marca(s). Já vale pro dashboard Margem Real.')
                 st.rerun()
             else:
                 st.error('Não foi possível salvar de forma permanente — veja o aviso acima sobre persistência.')
@@ -230,13 +245,13 @@ st.divider()
 # ---------------------------------------------------------------------------
 # Histórico de versões
 # ---------------------------------------------------------------------------
-historico = mp.historico_tabela()
+historico = mp.historico_marcas()
 if historico:
     with st.expander(f'🕓 Histórico de versões ({len(historico)} anterior(es))'):
         for v in historico:
             v_quando = (v.get('atualizado_em') or '')[:16].replace('T', ' ')
-            v_qtd = len(v.get('valores', {}).get('produtos', {}))
+            v_qtd = len(v.get('valores', {}).get('marcas', {}))
             st.markdown(
                 f"- **v{v.get('versao')}** — {v_quando} por {v.get('usuario', 'não identificado')} "
-                f"— {v_qtd} produto(s)"
+                f"— {v_qtd} marca(s)"
             )
