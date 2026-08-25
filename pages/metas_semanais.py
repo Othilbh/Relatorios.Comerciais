@@ -1062,7 +1062,7 @@ with tab_cfg:
                     }
                     for p in cfg['produtos'] if p['nome'].strip()
                 ]
-                resultados = compute_metas(vendas_rows, produtos_config, cfg['vendedor_pcts'])
+                resultados = compute_metas(vendas_rows, produtos_config, cfg['vendedor_pcts'], estoque_rows=estoque_rows)
                 _prio_map = {p['nome']: p.get('prioridade', 'Normal') for p in produtos_config}
                 for _r in resultados:
                     _r['prioridade'] = _prio_map.get(_r['produto'], 'Normal')
@@ -1285,6 +1285,7 @@ with tab_cfg:
             p_vend = sum(l['vendido'] for l in r['linhas'])
             p_atg  = p_vend / p_meta * 100 if p_meta else 0
             p_falt = max(p_meta - p_vend, 0)
+            p_media = r.get('media_rs_cx')
             resumo_rows.append({
                 'Produto':      r['produto'],
                 'Prioridade':   r.get('prioridade', 'Normal'),
@@ -1292,8 +1293,17 @@ with tab_cfg:
                 'Vendido (cx)': f"{p_vend:.0f}",
                 'Falta (cx)':   f"{p_falt:.0f}",
                 '% Atingido':   f"{p_atg:.1f}%",
+                'R$ Médio/cx':  _fmt_moeda(p_media) if p_media is not None else '—',
             })
         st.dataframe(pd.DataFrame(resumo_rows), use_container_width=True, hide_index=True)
+        if any(r.get('media_rs_cx') is None for r in resultados):
+            st.caption(
+                '— na coluna **R$ Médio/cx** significa que não há "Md Venda" desse produto '
+                'para calcular a média: ou o PDF de Estoque Físico não foi enviado (é opcional '
+                'nesta tela), ou nenhuma linha dele que bate com os códigos desse produto tem '
+                'Qtde Vendida maior que zero. O restante da meta (Vendido/Falta/%) continua '
+                'correto mesmo assim.'
+            )
 
         # Detalhe por vendedor (colapsado)
         st.caption('Clique em um produto para ver o detalhe por vendedor:')
