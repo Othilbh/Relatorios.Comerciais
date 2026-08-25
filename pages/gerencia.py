@@ -2110,27 +2110,32 @@ def _render_metas_gerais():
             st.info('Sem dado suficiente no período atual para comparar.')
 
         # ── Evolução ──────────────────────────────────────────────────────────
+        # Faturamento, Volume e Margem -- Quebra removida a pedido explícito da
+        # Ingrid em 25/08/2026 ("gráfico de quebra não é necessário").
         st.subheader('📈 Evolução')
         hist_refs = list(reversed(periodo_mod.listar_periodos(tipo_mg, n=8, ate=ref_mg)))
         evol_rows = []
         for r in hist_refs:
             rv_h = mg.realizado_vendas(tipo_mg, r)
-            rq_h = mg.realizado_quebra(tipo_mg, r)
             evol_rows.append({
                 'Período': periodo_mod.rotulo(tipo_mg, r),
                 'Faturamento': rv_h.get('faturamento') or 0,
-                'Quebra (CX)': rq_h.get('total_cx') or 0,
+                'Volume (CX)': rv_h.get('volume') or 0,
+                'Margem (%)': rv_h.get('margem_pct') or 0,
             })
         if evol_rows:
             import pandas as _pd
             df_evol = _pd.DataFrame(evol_rows).set_index('Período')
-            ev1, ev2 = st.columns(2)
+            ev1, ev2, ev3 = st.columns(3)
             with ev1:
                 st.caption('Faturamento (R$)')
                 st.bar_chart(df_evol[['Faturamento']], color='#2D6A4F')
             with ev2:
-                st.caption('Quebra (CX)')
-                st.bar_chart(df_evol[['Quebra (CX)']], color='#C00000')
+                st.caption('Volume (CX)')
+                st.bar_chart(df_evol[['Volume (CX)']], color='#7C6FAD')
+            with ev3:
+                st.caption('Margem (%)')
+                st.bar_chart(df_evol[['Margem (%)']], color='#2A6F97')
 
         # ── OnTrack Semanal — quebra da meta MENSAL fixa (Faturamento) ──────
         # Só faz sentido pra 'mensal' (não dá pra quebrar um trimestre/ano em
