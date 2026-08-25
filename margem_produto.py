@@ -1,256 +1,157 @@
-"""Cadastro do % de despesa administrativa POR PRODUTO EXATO, usado pelo
-dashboard "Margem Real" (pages/gerencia.py + dashboard_custo_real.py) pra
-retirar essa despesa do Custo do relatório e achar o custo real do produto:
+"""OTHIL — Cadastro de Marcas/Fornecedores (% de despesa administrativa)
 
-  Custo real = Custo do relatório ÷ (1 + % do produto / 100)
+Até 25/08/2026 esse cadastro era por PRODUTO EXATO (185+ linhas, uma pra
+cada combinação de fruta/calibre/embalagem). Analisando a planilha real
+que a Ingrid mandou, ficou claro que o percentual NÃO varia pela fruta ou
+pelo calibre — varia pela MARCA/FORNECEDOR/EMBALAGEM que aparece no nome
+do produto (ex.: VALENTINO, FRUTIMAR, POMERANA, SANJO...). Agrupando os
+185 produtos reais por essa marca, 100% dos grupos tiveram um percentual
+único e consistente (nenhuma mistura) — confirmado com a Ingrid em
+25/08/2026 ("Faz muito sentido, é exatamente isso").
 
-Esse % varia por produto (a maioria é 15% ou 17%, mas algumas variedades de
-Gala/Fuji são 18%, e Rosada/Caqui são 17%) -- vem da tabela "PORCENTAGEM
-PARA MARGEM DE CUSTO" que a Ingrid mantém e envia periodicamente.
+Por isso o cadastro passou a ser por MARCA (hoje ~80, bem mais enxuto que
+185+), e um produto NOVO da mesma marca já cai certo sozinho, sem precisar
+cadastrar cada SKU um por um:
 
-A partir de 24/08/2026 esse cadastro passou a ficar salvo na persistência
-central (data_store.py, com histórico versionado) em vez de fixo neste
-arquivo -- editável pela própria Ingrid na página "Cadastro de Produtos"
-(pages/8_Cadastro_Produtos_OTHIL.py), sem precisar de alteração de código
-pra cada atualização de planilha. `_TABELA_SEED` abaixo é só o valor
-SEMENTE: usado como ponto de partida a primeira vez que a página de
-cadastro é aberta (antes de qualquer 'Salvar'), e como fallback se por
-algum motivo a persistência central não puder ser lida.
+  Custo real = Custo do relatório ÷ (1 + % da marca do produto / 100)
 
-Produto não cadastrado na tabela -> `pct_admin` retorna PADRAO_PCT e sinaliza
-`encontrado=False`, pra ficar visível no dashboard "Margem Real" que aquele
-produto precisa ser adicionado ao cadastro (nunca adivinha um % por conta
-própria -- decisão explícita da Ingrid: risco de errar em dado financeiro).
+Como acha a marca de um produto: procura, dentro do nome do produto
+(comparação por palavra inteira, não por trecho solto), qual marca
+cadastrada aparece.
+  - Encontrou exatamente 1 marca cadastrada -> usa o % dela.
+  - Não encontrou nenhuma, ou encontrou mais de uma (nome ambíguo) -> usa
+    PADRAO_PCT e sinaliza como não encontrado, pra aparecer visível no
+    dashboard "Margem Real" (nunca adivinha um % por conta própria —
+    decisão explícita da Ingrid: risco de errar em dado financeiro).
+
+Persistência central versionada (data_store.py, com histórico) — editável
+pela própria Ingrid na página "Cadastro de Marcas"
+(pages/8_Cadastro_Produtos_OTHIL.py), sem precisar de alteração de código.
+`_MARCAS_SEED` abaixo é só o valor SEMENTE: ponto de partida derivado
+automaticamente da planilha real de 185 produtos (marca = a palavra, do
+fim do nome pro início, que não é um código de calibre/tamanho/caixa NEM
+uma palavra genérica de cor/embalagem -- "AZUL", "VERDE", "BRANCA",
+"ISOPOR", "PVC", "TP" etc. foram deixadas de fora de propósito, porque
+descrevem a caixa/cor, não o fornecedor, e bater com elas causaria
+percentual ambíguo/errado em produtos de fornecedores diferentes que
+usam a mesma cor de caixa) -- usado a primeira vez que a página de
+cadastro é aberta (antes de qualquer 'Salvar'), e como fallback se a
+persistência central não puder ser lida.
+
+Por causa desse filtro, ~35 dos 185 produtos originais (a maioria já no
+padrão de 15%) ficam sem marca detectada na semente -- aparecem
+sinalizados em "sem % cadastrado" no dashboard Margem Real até a Ingrid
+adicionar a marca certa (ex.: os produtos "ROSADA ... ISOPOR ..." são
+17%, mas não têm um nome de fornecedor claro no texto -- precisa da
+Ingrid pra saber qual é). Isso é intencional: preferível sinalizar um
+produto sem marca do que arriscar aplicar um percentual errado por
+adivinhação de texto.
 """
+import re
+
 import data_store as ds
 
-MODULO = 'cadastro_produtos_margem'
+MODULO = 'cadastro_marcas_margem'
 TIPO_PERIODO = 'global'
 PERIODO_REF = 'percentuais'
 
 PADRAO_PCT = 15.0
 
-_TABELA_SEED = {
-    'WILL 110 GAUCHO': 15,
-    'WILL 100 BREVI VERDE': 15,
-    'WILLIANS 100 DOLE PONTO AZUL': 15,
-    'WILLIANS 100 DOLE PONTO VERDE': 15,
-    'WILLIANS 110 DOLE PONTO AZUL': 15,
-    'WILLIANS 120 DOLE PONTO AZUL': 15,
-    'WILLIANS 135 DOLE PONTO AZUL': 15,
-    'WILLIANS 90 DOLE PONTO AZUL': 15,
-    'PACKMANS 100 JOSELIA ROXA': 15,
-    'PACKMANS 110 JOSELIA ROXA': 15,
-    'PACKMANS 110 JOSELIA VERDE': 15,
-    'PACKMANS 120 JOSELIA ROXA': 15,
-    'PACKMANS 120 JOSELIA VERDE': 15,
-    'PACKMANS 70 JOSELIA ROXA': 15,
-    'PACKMANS 80 JOSELIA ROXA': 15,
-    'PACKMANS 90 JOSELIA ROXA': 15,
-    'PACKHAMS 80 FAENZA': 15,
-    'PACKMANS 1/2 MONO AZUL': 15,
-    'PORTUGUESA 65/70 AURORA PREMIUM': 15,
-    'PORTUGUESA 55/60 SABOR': 15,
-    'PORTUGUESA 60/65 SABOR': 15,
-    'FORELLE 1/2 ALESSANDRINI': 15,
-    'ARGENTINA 125 DOLE': 15,
-    'ARGENTINA 110 BREVI AZUL': 15,
-    'ARGENTINA 80 BREVI VERDE': 15,
-    'ARGENTINA 90 BREVI VERDE': 15,
-    'ARGENTINA 100 QUALITY 47': 15,
-    'PINK LADY 1/2': 15,
-    'PINK LADY 100': 15,
-    'PINK LADY 110': 15,
-    'PINK LADY 70': 15,
-    'PINK LADY 80': 15,
-    'PINK LADY 90': 15,
-    'CHILENA 113 OPAL': 15,
-    'CHILENA 113 POLAR': 15,
-    'CHILENA 88 POLAR': 15,
-    'GRAN SMITH 113 VERFRUT': 15,
-    'GRAN SMITH EL TORREON 100': 15,
-    'GRAN SMITH EL TORREON 80': 15,
-    'GRAN SMITH 1/2 DOLE': 15,
-    'GALA 135 PRETA VALENTINO': 15,
-    'GALA 150 PRETA VALENTINO': 15,
-    'GALA 165 PRETA VALENTINO': 15,
-    'GALA 165 VALENTINO CX PARDA': 15,
-    'GALA 110 SANJO': 18,
-    'GALA 120 SANJO': 18,
-    'GALA 135 SANJO': 18,
-    'GALA 165 EXPRESSA': 15,
-    'GALA SOLTA EXPRESSA': 15,
-    'GALA 120 FRUTIMAR': 15,
-    'GALA 150 FRUTIMAR': 15,
-    'GALA 180 FRUTIMAR': 15,
-    'GALA 198 FRUTIMAR': 15,
-    'GALA SOLTA FRUTIMAR': 15,
-    'GALA165 FRUTIMAR': 15,
-    'GALA 165 DELICIA': 15,
-    'GALA 165 SANT CAROL': 15,
-    'GALA 135 DADIVA': 18,
-    'GALA 110 BRANCA POMERANA': 18,
-    'GALA 120 BRANCA POMERANA': 18,
-    'GALA 135 BRANCA POMERANA': 18,
-    'GALA 165 BRANCA POMERANA': 18,
-    'GALA 180 HOSHI': 15,
-    'GALA 120 MORESCO': 15,
-    'GALA 135 MORESCO': 15,
-    'GALA 150 MORESCO': 15,
-    'GALA 165 MORESCO': 15,
-    'GALA 180 MORESCO': 15,
-    'FUJI 100 PRETA VALENTINO': 15,
-    'FUJI 110 PRETA VALENTINO': 15,
-    'FUJI 120 PRETA VALENTINO': 15,
-    'FUJI 135 PRETA VALENTINO': 15,
-    'FUJI 150 EXPRESSA': 15,
-    'FUJI 135 AZALEIA': 15,
-    'FUJI 165 AZALEIA': 15,
-    'FUJI 110 BRANCA POMERANA': 18,
-    'FUJI 120 BRANCA POMERANA': 18,
-    'FUJI 135 BRANCA POMERANA': 18,
-    'FUJI 150 BRANCA POMERANA': 18,
-    'FUJI 165 BRANCA POMERANA': 18,
-    'FUJI 165 POMERANA CX PLAST': 18,
-    'FUJI 180  BRANCA POMERANA': 18,
-    'FUJI 150 HOSHI': 15,
-    'FUJI 165 HOSHI': 15,
-    'FUJI SOLTA HOSHI PP': 15,
-    'ROSADA 1 CAM  ISOPOR SERIE OURO': 17,
-    'ROSADA 1CAM ISOPOR SERIE OURO': 17,
-    'CAQUI HOTH 20X1': 17,
-    'CUMB ISIS VERMELHA DOCE CAPELLARO': 15,
-    'CUMB RED GLOBE MANAIRA': 15,
-    'CUMB CRINSON CHERRY BELLA': 15,
-    'CUMB CRINSON CHERRY GRANDVALLE': 15,
-    'CUMB CRINSON CHERRY GRANGRAPE': 15,
-    'CUMB NUBIA/JUBILLE SPECIALE': 15,
-    'CUMB THOMPSON BELLA': 15,
-    'CUMB THOMPSON FRUTIBRAS': 15,
-    'CUMB THOMPSON GURUVA': 15,
-    'CUMB THOMPSON JOIA DO VALE': 15,
-    'CUMB THOMPSON SUEMI PURO NECTA': 15,
-    'CUMB VITORIA CAPELLARO': 15,
-    'CUMB VITORIA DELICAT': 15,
-    'CUMB VITORIA FRUTIBRAS': 15,
-    'CUMB VITORIA GRAND VALLE': 15,
-    'CUMB VITORIA GRAPE CX AMARELA': 15,
-    'CUMB VITORIA IBACEM/GOOD': 15,
-    'CUMB VITORIA LINA': 15,
-    'CUMB VITORIA MANAIRA': 15,
-    'CUMB VITORIA REI': 15,
-    'CUMB VITORIA SPECIALE': 15,
-    'CUMB VITORIA SUEMI PURO NECTA': 15,
-    'CUMB THOMPSON GRANDVALLE': 15,
-    '8KG ITALIA OURO VERDE': 15,
-    '8KG ITALIA SPECIALE': 15,
-    '8KG BENITAKA SPECIALE': 15,
-    '8KG RED GLOBE GRANDGRAPE': 15,
-    '8KG RED GLOBE SUEMI PURO NECTA': 15,
-    '8KG THOMPSON AUTUM CAPELLARO': 15,
-    '8KG NUBIA/JUBILE CAPELLARO': 15,
-    '8KG NUBIA/JUBILLE SPECIALE': 15,
-    'CUMB NUBIA/JUBILLE CAPELLARO': 15,
-    'ROSADA 1CAM BL ISOPOR X': 17,
-    'ROSADA 1CAM SL ISOPOR Z': 17,
-    'ROSADA BAND GI': 17,
-    'PESSEGO IMP FRUITS PONENT': 15,
-    'PESSEGO VILLA POLPA BRANCA': 15,
-    'AMEIXA 45-50 TANY': 15,
-    'AMEIXA 50-55 TANY': 15,
-    'AMEIXA 60/65 TANY': 15,
-    'AMEIXA 65/70 TANY': 15,
-    'AMEIXA 45/50 NOGAL FRUITS': 15,
-    'AMEIXA 50/55 NOGAL FRUITS': 15,
-    'AMEIXA 65/70 NOGAL FRUITS': 15,
-    'AMEIXA IMP 55/60 VILA': 15,
-    'AMEIXA IMP TOFRUT': 15,
-    'NECTARINA TANY POLPA AMARELA': 15,
-    'NECTARINA IMP VILLA': 15,
-    'MAMAO FORMOSO NORTE T10/11 X': 15,
-    'MAMAO FORMOSO NORTE T10/11Y': 15,
-    'MAMAO FORMOSO NORTE T8X': 15,
-    'MAMAO FORMOSO NORTE T9X': 15,
-    'MAMAO FORMOSO NORTE T9Y': 15,
-    'MAMAO HAVAI NORTE T24 X': 15,
-    'MAMAO HAVAI NORTE T24Y': 15,
-    'MAMAO HAVAI NORTE T28 X': 15,
-    'GOIABA 6KG CX PLASTICA': 15,
-    'GOIABA 6KG REDE': 15,
-    'MELAO CEPI TP 5': 15,
-    'MELAO CEPI TP 6': 15,
-    'MELAO CEPI TP 7': 15,
-    'MELAO CEPI TP 8': 15,
-    'MELAO GAIA TP 10': 15,
-    'MELAO REI TP 5': 15,
-    'MELAO REI TP 6': 15,
-    'MELAO REI TP 7': 15,
-    'MELAO PELE DE SAPO CEPI TP 9 14KG': 15,
-    'CUMB KIWI 20X01 AGROEX': 15,
-    'KIWI 20 RIO BLANCO': 15,
-    'KIWI 27 RIO BLANCO': 15,
-    'KIWI 30 RIO BLANCO': 15,
-    'KIWI ZESPRI SUN GOLD': 15,
-    'LARANJA BAHIA KETTERFRUTTI': 15,
-    'LIMAO SICILIANO URUGOLD': 15,
-    'BERGAMOTA SELEÇÃO 15KG PILGER': 15,
-    'BERGAMOTA SUPER 15KG PILGER': 15,
-    'TANGERINA BERGAMOTA 15KG PVC': 15,
-    'TANGERINA IMP CX PARDA COMPOSOL': 15,
-    'TANGERINA IMP URUGOLD 10KG': 15,
-    'LARANJA IMP BAHIA CITRUS CX AZUL': 15,
-    'LARANJA IMP EL MOUGHRABI 64': 15,
-    'MELAO DINO REI T4': 15,
-    'MELAO DINO REI T5': 15,
-    'MELAO DINO REI T6': 15,
-    'ROMA IMP POMICA': 15,
-    'MIRTILO AZRA ARGO': 15,
-    'MIRTILO CRUNCH': 15,
-    'MIRTILO DOLE': 15,
-    'MIRTILO IGARASHI': 15,
-    'MIRTILO PRIZÓ GOLD': 15,
-    'TAMARA GOLDEN EXPORT': 15,
-    'TAMARA KHAJUR BDJ 200GR': 15,
-    'TAMARA KHOUET ALIG BDJ 200GR': 15,
-    'TAMARA MEDJOUL': 15,
-    'PIMENTAO REI DUO': 15,
-    'PIMENTAO REI GRANEL AMARELO': 15,
-    'PIMENTAO REI GRANEL VERMELHO': 15,
+_MARCAS_SEED = {
+    'AGROEX': 15,
+    'ALESSANDRINI': 15,
+    'ARGO': 15,
+    'AZALEIA': 15,
+    'BELLA': 15,
+    'CAPELLARO': 15,
+    'CAROL': 15,
+    'COMPOSOL': 15,
+    'CRUNCH': 15,
+    'DADIVA': 18,
+    'DELICAT': 15,
+    'DELICIA': 15,
+    'DOLE': 15,
+    'EXPORT': 15,
+    'EXPRESSA': 15,
+    'FAENZA': 15,
+    'FRUITS': 15,
+    'FRUTIBRAS': 15,
+    'FRUTIMAR': 15,
+    'GAUCHO': 15,
+    'GOLD': 15,
+    'GRANDGRAPE': 15,
+    'GRANDVALLE': 15,
+    'GRANGRAPE': 15,
+    'GURUVA': 15,
+    'HOSHI': 15,
+    'HOTH': 17,
+    'IBACEM/GOOD': 15,
+    'IGARASHI': 15,
+    'KETTERFRUTTI': 15,
+    'LADY': 15,
+    'LINA': 15,
+    'MANAIRA': 15,
+    'MEDJOUL': 15,
+    'MORESCO': 15,
+    'MOUGHRABI': 15,
+    'NECTA': 15,
+    'NORTE': 15,
+    'OPAL': 15,
+    'PILGER': 15,
+    'POLAR': 15,
+    'POMERANA': 18,
+    'POMICA': 15,
+    'PREMIUM': 15,
+    'QUALITY': 15,
+    'REI': 15,
+    'SABOR': 15,
+    'SANJO': 18,
+    'SPECIALE': 15,
+    'TANY': 15,
+    'TOFRUT': 15,
+    'TORREON': 15,
+    'URUGOLD': 15,
+    'VALE': 15,
+    'VALENTINO': 15,
+    'VALLE': 15,
+    'VERFRUT': 15,
+    'VILA': 15,
+    'VILLA': 15,
 }
 
 
-def carregar_tabela() -> dict:
-    """Carrega o cadastro atual (produto normalizado em MAIÚSCULO -> %) da
+def carregar_marcas() -> dict:
+    """Carrega o cadastro atual (marca normalizada em MAIÚSCULO -> %) da
     persistência central. Se ainda não existir nenhum registro salvo
     (página de cadastro nunca foi aberta/salva), devolve a tabela semente
-    (_TABELA_SEED) como ponto de partida -- não grava nada sozinho, quem
+    (_MARCAS_SEED) como ponto de partida -- não grava nada sozinho, quem
     decide salvar é sempre uma ação explícita da Ingrid na tela."""
     try:
         registro = ds.load_current(MODULO, TIPO_PERIODO, PERIODO_REF)
     except Exception:
         registro = None
-    if registro and registro.get('valores', {}).get('produtos'):
+    if registro and registro.get('valores', {}).get('marcas'):
         return {str(k).strip().upper(): float(v)
-                for k, v in registro['valores']['produtos'].items()}
-    return dict(_TABELA_SEED)
+                for k, v in registro['valores']['marcas'].items()}
+    return dict(_MARCAS_SEED)
 
 
-def salvar_tabela(tabela: dict, usuario: str = None):
+def salvar_marcas(marcas: dict, usuario: str = None):
     """Salva o cadastro completo (substitui o anterior, mas o histórico de
-    versões antigas continua disponível via ds.load_history). `tabela` é um
-    dict {produto: pct} -- normaliza nome (strip+upper) e pct (float) antes
-    de gravar, e descarta linhas com produto vazio."""
-    produtos = {
+    versões antigas continua disponível via ds.load_history). `marcas` é
+    um dict {marca: pct} -- normaliza nome (strip+upper) e pct (float)
+    antes de gravar, e descarta linhas com marca vazia."""
+    limpo = {
         str(k).strip().upper(): float(v)
-        for k, v in tabela.items() if str(k).strip()
+        for k, v in marcas.items() if str(k).strip()
     }
     return ds.save_record(
         modulo=MODULO, tipo_periodo=TIPO_PERIODO, periodo_ref=PERIODO_REF,
-        valores={'produtos': produtos}, usuario=usuario,
+        valores={'marcas': limpo}, usuario=usuario,
     )
 
 
-def historico_tabela() -> list:
+def historico_marcas() -> list:
     """Versões anteriores do cadastro (mais recente primeiro), pra tela de
     auditoria -- quem mudou o quê e quando."""
     try:
@@ -259,15 +160,38 @@ def historico_tabela() -> list:
         return []
 
 
-def pct_admin(produto_nome: str, tabela: dict = None):
-    """Retorna (pct, encontrado). pct usa PADRAO_PCT se o produto não
-    estiver cadastrado na tabela (e encontrado vem False, pra sinalizar).
-    `tabela` é opcional -- passe a tabela já carregada (carregar_tabela())
+def marcas_no_produto(produto_nome: str, marcas: dict = None):
+    """Lista as marcas cadastradas que aparecem como palavra (ou sequência
+    de palavras) inteira dentro do nome do produto -- comparação por
+    limite de palavra (\\b), não substring solta, pra 'PP' não bater sozinho
+    dentro de outra palavra maior por acidente."""
+    if marcas is None:
+        marcas = carregar_marcas()
+    nome = (produto_nome or '').strip().upper()
+    if not nome:
+        return []
+    achadas = []
+    for m in marcas:
+        m_norm = str(m).strip().upper()
+        if not m_norm:
+            continue
+        if re.search(r'\b' + re.escape(m_norm) + r'\b', nome):
+            achadas.append(m)
+    return achadas
+
+
+def pct_admin(produto_nome: str, marcas: dict = None):
+    """Retorna (pct, encontrado). `encontrado=True` só quando exatamente
+    UMA marca cadastrada aparece no nome do produto. Nome sem nenhuma
+    marca reconhecida, ou ambíguo (mais de uma marca cadastrada aparece),
+    usa PADRAO_PCT e volta encontrado=False, pra ficar sinalizado no
+    dashboard Margem Real (nunca adivinha -- decisão explícita da Ingrid).
+    `marcas` é opcional -- passe o cadastro já carregado (carregar_marcas())
     quando for chamar isso muitas vezes em loop, pra não ler a persistência
     central a cada item; se omitido, carrega uma vez internamente."""
-    if tabela is None:
-        tabela = carregar_tabela()
-    key = (produto_nome or '').strip().upper()
-    if key in tabela:
-        return float(tabela[key]), True
+    if marcas is None:
+        marcas = carregar_marcas()
+    achadas = marcas_no_produto(produto_nome, marcas)
+    if len(achadas) == 1:
+        return float(marcas[achadas[0]]), True
     return PADRAO_PCT, False
