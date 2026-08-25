@@ -6,9 +6,9 @@
     "periodo_ref": "2026-08",
     "data_referencia": "2026-08-25",
     "criado_em": "2026-08-14T13:37:11+00:00",
-    "atualizado_em": "2026-08-25T17:14:47+00:00",
+    "atualizado_em": "2026-08-25T17:15:52+00:00",
     "usuario": "Ingrid",
-    "versao": 7,
+    "versao": 8,
     "valores": {
       "faturamento": 18000000.0,
       "volume": 0.0,
@@ -114,6 +114,24 @@
       "atualizado_em": "2026-08-25T17:14:33+00:00",
       "usuario": "Ingrid",
       "versao": 6,
+      "valores": {
+        "faturamento": 18000000.0,
+        "volume": 0.0,
+        "margem_pct": 13.0,
+        "quebra_max_cx": 0.0,
+        "quebra_max_rs": 80000.0
+      }
+    },
+    {
+      "id": "0df41666-21ca-4166-8d23-2bef7c3c8226",
+      "modulo_origem": "metas_gerais_config",
+      "tipo_periodo": "mensal",
+      "periodo_ref": "2026-08",
+      "data_referencia": "2026-08-25",
+      "criado_em": "2026-08-14T13:37:11+00:00",
+      "atualizado_em": "2026-08-25T17:14:47+00:00",
+      "usuario": "Ingrid",
+      "versao": 7,
       "valores": {
         "faturamento": 18000000.0,
         "volume": 0.0,
