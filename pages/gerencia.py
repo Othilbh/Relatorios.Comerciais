@@ -2141,10 +2141,11 @@ def _render_metas_gerais():
             st.divider()
             st.subheader('📅 OnTrack Semanal — Quebra da Meta Mensal (Faturamento)')
             st.caption(
-                'A Meta de Faturamento definida acima nunca muda. Aqui só se acompanha '
-                'quanto dela já era esperado ter sido vendido até cada semana (percentuais '
-                'incrementais acumulados -- podem passar de 100%, isso é normal) comparado '
-                'com o vendido real acumulado até aquele ponto.'
+                'A Meta de Faturamento definida acima nunca muda. Aqui se acompanha, semana '
+                'a semana, quanto dela já era esperado ter sido vendido (percentuais '
+                'incrementais -- podem somar mais ou menos que 100%, isso é normal) e o '
+                '**Atingimento**, que é sempre o vendido acumulado sobre a META TOTAL do mês '
+                '(não sobre o esperado daquela semana).'
             )
             with st.expander('⚙️ Configurar percentuais semanais'):
                 st.caption(
@@ -2186,7 +2187,6 @@ def _render_metas_gerais():
                     'Semana':             l['label'],
                     'Meta fixa (R$)':     f"R$ {_num_vc(_meta_fat_mg, 2)}",
                     '% semanal':          f"{l['pct_semana']:.0f}%",
-                    '% acumulado':        f"{l['pct_acumulado']:.0f}%",
                     'Esperado acumulado': f"R$ {_num_vc(l['esperado_acumulado'], 2)}",
                     'Vendido acumulado':  f"R$ {_num_vc(l['vendido_acumulado'], 2)}" if l['vendido_acumulado'] is not None else '—',
                     'Atingimento':        f"{l['atingimento']:.0f}%" if l['atingimento'] is not None else '—',
@@ -2291,7 +2291,6 @@ def _render_metas_gerais():
                     'Semana':             l['label'],
                     'Meta fixa (R$)':     f"R$ {_num_vc(_meta_fixa_v, 2)}",
                     '% semanal':          f"{l['pct_semana']:.0f}%",
-                    '% acumulado':        f"{l['pct_acumulado']:.0f}%",
                     'Esperado acumulado': f"R$ {_num_vc(l['esperado_acumulado'], 2)}",
                     'Vendido acumulado':  f"R$ {_num_vc(l['vendido_acumulado'], 2)}" if l['vendido_acumulado'] is not None else '—',
                     'Atingimento':        f"{l['atingimento']:.0f}%" if l['atingimento'] is not None else '—',
