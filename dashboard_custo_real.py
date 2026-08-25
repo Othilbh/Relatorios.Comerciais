@@ -72,7 +72,7 @@ def _status(mc_pct_real):
 def _produtos_sem_cadastro(itens, tabela):
     """Lista (produto, caixas, faturamento) dos produtos distintos que
     caíram no PADRAO_PCT por falta de % cadastrado -- pra Ingrid saber
-    exatamente o que precisa adicionar em Cadastro de Produtos, e ter
+    exatamente o que precisa adicionar em Cadastro de Marcas, e ter
     ciência de que o número desses itens está usando um % aproximado."""
     agg = {}
     for it in itens:
@@ -329,7 +329,7 @@ _HTML_TEMPLATE = (
   <section id="secaoSemCadastro" style="display:none;">
     <h2>&#9888; Produtos sem % administrativo cadastrado (usando __PADRAO_PCT__% padrão)</h2>
     <div class="aviso-note">Estes produtos ainda não têm percentual cadastrado em
-      <strong>Cadastro de Produtos</strong> -- o número deles nesta tela está usando um
+      <strong>Cadastro de Marcas</strong> -- o número deles nesta tela está usando um
       percentual aproximado (__PADRAO_PCT__%), não o real. Cadastre o produto certo assim
       que possível pra este número ficar exato.</div>
     <div class="table-scroll" style="margin-top:10px;max-height:200px;">
@@ -616,7 +616,7 @@ function montarImpacto() {
 
 def gerar_dashboard(parsed, tabela, output_path, tipo='diario'):
     """tipo: 'diario' | 'semanal' | 'mensal'. `tabela` é o cadastro de
-    percentuais já carregado (margem_produto.carregar_tabela()) -- passado
+    marcas já carregado (margem_produto.carregar_marcas()) -- passado
     de fora pra quem gera vários dashboards em sequência poder carregar uma
     vez só, em vez de ler a persistência central a cada chamada."""
     dados = _montar_dados(parsed, tabela)
