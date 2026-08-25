@@ -409,16 +409,16 @@ _PRIO_TITLE_COLOR_RG = {
 # Landscape A4 disponível (com margens): ~27.7 cm largura, ~19.5 cm altura.
 _RESUMO_LEVELS = [
     dict(margin=1.0*cm, font=7,   prod_col=4.2*cm, qtde_col=1.6*cm,
-         num_col=1.25*cm, pct_col=1.0*cm, pad=2.5, lpad=3, rpad=3,
+         num_col=1.25*cm, pct_col=1.0*cm, rs_col=1.5*cm, pad=2.5, lpad=3, rpad=3,
          spacer=0.4*cm, sec_font=10),
     dict(margin=0.8*cm, font=6.5, prod_col=4.0*cm, qtde_col=1.5*cm,
-         num_col=1.18*cm, pct_col=0.93*cm, pad=2.0, lpad=2, rpad=2,
+         num_col=1.18*cm, pct_col=0.93*cm, rs_col=1.4*cm, pad=2.0, lpad=2, rpad=2,
          spacer=0.3*cm, sec_font=9.5),
     dict(margin=0.6*cm, font=6,   prod_col=3.7*cm, qtde_col=1.4*cm,
-         num_col=1.1*cm,  pct_col=0.87*cm, pad=1.5, lpad=2, rpad=2,
+         num_col=1.1*cm,  pct_col=0.87*cm, rs_col=1.3*cm, pad=1.5, lpad=2, rpad=2,
          spacer=0.2*cm, sec_font=9),
     dict(margin=0.4*cm, font=5.5, prod_col=3.4*cm, qtde_col=1.3*cm,
-         num_col=1.02*cm, pct_col=0.8*cm,  pad=1.0, lpad=1, rpad=1,
+         num_col=1.02*cm, pct_col=0.8*cm, rs_col=1.2*cm,  pad=1.0, lpad=1, rpad=1,
          spacer=0.1*cm, sec_font=8.5),
 ]
 
@@ -454,7 +454,7 @@ def _build_resumo_geral(periodo: str, data_emissao: str, metas_results: list,
     vendedores  = list(vendedor_pcts.keys())
     col_widths  = [level['prod_col'], level['qtde_col']] + \
                   [level['num_col']] * len(vendedores) + \
-                  [level['num_col'], level['pct_col']]
+                  [level['num_col'], level['pct_col'], level['rs_col']]
 
     def _header_rows():
         r1 = [Paragraph('Produto', hdr_style), Paragraph('Qtde', hdr_style)]
@@ -462,8 +462,8 @@ def _build_resumo_geral(periodo: str, data_emissao: str, metas_results: list,
         for v in vendedores:
             r1 += [Paragraph(v, hdr_style)]
             r2 += ['']
-        r1 += [Paragraph('TOTAL', hdr_style), '']
-        r2 += ['Vend', '%']
+        r1 += [Paragraph('TOTAL', hdr_style), '', '']
+        r2 += ['Vend', '%', 'R$ Méd/cx']
         return r1, r2
 
     def _produto_row(r):
@@ -472,7 +472,8 @@ def _build_resumo_geral(periodo: str, data_emissao: str, metas_results: list,
             l = next((x for x in r['linhas'] if x['vendedor'] == v), None)
             row += [f"{l['vendido']:.1f}" if l else '-']
         _, ve, _, p = _produto_totais(r)
-        row += [f"{ve:.1f}", _fmt_pct(p)]
+        media = r.get('media_rs_cx')
+        row += [f"{ve:.1f}", _fmt_pct(p), _fmt_money(media) if media is not None else '—']
         return row
 
     def _subtotal_row(label, group):
@@ -486,7 +487,14 @@ def _build_resumo_geral(periodo: str, data_emissao: str, metas_results: list,
             row += [f"{ve_v:.1f}"]
         ve_g = sum(l['vendido'] for r in group for l in r['linhas'])
         m_g  = est
-        row += [f"{ve_g:.1f}", _fmt_pct(ve_g / m_g if m_g else 0)]
+        # Média ponderada do grupo: soma dos R$ (só produtos com dado) ÷
+        # soma das cx correspondentes -- nunca a média simples das médias de
+        # cada produto (distorceria quando os produtos têm volumes diferentes).
+        fat_g = sum(r.get('media_rs_cx_soma_ponderada', 0.0) for r in group)
+        qtd_fat_g = sum(r.get('media_rs_cx_peso', 0.0) for r in group)
+        media_g = (fat_g / qtd_fat_g) if qtd_fat_g else None
+        row += [f"{ve_g:.1f}", _fmt_pct(ve_g / m_g if m_g else 0),
+                _fmt_money(media_g) if media_g is not None else '—']
         return row
 
     def _build_table(rows, bg_color):
@@ -513,13 +521,13 @@ def _build_resumo_geral(periodo: str, data_emissao: str, metas_results: list,
         ]
         # Cada vendedor agora é 1 coluna só (mostra só o vendido) -- o nome
         # do vendedor ocupa as 2 linhas do cabeçalho (merge vertical), igual
-        # a 'Produto'/'Qtde'. Só a coluna TOTAL continua com 2 sub-colunas
-        # (Vend/%), então o nome dela precisa de merge horizontal.
+        # a 'Produto'/'Qtde'. Só a coluna TOTAL tem 3 sub-colunas
+        # (Vend/%/R$ Méd/cx), então o nome dela precisa de merge horizontal.
         col = 2
         for _ in vendedores:
             cmds.append(('SPAN', (col, 0), (col, 1)))
             col += 1
-        cmds.append(('SPAN', (col, 0), (col + 1, 0)))
+        cmds.append(('SPAN', (col, 0), (col + 2, 0)))
         t.setStyle(TableStyle(cmds))
         return t
 
@@ -576,8 +584,7 @@ def _build_resumo_geral(periodo: str, data_emissao: str, metas_results: list,
     elems.append(Paragraph('TOTAL GERAL', tot_sty))
 
     total_row = _subtotal_row('TOTAL GERAL', metas_results)
-    n_cols = 2 + (len(vendedores) + 1) * 2
-    gt = Table([total_row], colWidths=col_widths[:n_cols])
+    gt = Table([total_row], colWidths=col_widths[:len(total_row)])
     gt.setStyle(TableStyle([
         ('BACKGROUND',    (0, 0), (-1, 0), colors.HexColor('#1B4332')),
         ('TEXTCOLOR',     (0, 0), (-1, 0), colors.white),
