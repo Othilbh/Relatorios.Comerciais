@@ -299,7 +299,7 @@ def _render_secao_dash(tipo, titulo_secao, emoji):
 # Reaproveita os MESMOS itens já salvos no histórico do Relatório Diário
 # (MOD_RELATORIO_DIARIO) -- sem nenhuma publicação própria -- e o cadastro
 # de percentuais por produto (margem_produto.py, editável na página
-# "Cadastro de Produtos"). Ao contrário de _listar_dashboards/_render_secao_dash
+# "Cadastro de Marcas"). Ao contrário de _listar_dashboards/_render_secao_dash
 # acima, o HTML aqui é SEMPRE regenerado na hora (nunca fica em cache no
 # disco) -- decisão explícita da Ingrid: a Margem Real de um dia antigo tem
 # que usar o percentual MAIS ATUAL do cadastro, não o que valia na época.
@@ -398,12 +398,12 @@ def _render_secao_margem_real(tipo, titulo_secao, emoji):
     gerado = (registro.get('atualizado_em') or '')[:16].replace('T', ' ')
     st.caption(f'Período: {valores.get("periodo","-")}  |  Dado original salvo em: {gerado}')
 
-    tabela = mp.carregar_tabela()
+    tabela = mp.carregar_marcas()
     n_sem_cadastro = sum(1 for it in valores['itens'] if not mp.pct_admin(it.get('produto'), tabela)[1])
     if n_sem_cadastro:
         st.caption(
-            f'⚠️ {n_sem_cadastro} linha(s) deste período usam produtos sem % cadastrado — '
-            f'veja a lista no dashboard abaixo e cadastre em **Cadastro de Produtos**.'
+            f'⚠️ {n_sem_cadastro} linha(s) deste período usam produtos sem marca cadastrada — '
+            f'veja a lista no dashboard abaixo e cadastre em **Cadastro de Marcas**.'
         )
 
     html_path = os.path.join(_dir_tipo_margem_real(tipo), f'{ref_sel}.html')
@@ -2629,7 +2629,7 @@ with grp_margem_real:
     st.caption(
         'Custo real = Custo do relatório ÷ (1 + % administrativo do produto) — retira do Custo '
         'a despesa administrativa que já vem embutida nele (variável por produto, cadastrada em '
-        '**Cadastro de Produtos**). MC % real = MC R$ real ÷ Custo real × 100, sem o +15pp '
+        '**Cadastro de Marcas**). MC % real = MC R$ real ÷ Custo real × 100, sem o +15pp '
         'operacional usado nos outros indicadores. Sempre recalculada com o percentual mais atual '
         'do cadastro, mesmo para períodos antigos.'
     )
