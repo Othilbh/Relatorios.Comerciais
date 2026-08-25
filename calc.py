@@ -155,7 +155,7 @@ def parse_codigos_input(text: str) -> list[str]:
     return parts
 
 
-def compute_metas(vendas_rows, produtos_config, vendedor_pcts):
+def compute_metas(vendas_rows, produtos_config, vendedor_pcts, estoque_rows=None):
     """
     produtos_config: list of {'nome': str, 'codigos': list[str], 'estoque': float}
       'estoque' é a quantidade atual em estoque do produto (em caixas),
@@ -163,15 +163,34 @@ def compute_metas(vendas_rows, produtos_config, vendedor_pcts):
     'codigos' continua sendo usado apenas para casar as vendas (Vendido)
       no relatório de Lucratividade por Vendedor.
     vendedor_pcts: dict {nome_vendedor: percentual (0-100)}
+    estoque_rows: lista OPCIONAL de linhas do PDF "Estoque Físico"
+      (parsers.parse_estoque), cada uma com pelo menos 'codigo', 'qtde_vendida'
+      e 'md_venda' (R$ médio de venda por caixa, já calculado pelo sistema de
+      origem -- Mercatus/Previsão, coluna "Md Venda" do relatório -- pedido
+      explícito da Ingrid por ser "mais acertivo" que calcular por conta
+      própria a partir do PDF de vendas). Casada pelo MESMO código usado pra
+      achar Vendido. Se omitida/vazia (PDF de Estoque Físico não enviado --
+      é opcional nesta tela), 'media_rs_cx' fica None em todos os produtos.
 
     Retorna lista de dicts:
       {
         'produto': str, 'estoque_total': float,
         'linhas': [
           {'vendedor', 'pct', 'meta', 'vendido', 'falta', 'atingido'}, ...
-        ]
+        ],
+        'media_rs_cx': float | None,
       }
+    'media_rs_cx' = média do "Md Venda" (R$/cx, vindo pronto do Estoque
+    Físico) das linhas de estoque que casam com os códigos configurados
+    desse produto, PONDERADA pela Qtde Vendida de cada linha (um código com
+    mais volume pesa mais que um com pouco volume no resultado do produto
+    como um todo -- nunca uma média simples entre códigos/SKUs, que
+    distorceria quando eles têm volumes bem diferentes). Vem None quando
+    nenhuma linha de estoque que bate com esse produto tem Qtde Vendida > 0
+    (nada pra ponderar -- nunca inventa um valor), inclusive quando o PDF de
+    Estoque Físico simplesmente não foi enviado.
     """
+    estoque_rows = estoque_rows or []
     results = []
     for produto in produtos_config:
         nome = produto['nome']
@@ -185,6 +204,19 @@ def compute_metas(vendas_rows, produtos_config, vendedor_pcts):
                 disp = map_vendedor(row['vendedor'])
                 if disp in vendido_por_vendedor:
                     vendido_por_vendedor[disp] += row['qtde_vendida']
+
+        soma_rs_ponderada = 0.0
+        soma_peso = 0.0
+        for er in estoque_rows:
+            cn_er = normalize_codigo(er.get('codigo', ''))
+            if not any(codigo_matches(cn_er, e) for e in entries):
+                continue
+            peso = er.get('qtde_vendida') or 0.0
+            md = er.get('md_venda')
+            if peso > 0 and md is not None:
+                soma_rs_ponderada += md * peso
+                soma_peso += peso
+        media_rs_cx = (soma_rs_ponderada / soma_peso) if soma_peso else None
 
         linhas = []
         for vend, pct in vendedor_pcts.items():
@@ -208,5 +240,14 @@ def compute_metas(vendas_rows, produtos_config, vendedor_pcts):
             'produto': nome,
             'estoque_total': estoque_total,
             'linhas': linhas,
+            'media_rs_cx': media_rs_cx,
+            # Somas brutas (não só a razão pronta) -- pra quem agrupa vários
+            # produtos (ex.: subtotal por prioridade no PDF Resumo Geral)
+            # poder calcular a média ponderada certa (soma dos R$ ponderados
+            # ÷ soma dos pesos), em vez de fazer média simples das médias de
+            # cada produto (que distorceria o resultado quando os produtos
+            # têm volumes bem diferentes entre si).
+            'media_rs_cx_soma_ponderada': soma_rs_ponderada,
+            'media_rs_cx_peso': soma_peso,
         })
     return results
