@@ -340,20 +340,38 @@ def _extrai_qtde_tail(tail: str):
         colunas zeradas), cai para extrair por regex os números com 3 casas
         decimais (ou, na falta deles, qualquer número) e pega o último.
     """
+    return _extrai_qtde_fat_tail(tail)[0]
+
+
+def _extrai_qtde_fat_tail(tail: str):
+    """Como _extrai_qtde_tail, mas também tenta extrair o Faturamento (Total
+    das Saídas R$ Total -- mesmo campo usado como 'faturamento' em
+    parse_relatorio_diario, índice 8 de _SEQ) da mesma linha. Retorna
+    (qtde, faturamento) -- faturamento vem None quando a tokenização
+    posicional falha (ex.: relatório com "--------" nas colunas zeradas) ou
+    quando a linha tem menos de 9 campos; nesses casos ainda dá pra
+    recuperar ao menos a quantidade via regex, mas o Faturamento fica
+    indisponível pra aquela linha específica -- nunca inventa um valor.
+    Usada pelo cálculo de 'R$ Médio por caixa' das Metas Semanais."""
     vals = _tokenize_tail(tail)
     if vals:
+        qtde = None
         for idx in reversed(_QTY_INDICES):
             if idx < len(vals):
-                return vals[idx]
-        return vals[0]
+                qtde = vals[idx]
+                break
+        if qtde is None:
+            qtde = vals[0]
+        faturamento = vals[8] if len(vals) > 8 else None
+        return qtde, faturamento
 
     qty3_matches = re.findall(r'\b\d[\d.]*,\d{3}\b', tail)
     if qty3_matches:
-        return _to_float(qty3_matches[-1])
+        return _to_float(qty3_matches[-1]), None
     any_nums = re.findall(r'\b\d[\d.]*,\d+\b', tail)
     if any_nums:
-        return _to_float(any_nums[-1])
-    return None
+        return _to_float(any_nums[-1]), None
+    return None, None
 
 
 def parse_vendas_pdftotext(file) -> list[dict]:
@@ -361,11 +379,14 @@ def parse_vendas_pdftotext(file) -> list[dict]:
     cabeçalho do vendedor) usando pdftotext -layout.
 
     Retorna lista de dicts: {'vendedor': str, 'codigo': str, 'qtde_vendida': float,
-    'descricao': str} — mesmo formato de parse_vendas() em parsers.py (mais o
-    campo 'descricao', usado por calc.sugestao_codigo_por_nome para detectar
-    código configurado errado quando o NOME do produto bate mas o código
-    não), usando a tokenização posicional de _tokenize_tail para não
-    depender de espaços entre colunas.
+    'descricao': str, 'faturamento': float | None} — mesmo formato de
+    parse_vendas() em parsers.py (mais os campos 'descricao', usado por
+    calc.sugestao_codigo_por_nome para detectar código configurado errado
+    quando o NOME do produto bate mas o código não, e 'faturamento', usado
+    pelo cálculo de 'R$ Médio por caixa' das Metas Semanais -- None quando a
+    linha não permitiu extrair o valor com confiança, nunca inventado),
+    usando a tokenização posicional de _tokenize_tail para não depender de
+    espaços entre colunas.
     """
     text = extract_text(file)
     rows_out = []
@@ -400,13 +421,14 @@ def parse_vendas_pdftotext(file) -> list[dict]:
         # comentário acima) -- tenta consumir esta linha como sendo ela,
         # antes de tratá-la como início de um novo produto.
         if pending_qty is not None:
-            qtde_pendente = _extrai_qtde_tail(line)
+            qtde_pendente, fat_pendente = _extrai_qtde_fat_tail(line)
             if qtde_pendente is not None:
                 rows_out.append({
                     'vendedor': pending_qty['vendedor'],
                     'codigo': pending_qty['codigo'],
                     'qtde_vendida': qtde_pendente,
                     'descricao': pending_qty['descricao'],
+                    'faturamento': fat_pendente,
                 })
                 pending_qty = None
                 continue
@@ -430,7 +452,7 @@ def parse_vendas_pdftotext(file) -> list[dict]:
             descricao = _clean_produto(full_desc)
 
             tail = line[cxm.end():]
-            qtde = _extrai_qtde_tail(tail)
+            qtde, faturamento = _extrai_qtde_fat_tail(tail)
 
             if qtde is None:
                 # A quantidade não veio nesta linha -- provavelmente está
@@ -445,6 +467,7 @@ def parse_vendas_pdftotext(file) -> list[dict]:
                 'codigo': codigo,
                 'qtde_vendida': qtde,
                 'descricao': descricao,
+                'faturamento': faturamento,
             })
             continue
 
