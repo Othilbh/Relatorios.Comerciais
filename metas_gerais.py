@@ -30,7 +30,9 @@ OnTrack Semanal (quebra da meta MENSAL): a meta mensal de Faturamento
 semana sem nunca mudar de valor -- só a EXPECTATIVA de quanto dela já
 deveria ter sido vendida em cada semana muda, via percentuais incrementais
 configuráveis (padrão 30/28/25/25, acumulados: 30/58/83/108 -- pode passar
-de 100%, isso é esperado e nunca é limitado). O "vendido acumulado" real
+de 100%, isso é esperado e nunca é limitado -- decisão explícita da Ingrid,
+reafirmada em 25/08/2026: "deixa dar mais que 100%, não tem problema").
+O "vendido acumulado" real
 usa o histórico versionado do Vendedor-Cliente daquele mês (cada upload
 durante o mês vira uma versão datada) -- pega a versão mais recente até o
 fim de cada semana, sem inventar número. Só existe pra tipo_periodo
@@ -220,6 +222,10 @@ def quebra_semanal_meta(mes_ref: str, meta_fixa, pcts_semanais: list = None,
       {'semana', 'periodo_ref', 'label', 'pct_semana', 'pct_acumulado',
        'esperado_acumulado', 'vendido_acumulado' (None se a semana ainda
        não começou), 'atingimento' (None se não dá pra calcular)}.
+    'atingimento' = vendido_acumulado ÷ meta_fixa (a meta TOTAL do mês, não
+    o esperado daquela semana) -- ex.: meta 18.000.000, vendido acumulado
+    12.963.383,34 -> 72%. É simplesmente "quanto da meta já foi batido até
+    agora", sem ajustar pelo ritmo esperado da semana.
 
     O 'label' é a posição da semana DENTRO do mês (ex.: "Semana 01 do mês
     08"). As semanas em si NÃO são semanas ISO -- são blocos sequenciais
@@ -257,7 +263,12 @@ def quebra_semanal_meta(mes_ref: str, meta_fixa, pcts_semanais: list = None,
             else:
                 vendido = (totais.get(vendedor) or {}).get('fat')
 
-        atingimento = (vendido / esperado * 100) if (vendido is not None and esperado) else None
+        # Atingimento = % da META TOTAL do mês (não da expectativa daquela
+        # semana) -- decisão explícita da Ingrid em 25/08/2026: "a
+        # porcentagem de atingido seja em cima da meta total" (ex.: meta
+        # 18.000.000, vendido acumulado 12.963.383,34 -> 72%, não a
+        # comparação com o esperado daquele ponto do mês).
+        atingimento = (vendido / meta_fixa * 100) if (vendido is not None and meta_fixa) else None
 
         linhas.append({
             'semana': i + 1,
