@@ -89,7 +89,7 @@ pg = st.navigation(
         ],
         "Administração": [
             st.Page("pages/gerencia.py", title="Gerência", icon="🔐"),
-            st.Page("pages/8_Cadastro_Produtos_OTHIL.py", title="Cadastro de Produtos", icon="📦"),
+            st.Page("pages/8_Cadastro_Produtos_OTHIL.py", title="Cadastro de Marcas", icon="🏷️"),
         ],
     }
 )
