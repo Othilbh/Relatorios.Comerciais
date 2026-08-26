@@ -703,11 +703,17 @@ _GER_STATUS_COR = {
 }
 
 
-def _on_track_status_ger(atingido: float, dia: int):
+def _on_track_status_ger(atingido: float, dia: int, total_dias: int = 7):
     """(emoji, label, hex_color) — via lógica central de On Track
-    (on_track.py), tempo decorrido em dias úteis (1..5), mesma convenção
-    já usada em Metas Semanais."""
-    pct_tempo = dia / 5 if dia > 0 else 0.0
+    (on_track.py), tempo decorrido em dias de venda da semana comercial
+    sexta a sexta (1..7, sem domingo -- ver calc.dia_semana_atual), MESMA
+    convenção usada em Metas Semanais (calc.py é a fonte única). Corrige
+    inconsistência: esta função usava a convenção ANTIGA segunda-sexta
+    (1..5, dia/5) mesmo depois da semana comercial de Metas Semanais já
+    ter virado sexta-sexta -- exatamente o tipo de divergência que a
+    Ingrid pediu pra eliminar ("não criar uma segunda lógica de
+    semana")."""
+    pct_tempo = (dia / total_dias) if total_dias else 0.0
     r = on_track.calcular(
         meta=1.0, realizado=atingido, tipo_periodo='semanal',
         periodo_ref='(dias uteis)', pct_tempo_decorrido=pct_tempo,
@@ -788,9 +794,13 @@ def _render_ontrack_publicado():
     st.caption(f"Período: **{periodo}**  |  Publicado em: **{pub_em}**")
 
     dia = st.slider(
-        'Dia da semana (para status On Track)', 1, 5,
-        value=min(datetime.date.today().weekday() + 1, 5),
-        format='Dia %d de 5', key='ger_ot_dia',
+        'Dia da semana (para status On Track)', 1, 7,
+        value=calc.dia_semana_atual(),
+        format='Dia %d de 7', key='ger_ot_dia',
+        help='Semana comercial sexta a sexta (sem domingo, que não tem '
+             'venda): Sexta=1  Sábado=2  Segunda=3  Terça=4  Quarta=5  '
+             'Quinta=6  Sexta (fecha a semana)=7 -- mesma convenção da '
+             'aba Metas Semanais.',
     )
 
     st.divider()
@@ -801,7 +811,7 @@ def _render_ontrack_publicado():
     total_meta = sum(r.get('estoque_total', 0) for r in resultados)
     total_vend = sum(l['vendido'] for r in resultados for l in r.get('linhas', []))
     total_atg  = total_vend / total_meta if total_meta else 0
-    proj_cx    = math.ceil(total_vend / dia * 5) if dia > 0 else total_vend
+    proj_cx    = math.ceil(total_vend / dia * 7) if dia > 0 else total_vend
     em, lb, _  = _on_track_status_ger(total_atg, dia)
 
     k1, k2, k3, k4, k5 = st.columns(5)
@@ -1830,19 +1840,23 @@ _GER_STATUS_LABEL_COR = {
 
 
 def _render_indicador_mg(titulo, unidade_fmt, meta, realizado, ot, completude_msg=None):
+    # Cartão compactado (26/08/2026, pedido explícito da Ingrid: "reduzir o
+    # tamanho/altura do cabeçalho... dando mais espaço para os dados
+    # realmente relevantes") -- mesmo conteúdo de antes, só com
+    # padding/fonte/espaçamento menores.
     bg, fg = _GER_STATUS_LABEL_COR[ot['status']]
     html = f"""
-    <div style="background:{bg}; color:{fg}; border-radius:10px; padding:0.9rem 1rem; margin-bottom:0.5rem;">
-        <div style="font-weight:600; font-size:0.95rem;">{ot['emoji']} {titulo}</div>
-        <div style="font-size:1.4rem; font-weight:700; margin-top:0.2rem;">
+    <div style="background:{bg}; color:{fg}; border-radius:8px; padding:0.5rem 0.7rem; margin-bottom:0.35rem;">
+        <div style="font-weight:600; font-size:0.8rem;">{ot['emoji']} {titulo}</div>
+        <div style="font-size:1.15rem; font-weight:700; margin-top:0.1rem;">
             {unidade_fmt(realizado) if realizado is not None else '—'}
         </div>
-        <div style="font-size:0.82rem; opacity:0.85;">
+        <div style="font-size:0.72rem; opacity:0.85;">
             Meta: {unidade_fmt(meta) if meta else '—'}
             {'  |  ' + ot['label'] if meta else ''}
             {f"  |  {ot['pct_atingido']*100:.0f}% da meta" if ot.get('pct_atingido') is not None else ''}
         </div>
-        {f'<div style="font-size:0.78rem; opacity:0.75; margin-top:0.2rem;">Projeção de fechamento: {unidade_fmt(ot["projecao_fechamento"])}</div>' if ot.get('projecao_fechamento') is not None else ''}
+        {f'<div style="font-size:0.68rem; opacity:0.75; margin-top:0.1rem;">Projeção de fechamento: {unidade_fmt(ot["projecao_fechamento"])}</div>' if ot.get('projecao_fechamento') is not None else ''}
     </div>
     """
     # Remove linhas em branco (só espaço) do HTML montado. Quando um dos
@@ -1920,18 +1934,20 @@ def _render_indicador_quebra(meta_cx, realizado_cx, meta_rs, realizado_rs, fatur
         aviso_txt = ('Realizado em R$ ainda não disponível pra este período -- o PDF de Quebra '
                       'precisa ser reprocessado (reenviado) pra extrair o custo.')
 
+    # Cartão compactado -- mesma lógica de conteúdo, padding/fonte menores
+    # (ver comentário em _render_indicador_mg acima).
     html = f"""
-    <div style="background:{bg}; color:{fg}; border-radius:10px; padding:0.9rem 1rem; margin-bottom:0.5rem;">
-        <div style="font-weight:600; font-size:0.95rem;">{ot['emoji']} {titulo}</div>
-        <div style="font-size:1.4rem; font-weight:700; margin-top:0.2rem;">
+    <div style="background:{bg}; color:{fg}; border-radius:8px; padding:0.5rem 0.7rem; margin-bottom:0.35rem;">
+        <div style="font-weight:600; font-size:0.8rem;">{ot['emoji']} {titulo}</div>
+        <div style="font-size:1.15rem; font-weight:700; margin-top:0.1rem;">
             {linha_principal}
         </div>
-        <div style="font-size:0.82rem; opacity:0.85;">
+        <div style="font-size:0.72rem; opacity:0.85;">
             {linha_secundaria}
         </div>
-        {f'<div style="font-size:0.8rem; opacity:0.8; margin-top:0.1rem;">{linha_cx}</div>' if linha_cx else ''}
-        {f'<div style="font-size:0.78rem; opacity:0.75; margin-top:0.2rem;">{projecao_txt}</div>' if projecao_txt else ''}
-        {f'<div style="font-size:0.78rem; opacity:0.7; margin-top:0.2rem;">{aviso_txt}</div>' if aviso_txt else ''}
+        {f'<div style="font-size:0.7rem; opacity:0.8; margin-top:0.05rem;">{linha_cx}</div>' if linha_cx else ''}
+        {f'<div style="font-size:0.68rem; opacity:0.75; margin-top:0.1rem;">{projecao_txt}</div>' if projecao_txt else ''}
+        {f'<div style="font-size:0.68rem; opacity:0.7; margin-top:0.1rem;">{aviso_txt}</div>' if aviso_txt else ''}
     </div>
     """
     html = '\n'.join(line for line in html.split('\n') if line.strip())
@@ -1965,9 +1981,10 @@ def _render_metas_gerais():
     # ── Realizado (agregado automaticamente) ────────────────────────────────
     rv = mg.realizado_vendas(tipo_mg, ref_mg)
     rq = mg.realizado_quebra(tipo_mg, ref_mg)
-    ref_ant_mg = periodo_mod.periodo_anterior(tipo_mg, ref_mg)
-    rv_ant = mg.realizado_vendas(tipo_mg, ref_ant_mg)
-    rq_ant = mg.realizado_quebra(tipo_mg, ref_ant_mg)
+    # Os blocos "Comparativo vs período anterior" (Empresa e Vendedor) foram
+    # removidos a pedido explícito da Ingrid em 26/08/2026 ("remover
+    # completamente"), junto com o cálculo de período/realizado anterior
+    # que só existia pra alimentá-los.
 
     tab_empresa, tab_vendedor = st.tabs(['🏢 Empresa', '👤 Vendedor'])
 
@@ -2077,51 +2094,36 @@ def _render_metas_gerais():
                                       meta_atual.get('faturamento'), tipo_mg, ref_mg,
                                       _completude_msgs.get(rq['completude']))
 
-        # ── Comparativo vs período anterior ──────────────────────────────────
-        st.subheader('📊 Comparativo vs período anterior')
-        _linhas_comp = [
-            ('Faturamento', rv.get('faturamento'), rv_ant.get('faturamento'), lambda x: f'R$ {_num_vc(x, 0)}', False),
-            ('Volume (CX)', rv.get('volume'), rv_ant.get('volume'), lambda x: f'{_num_vc(x, 0)}', False),
-            ('Margem (%)', rv.get('margem_pct'), rv_ant.get('margem_pct'), lambda x: f'{x:.2f}%', False),
-            ('Quebra (CX)', rq.get('total_cx'), rq_ant.get('total_cx'), lambda x: f'{_num_vc(x, 0)}', True),
-        ]
-        # Antes, este bloco inteiro só aparecia se FATURAMENTO especificamente
-        # tivesse dado no período atual e no anterior -- então, se só o
-        # relatório de Vendedor-Cliente atrasasse num mês (mas a Quebra já
-        # tivesse sido publicada normalmente, fluxo real já que são uploads
-        # independentes), o comparativo de Quebra (que estaria disponível)
-        # também sumia. Agora mostra qualquer indicador que tenha dado no
-        # período atual, com "n/d" individual (via comparativo.calcular, que
-        # já trata "sem dado anterior" com segurança) quando faltar só o lado
-        # anterior daquele indicador específico.
-        if any(_atual is not None for _, _atual, _, _, _ in _linhas_comp):
-            cc1, cc2, cc3, cc4 = st.columns(4)
-            for _col, (_lab, _atual, _ant, _fmt, _menor_melhor) in zip(
-                    [cc1, cc2, cc3, cc4], _linhas_comp):
-                if _atual is None:
-                    with _col:
-                        st.metric(_lab, '—', delta='n/d')
-                    continue
-                _comp = comparativo.calcular(_atual, _ant, menor_e_melhor=_menor_melhor)
-                _col.metric(_lab, _fmt(_atual), delta=comparativo.formatar_variacao(_comp),
-                             delta_color='inverse' if _menor_melhor else 'normal')
-            st.caption(f'Base de comparação: {periodo_mod.rotulo(tipo_mg, ref_ant_mg)}')
-        else:
-            st.info('Sem dado suficiente no período atual para comparar.')
+        # Comparativo vs período anterior removido a pedido explícito da
+        # Ingrid em 26/08/2026 ("remover completamente"), pra deixar a tela
+        # mais compacta.
 
         # ── Evolução ──────────────────────────────────────────────────────────
-        # Faturamento, Volume e Margem -- Quebra removida a pedido explícito da
-        # Ingrid em 25/08/2026 ("gráfico de quebra não é necessário").
+        # Faturamento, Volume e Margem já existiam (Quebra tinha sido removida
+        # DESSE MESMO gráfico combinado a pedido da Ingrid em 25/08/2026:
+        # "gráfico de quebra não é necessário" -- ela se referia a não misturar
+        # Quebra no mesmo gráfico/eixo de Faturamento/Volume/Margem).
+        # Gráfico de Quebra (R$) adicionado em 26/08/2026 a pedido explícito
+        # (item 5 do pedido "AJUSTES NO APP": "adicionar também um gráfico de
+        # quebra na aba Evolução" -- ela esclareceu que é o indicador de
+        # Quebra de verdade, não uma quebra/breakdown por dimensão). Fica
+        # como card SEPARADO dos outros 3, mesmos filtros/período, sem alterar
+        # os 3 gráficos existentes.
         st.subheader('📈 Evolução')
         hist_refs = list(reversed(periodo_mod.listar_periodos(tipo_mg, n=8, ate=ref_mg)))
         evol_rows = []
         for r in hist_refs:
             rv_h = mg.realizado_vendas(tipo_mg, r)
+            rq_h = mg.realizado_quebra(tipo_mg, r)
             evol_rows.append({
                 'Período': periodo_mod.rotulo(tipo_mg, r),
                 'Faturamento': rv_h.get('faturamento') or 0,
                 'Volume (CX)': rv_h.get('volume') or 0,
                 'Margem (%)': rv_h.get('margem_pct') or 0,
+                # Mesma prioridade R$ > cx do card de Quebra (_render_indicador_quebra):
+                # custo real quando já extraído do PDF, senão cx como fallback.
+                'Quebra (R$)': (rq_h.get('total_custo') if rq_h.get('total_custo') is not None
+                                 else (rq_h.get('total_cx') or 0)),
             })
         if evol_rows:
             import pandas as _pd
@@ -2136,6 +2138,8 @@ def _render_metas_gerais():
             with ev3:
                 st.caption('Margem (%)')
                 st.bar_chart(df_evol[['Margem (%)']], color='#2A6F97')
+            st.caption('Quebra (R$ — ou cx, quando o custo real ainda não foi extraído do PDF)')
+            st.bar_chart(df_evol[['Quebra (R$)']], color='#BC4749')
 
         # ── OnTrack Semanal — quebra da meta MENSAL fixa (Faturamento) ──────
         # Só faz sentido pra 'mensal' (não dá pra quebrar um trimestre/ano em
@@ -2236,22 +2240,14 @@ def _render_metas_gerais():
             st.subheader('🔎 Detalhe por vendedor')
             vend_sel_mg = st.selectbox('Selecionar vendedor', sorted(vendedores_mg.keys()), key='mg_vend_sel')
             v_sel = vendedores_mg.get(vend_sel_mg, {})
-            vend_ant = (rv_ant.get('vendedores') or {}).get(vend_sel_mg, {})
             dc1, dc2, dc3, dc4 = st.columns(4)
             dc1.metric('Faturamento', f"R$ {_num_vc(v_sel.get('fat', 0), 2)}")
             dc2.metric('Volume (CX)', f"{_num_vc(v_sel.get('vol', 0), 3)}")
             dc3.metric('Margem %', f"{v_sel.get('mc_pct', 0):.2f}%")
             dc4.metric('Participação na empresa',
                        f"{(v_sel.get('fat', 0) / fat_total_emp * 100) if fat_total_emp else 0:.1f}%")
-            if vend_ant:
-                st.caption('Comparativo vs período anterior')
-                comp_fat_v = comparativo.calcular(v_sel.get('fat', 0), vend_ant.get('fat'))
-                comp_vol_v = comparativo.calcular(v_sel.get('vol', 0), vend_ant.get('vol'))
-                dcc1, dcc2 = st.columns(2)
-                dcc1.metric('Faturamento', f"R$ {_num_vc(v_sel.get('fat', 0), 2)}",
-                            delta=comparativo.formatar_variacao(comp_fat_v))
-                dcc2.metric('Volume (CX)', f"{_num_vc(v_sel.get('vol', 0), 3)}",
-                            delta=comparativo.formatar_variacao(comp_vol_v))
+            # Comparativo vs período anterior removido a pedido explícito da
+            # Ingrid em 26/08/2026 ("remover completamente").
 
         # ── OnTrack Semanal por Vendedor — quebra da meta MENSAL fixa dele ──
         # Fica FORA do if/else acima de propósito: precisa estar disponível
