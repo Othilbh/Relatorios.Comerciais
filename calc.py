@@ -23,6 +23,7 @@ extraído automaticamente do PDF de Estoque Físico), pois o snapshot do PDF
 pode não refletir o estoque conferido na segunda-feira na hora de bater a
 meta.
 """
+import datetime
 import math
 import re
 import unicodedata
@@ -58,6 +59,87 @@ def round_up(x: float) -> int:
     """Arredonda sempre para cima quando o resultado não é inteiro
     (ex.: 20,3 -> 21; 20,0 permanece 20)."""
     return math.ceil(x)
+
+
+# ---------------------------------------------------------------------------
+# Semana comercial de Metas Semanais: SEXTA A SEXTA (pedido explícito da
+# Ingrid, 18/08/2026: "Hj na meta semanal, nossa semana vai de segunda a
+# sexta, preciso que passe a ser de sexta a sexta... na sexta encerra a
+# semana e na sexta mesmo, já será definido as metas da proxima semana").
+# FONTE ÚNICA dessa definição -- tanto pages/metas_semanais.py quanto a
+# tela "On Track Atual" de pages/gerencia.py (que exibe snapshots
+# publicados de Metas Semanais) importam daqui, pra nunca haver uma
+# segunda lógica de semana divergente (reafirmado pela Ingrid em
+# 26/08/2026: "não criar uma segunda lógica de semana" -- antes desta
+# consolidação, gerencia.py._render_ontrack_publicado ainda calculava o
+# tempo decorrido com a convenção ANTIGA segunda-sexta [1..5], mesmo
+# depois da semana comercial já ter virado sexta-sexta em
+# metas_semanais.py -- essa era exatamente a inconsistência que ela
+# pediu pra corrigir "definitivamente").
+#
+# ISSO É ESPECÍFICO DE METAS SEMANAIS -- não usa nem altera periodo.py
+# (que continua semana ISO segunda-domingo, usado por Quebra, Vendedor-
+# Cliente e outros módulos independentes; escopo confirmado com a
+# Ingrid: "Só Metas Semanais").
+# ---------------------------------------------------------------------------
+
+def slug_semana(data: datetime.date) -> str:
+    """periodo_ref da semana COMERCIAL de Metas Semanais: sexta a sexta (8
+    dias corridos, contando as duas sextas -- a que abre e a que
+    fecha/já abre a semana seguinte). O identificador é a data (ISO,
+    "AAAA-MM-DD") da sexta-feira de ABERTURA da semana. Se `data` cair
+    numa sexta-feira, ela é tratada como a sexta de abertura da semana
+    que começa NAQUELA data."""
+    dias_desde_sexta = (data.weekday() - 4) % 7  # segunda=0 ... sexta=4 -> 0
+    sexta_abertura = data - datetime.timedelta(days=dias_desde_sexta)
+    return sexta_abertura.isoformat()
+
+
+def intervalo_semana(slug: str):
+    """(sexta_abertura, sexta_fechamento) da semana `slug` -- 8 dias
+    corridos, incluindo as duas sextas (confirmado com a Ingrid: "8 dias
+    corridos, porém 07 [dias de venda] pq no domingo não tem venda")."""
+    inicio = datetime.date.fromisoformat(slug)
+    fim = inicio + datetime.timedelta(days=7)
+    return inicio, fim
+
+
+def label_semana(slug: str) -> str:
+    try:
+        inicio, fim = intervalo_semana(slug)
+        return f"Semana {inicio.strftime('%d/%m')} a {fim.strftime('%d/%m')}"
+    except Exception:
+        return slug
+
+
+def semana_anterior(slug: str) -> str:
+    """periodo_ref da semana comercial imediatamente anterior."""
+    inicio, _ = intervalo_semana(slug)
+    return (inicio - datetime.timedelta(days=7)).isoformat()
+
+
+def semana_ano_anterior(slug: str) -> str:
+    """periodo_ref da mesma semana comercial um ano antes -- aproximação
+    por 364 dias (52 semanas exatas) em vez de 365/366, pra preservar a
+    sexta-feira como dia da semana (mesma lógica de aproximação que
+    periodo.periodo_ano_anterior já usa pro tipo 'semanal')."""
+    inicio, _ = intervalo_semana(slug)
+    return (inicio - datetime.timedelta(days=364)).isoformat()
+
+
+def dia_semana_atual(data: datetime.date = None) -> int:
+    """Dia de venda (1..7) dentro da semana sexta-a-sexta que contém
+    `data` (hoje, por padrão) -- pula domingo, que não tem venda."""
+    if data is None:
+        data = datetime.date.today()
+    inicio, _ = intervalo_semana(slug_semana(data))
+    dia = 0
+    d = inicio
+    while d <= data:
+        if d.weekday() != 6:  # domingo
+            dia += 1
+        d += datetime.timedelta(days=1)
+    return max(1, min(dia, 7))
 
 
 def codigo_matches(codigo_norm: str, entry: str) -> bool:
