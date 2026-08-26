@@ -134,22 +134,30 @@ def _montar_dados(parsed, tabela):
             'mc_rs': mc_rs_cat, 'mc_pct_real': mc_pct_cat,
         })
 
-    # ---- top 10 clientes -----------------------------------------------
+    # ---- clientes do dia (ranking completo) -----------------------------
+    # 'todos_clientes' = TODOS os clientes com movimentação no dia
+    # selecionado (pedido explícito da Ingrid, 26/08/2026: "exibir 100% dos
+    # clientes do dia... se houver 50 clientes no dia, exibir os 50; se
+    # houver 100, exibir os 100" -- usado na TABELA). 'top_clientes'
+    # continua limitado aos 10 primeiros (por faturamento) -- usado só no
+    # GRÁFICO de barras, que fica ilegível com dezenas de clientes; ela
+    # confirmou "manter o top 10".
     por_cliente = {}
     for it in itens:
         cod = it['cliente_codigo']
         d = por_cliente.setdefault(cod, {'nome': it['cliente_nome'], 'itens': []})
         d['itens'].append(it)
-    top_clientes = []
+    todos_clientes = []
     for cod, d in sorted(por_cliente.items(),
-                          key=lambda x: -sum(i['faturamento'] for i in x[1]['itens']))[:10]:
+                          key=lambda x: -sum(i['faturamento'] for i in x[1]['itens'])):
         fat_cli = sum(i['faturamento'] for i in d['itens'])
         mc_rs_cli, mc_pct_cli = _agg(d['itens'], tabela)
-        top_clientes.append({
+        todos_clientes.append({
             'cliente': d['nome'], 'codigo': cod,
             'faturamento': round(fat_cli, 2),
             'mc_rs': mc_rs_cli, 'mc_pct_real': mc_pct_cli,
         })
+    top_clientes = todos_clientes[:10]
 
     # ---- alertas: MC % real < 0 (vendendo abaixo do custo real) --------
     alertas = []
@@ -214,6 +222,7 @@ def _montar_dados(parsed, tabela):
         'ranking':           ranking,
         'categorias':        categorias_lista,
         'top_clientes':      top_clientes,
+        'todos_clientes':    todos_clientes,
         'alertas':           alertas,
         'impacto':           impacto,
         'sem_cadastro':      _produtos_sem_cadastro(itens, tabela),
@@ -375,7 +384,8 @@ _HTML_TEMPLATE = (
       <div>
         <h2>Top 10 clientes</h2>
         <div class="chart-wrap small"><canvas id="chartClientes"></canvas></div>
-        <div class="table-scroll" style="margin-top:10px;max-height:180px;">
+        <h2 style="margin-top:14px;">Todos os clientes do dia (<span id="qtdClientes"></span>)</h2>
+        <div class="table-scroll" style="margin-top:10px;max-height:320px;">
           <table id="tabelaClientes">
             <thead><tr>
               <th>Cliente</th><th class="num">Faturamento R$</th>
@@ -535,8 +545,9 @@ function montarClientes() {
     });
   } catch(e) { console.error('Erro grafico clientes:', e); }
 
+  document.getElementById('qtdClientes').textContent = DADOS.todos_clientes.length;
   const tbody = document.querySelector('#tabelaClientes tbody');
-  tbody.innerHTML = DADOS.top_clientes.map(c => {
+  tbody.innerHTML = DADOS.todos_clientes.map(c => {
     const cRes = resColor(c.mc_pct_real);
     const mcNeg = c.mc_rs < 0;
     return '<tr>' +
