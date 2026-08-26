@@ -17,10 +17,11 @@ from parsers import parse_estoque, parse_vendas, normalize_codigo
 from parsers_diario import parse_vendas_pdftotext
 from parsers_vendedor import parse_totais_vendedor
 from calc import (compute_metas, VENDEDORES_PADRAO, parse_codigos_input, map_vendedor,
-                   codigo_matches, soma_falta, sugestao_codigo_por_nome)
+                   codigo_matches, soma_falta, sugestao_codigo_por_nome,
+                   slug_semana as _slug_semana, label_semana as _label_semana,
+                   dia_semana_atual as _dia_semana_atual)
 from pdfgen import generate_relatorio_vendedor, generate_dashboard, generate_resumo_geral
 import storage
-import comparativo
 import on_track
 import data_store as ds
 import resumo_matriz
@@ -90,77 +91,13 @@ def save_config(cfg, show_feedback=True):
 # ---------------------------------------------------------------------------
 # Fechamento helpers
 # ---------------------------------------------------------------------------
-
-def _slug_semana(data: datetime.date) -> str:
-    """periodo_ref da semana COMERCIAL desta página: sexta a sexta (8 dias
-    corridos, contando as duas sextas -- a que abre e a que fecha/já abre
-    a semana seguinte), pedido explícito da Ingrid só para o módulo Metas
-    Semanais ("Hj na meta semanal, nossa semana vai de segunda a sexta,
-    preciso que passe a ser de sexta a sexta... na sexta encerra a semana
-    e na sexta mesmo, já será definido as metas da proxima semana").
-    ISSO É LOCAL A ESTA PÁGINA -- não usa nem altera periodo.py (que
-    continua semana ISO segunda-domingo, usado por Quebra, Vendedor-
-    Cliente e outros módulos; ela confirmou o escopo: "Só Metas Semanais").
-
-    O identificador é a data (ISO, "AAAA-MM-DD") da sexta-feira de
-    ABERTURA da semana. Se `data` cair numa sexta-feira, ela é tratada
-    como a sexta de abertura da semana que começa NAQUELA data (mesmo dia
-    em que a semana anterior fecha e as novas metas são definidas) -- ela
-    confirmou que essa sexta conta "das duas ao mesmo tempo", mas pra
-    decidir default de tela numa data ambígua o app assume a semana que
-    está abrindo."""
-    dias_desde_sexta = (data.weekday() - 4) % 7  # segunda=0 ... sexta=4 -> 0
-    sexta_abertura = data - datetime.timedelta(days=dias_desde_sexta)
-    return sexta_abertura.isoformat()
-
-
-def _intervalo_semana(slug: str):
-    """(sexta_abertura, sexta_fechamento) da semana `slug` -- 8 dias
-    corridos, incluindo as duas sextas (confirmado com a Ingrid: "8 dias
-    corridos, porém 07 [dias de venda] pq no domingo não tem venda")."""
-    inicio = datetime.date.fromisoformat(slug)
-    fim = inicio + datetime.timedelta(days=7)
-    return inicio, fim
-
-
-def _label_semana(slug: str) -> str:
-    try:
-        inicio, fim = _intervalo_semana(slug)
-        return f"Semana {inicio.strftime('%d/%m')} a {fim.strftime('%d/%m')}"
-    except Exception:
-        return slug
-
-
-def _semana_anterior(slug: str) -> str:
-    """periodo_ref da semana comercial imediatamente anterior."""
-    inicio, _ = _intervalo_semana(slug)
-    return (inicio - datetime.timedelta(days=7)).isoformat()
-
-
-def _semana_ano_anterior(slug: str) -> str:
-    """periodo_ref da mesma semana comercial um ano antes -- aproximação
-    por 364 dias (52 semanas exatas) em vez de 365/366, pra preservar a
-    sexta-feira como dia da semana (mesma lógica de aproximação que
-    periodo.periodo_ano_anterior já usa pro tipo 'semanal')."""
-    inicio, _ = _intervalo_semana(slug)
-    return (inicio - datetime.timedelta(days=364)).isoformat()
-
-
-def _dia_semana_atual(data: datetime.date = None) -> int:
-    """Dia de venda (1..7) dentro da semana sexta-a-sexta que contém
-    `data` (hoje, por padrão) -- pula domingo, que não tem venda. Substitui
-    o antigo conceito de 'dia útil 1..5 (segunda a sexta)', que deixou de
-    fazer sentido com a semana agora começando na sexta-feira."""
-    if data is None:
-        data = datetime.date.today()
-    inicio, _ = _intervalo_semana(_slug_semana(data))
-    dia = 0
-    d = inicio
-    while d <= data:
-        if d.weekday() != 6:  # domingo
-            dia += 1
-        d += datetime.timedelta(days=1)
-    return max(1, min(dia, 7))
+# _slug_semana / _intervalo_semana / _label_semana / _semana_anterior /
+# _semana_ano_anterior / _dia_semana_atual (semana comercial sexta-a-sexta)
+# foram MOVIDAS pra calc.py em 26/08/2026 -- fonte única compartilhada com
+# pages/gerencia.py (tela "On Track Atual", que exibe snapshots publicados
+# daqui e precisava da MESMA definição de semana, não uma segunda lógica
+# divergente). Os nomes locais acima continuam funcionando normalmente em
+# todo o resto deste arquivo via os aliases importados no topo.
 
 
 def _salvar_fechamento(resultados: list, totais_rs: dict, periodo_txt: str, slug: str,
@@ -386,10 +323,13 @@ def _render_on_track():
 
     on_em, on_lb, on_cor = _on_track_status(ating_geral, dia_semana)
 
+    # Pill compactada (26/08/2026, pedido explícito da Ingrid: "reduzir o
+    # tamanho/altura do cabeçalho... dando mais espaço para os dados
+    # realmente relevantes") -- mesmo conteúdo, padding/fonte menores.
     st.markdown(
-        f'<div style="background:{on_cor}; color:white; padding:0.55rem 1.2rem; '
-        f'border-radius:10px; display:inline-block; margin-bottom:0.8rem; '
-        f'font-size:1.05rem; font-weight:600;">'
+        f'<div style="background:{on_cor}; color:white; padding:0.35rem 0.9rem; '
+        f'border-radius:8px; display:inline-block; margin-bottom:0.5rem; '
+        f'font-size:0.9rem; font-weight:600;">'
         f'{on_em} {on_lb} — {ating_geral*100:.1f}% atingido (dia {dia_semana}/7)'
         f'</div>',
         unsafe_allow_html=True,
@@ -603,59 +543,6 @@ def _render_resumo_geral_inline(resultados: list, totais_rs: dict, dia: int = 7)
     resumo_matriz.render_matriz_produto_vendedor(resultados)
 
 
-def _render_comparativo_semanal(resultados: list, totais_rs: dict, slug_atual: str):
-    """Comparativo padrão (componente central comparativo.py): semana atual
-    × semana anterior, e semana atual × mesma semana no ano anterior —
-    usando o histórico real salvo em data_store (sobrevive a restart do app,
-    diferente do que estava em session_state antes)."""
-    st.subheader('📊 Comparativo')
-
-    total_vend_atual = sum(l['vendido'] for r in resultados for l in r['linhas'])
-    fat_atual = totais_rs.get('total_geral', {}).get('fat')
-
-    def _totais_do_registro(registro):
-        if not registro:
-            return None, None
-        prods = registro['valores'].get('produtos', [])
-        vend = sum(l['vendido'] for r in prods for l in r.get('linhas', []))
-        fat = registro['valores'].get('totais_rs', {}).get('total_geral', {}).get('fat')
-        return vend, fat
-
-    slug_ant = _semana_anterior(slug_atual)
-    slug_ano_ant = _semana_ano_anterior(slug_atual)
-
-    reg_ant = ds.load_current(MODULO, 'semanal', slug_ant)
-    reg_ano_ant = ds.load_current(MODULO, 'semanal', slug_ano_ant)
-    vend_ant, fat_ant = _totais_do_registro(reg_ant)
-    vend_ano_ant, fat_ano_ant = _totais_do_registro(reg_ano_ant)
-
-    col1, col2 = st.columns(2)
-    with col1:
-        st.markdown(f'**Semana atual × {_label_semana(slug_ant)}**')
-        if vend_ant is None:
-            st.caption('Ainda não há fechamento salvo da semana anterior para comparar.')
-        else:
-            comp_v = comparativo.calcular(total_vend_atual, vend_ant)
-            st.metric('Vendido (cx)', _fmt_num(total_vend_atual, 0),
-                       delta=f"{comparativo.formatar_variacao(comp_v)} vs semana anterior")
-            if fat_atual is not None and fat_ant is not None:
-                comp_f = comparativo.calcular(fat_atual, fat_ant)
-                st.metric('Faturamento', _fmt_moeda(fat_atual),
-                           delta=f"{comparativo.formatar_variacao(comp_f)} vs semana anterior")
-    with col2:
-        st.markdown(f'**Semana atual × {_label_semana(slug_ano_ant)} (ano anterior)**')
-        if vend_ano_ant is None:
-            st.caption('Ainda não há fechamento salvo da mesma semana no ano anterior.')
-        else:
-            comp_v2 = comparativo.calcular(total_vend_atual, vend_ano_ant)
-            st.metric('Vendido (cx)', _fmt_num(total_vend_atual, 0),
-                       delta=f"{comparativo.formatar_variacao(comp_v2)} vs ano anterior")
-            if fat_atual is not None and fat_ano_ant is not None:
-                comp_f2 = comparativo.calcular(fat_atual, fat_ano_ant)
-                st.metric('Faturamento', _fmt_moeda(fat_atual),
-                           delta=f"{comparativo.formatar_variacao(comp_f2)} vs ano anterior")
-
-
 def _render_fechamento_semanal():
     st.header('📅 Fechamento Semanal')
 
@@ -703,9 +590,9 @@ def _render_fechamento_semanal():
         # Resumo inline completo
         _render_resumo_geral_inline(resultados, totais_rs, dia_fech)
 
-        st.divider()
-        _render_comparativo_semanal(resultados, totais_rs, slug_atual)
-
+        # Comparativo ("vs semana anterior" / "vs ano anterior") removido a
+        # pedido explícito da Ingrid em 26/08/2026 ("remover completamente"),
+        # pra deixar a tela mais compacta.
         st.divider()
         label_botao = '💾 Fechar Semana e Salvar no Histórico' if not retroativo \
             else f'💾 Fechar {label_atual} (retroativo) e Salvar no Histórico'
