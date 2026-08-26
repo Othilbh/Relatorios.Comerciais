@@ -829,23 +829,11 @@ def _render_ontrack_publicado():
         r2.metric('MC R$',       f"R$ {_num_vc(tg.get('mc_rs', 0), 2)}")
         r3.metric('MC %',        f"{tg.get('resultado_real', 0):.2f}%")
 
-    # ── Comparativo vs semana anterior salva ────────────────────────────────
-    if historico_ot and idx_ot + 1 < len(historico_ot):
-        snap_ant_ot = historico_ot[idx_ot + 1][1]
-        totais_rs_ant = snap_ant_ot.get('totais_rs', {})
-        tg_ant = totais_rs_ant.get('total_geral', {})
-        vend_ant_total = sum(l['vendido'] for r in snap_ant_ot.get('resultados', [])
-                              for l in r.get('linhas', []))
-        st.subheader('📊 Comparativo vs semana anterior')
-        cc1, cc2, cc3 = st.columns(3)
-        comp_vend = comparativo.calcular(total_vend, vend_ant_total)
-        cc1.metric('Vendido (cx)', f'{_num_vc(total_vend, 0)}', delta=comparativo.formatar_variacao(comp_vend))
-        if tg and tg_ant:
-            comp_fat = comparativo.calcular(tg.get('fat', 0), tg_ant.get('fat'))
-            comp_mc  = comparativo.calcular(tg.get('mc_rs', 0), tg_ant.get('mc_rs'))
-            cc2.metric('Faturamento', f"R$ {_num_vc(tg.get('fat', 0), 2)}", delta=comparativo.formatar_variacao(comp_fat))
-            cc3.metric('MC R$', f"R$ {_num_vc(tg.get('mc_rs', 0), 2)}", delta=comparativo.formatar_variacao(comp_mc))
-        st.caption(f'Base de comparação: {_label_fech(historico_ot[idx_ot + 1][0])}')
+    # Comparativo vs semana anterior salva -- removido em 26/08/2026 a pedido
+    # explícito da Ingrid ("ainda está com o comparativo, que já falei que
+    # não é necessário"): ela confirmou que isso também se aplica a esta
+    # tela (On Track Atual / Publicado), não só ao bloco já removido dentro
+    # da aba Metas Gerais.
 
     st.divider()
 
