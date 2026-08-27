@@ -18,6 +18,7 @@ sys.path.insert(0, str(pathlib.Path(__file__).parent.parent))
 
 from parsers_diario import parse_relatorio_diario
 from xlsx_recorrencia import gerar_xlsx
+import acesso
 import comparativo
 import data_store as ds
 import periodo
@@ -238,6 +239,11 @@ if 'resultado_rec' in st.session_state:
         st.caption(f'✅ Salvo na Gerência como **{periodo.rotulo(tipo_periodo_rec, periodo_ref_rec)}** '
                    f'({periodo.rotulo_tipo(tipo_periodo_rec)}).')
 
+        # Perfil de upload (26/08/2026, pedido da Ingrid): o salvamento acima
+        # já aconteceu -- a partir daqui é só comparativo/gráfico/tabela
+        # (Dashboard), então redireciona pra Gerência em vez de mostrar isso.
+        acesso.redirecionar_pos_upload()
+
         # ---- Comparativo vs período anterior publicado (mesmo tipo) --------
         _ref_ant = periodo.periodo_anterior(tipo_periodo_rec, periodo_ref_rec)
         _registro_ant = None
@@ -282,6 +288,11 @@ if 'resultado_rec' in st.session_state:
         st.dataframe(styled, use_container_width=True, hide_index=True)
     else:
         st.info('Nenhum cliente encontrado nos dados.')
+
+    # Perfil de upload: nunca vê o "Gerar Excel"/Histórico abaixo -- rede
+    # de segurança pro caso raro de `rows` vir vazio acima (nada foi salvo
+    # nesse caso, então não há o que redirecionar; só bloqueia mesmo).
+    acesso.parar_se_upload()
 
     # ------------------------------------------------------------------
     # Gerar Excel
