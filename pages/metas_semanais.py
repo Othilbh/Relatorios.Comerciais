@@ -21,17 +21,10 @@ from calc import (compute_metas, VENDEDORES_PADRAO, parse_codigos_input, map_ven
                    slug_semana as _slug_semana, label_semana as _label_semana,
                    dia_semana_atual as _dia_semana_atual)
 from pdfgen import generate_relatorio_vendedor, generate_dashboard, generate_resumo_geral
-import acesso
 import storage
 import on_track
 import data_store as ds
 import resumo_matriz
-
-# Módulo de configuração/acompanhamento de metas (On Track, Fechamento
-# Semanal etc.), não é "upload de PDF pra geração de relatório" no sentido
-# do pedido da Ingrid (26/08/2026) -- bloqueado por inteiro pro perfil de
-# upload, junto com Rentabilidade e Margens e Cadastro de Marcas.
-acesso.bloquear_dashboard()
 
 # ── Formatação numérica em padrão brasileiro ────────────────────────────────
 # Mesmo idioma já usado em pdfgen.py, pages/1_Relatorio_Diario_OTHIL.py,
