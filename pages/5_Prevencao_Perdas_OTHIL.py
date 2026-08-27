@@ -10,6 +10,7 @@ import streamlit as st
 import pandas as pd
 
 from parsers_estoque import parse_estoque_fisico
+import acesso
 import data_store as ds
 import comparativo
 
@@ -445,6 +446,15 @@ def _render_tab(key, titulo, upload_label, filtro_sem_venda, dias_min):
         + f" · Total no relatório: **{len(produtos)} produtos**"
     )
 
+    # Perfil de upload (26/08/2026, pedido da Ingrid): a partir daqui é tudo
+    # painel/tabela/filtro -- Dashboard -- então para aqui pra esse perfil.
+    # Nota: nesta página o botão "Publicar na Gerência" só existe DEPOIS
+    # dessa parte (ele publica o resultado já filtrado da tabela), então o
+    # perfil de upload confirma a leitura do PDF mas não publica por aqui --
+    # reestruturar isso pra publicar direto do PDF lido mudaria o fluxo
+    # também pros demais usuários, então não fiz sem confirmar com a Ingrid.
+    acesso.parar_se_upload()
+
     # Gerar DataFrame completo e aplicar filtros de negócio
     df_full = _gerar_df(produtos, emissao_date, period_days)
     if df_full.empty:
@@ -564,6 +574,11 @@ def _carregar_pp_mais_recente():
 
 
 def _render_alerta_recebimento():
+    # Mesmo antes de enviar qualquer PDF, esta aba já mostra quantos
+    # produtos estão "em alerta" a partir do último snapshot publicado --
+    # ou seja, informação de Dashboard. Bloqueada por inteiro pro perfil de
+    # upload (26/08/2026, pedido explícito da Ingrid).
+    acesso.bloquear_dashboard()
     st.subheader("🔔 Alerta de Recebimento")
     st.info(
         "Envie o **Estoque Físico do dia**. O app identifica produtos que "
