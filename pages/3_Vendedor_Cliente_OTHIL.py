@@ -112,6 +112,31 @@ def _num(v, casas: int = 0) -> str:
     """Formata número (não monetário) no padrão brasileiro: 1.234"""
     return f"{v:,.{casas}f}".replace(',', 'X').replace('.', ',').replace('X', '.')
 
+def _fmt_brl_or_dash(v) -> str:
+    """Como _brl, mas retorna '—' quando o valor está ausente (ex.: sem meta) —
+    usado em colunas de tabela com st.dataframe(...).style.format(...)."""
+    if v is None or pd.isna(v):
+        return '—'
+    return _brl(v)
+
+def _fmt_pct1(v, casas: int = 1) -> str:
+    """Formata percentual (valor já em unidade %, ex.: 23.5) com 1 casa —
+    mesmo padrão usado hoje nas colunas de percentual desta página."""
+    return f"{v:.{casas}f}%"
+
+def _fmt_pct1_or_dash(v, casas: int = 1) -> str:
+    """Como _fmt_pct1, mas retorna '—' quando o valor está ausente (ex.: sem meta)."""
+    if v is None or pd.isna(v):
+        return '—'
+    return f"{v:.{casas}f}%"
+
+def _fmt_dif_or_dash(v) -> str:
+    """Formata diferença de projeção com sinal explícito '+'/'-' (padrão
+    brasileiro), ou '—' quando não há meta para calcular a diferença."""
+    if v is None or pd.isna(v):
+        return '—'
+    return ('+' if v >= 0 else '') + _brl(v)
+
 def _ot_status(atual_pct: float, elapsed_pct: float):
     """Retorna (emoji, label, ratio) para status On Track — via lógica
     central (on_track.py), mesmos limiares 0,85/0,55 usados em todo o app."""
@@ -220,6 +245,7 @@ with tab_rel:
                                 data=json_bytes,
                                 file_name=fname_json,
                                 mime='application/json',
+                                type='secondary',
                             )
                             _salvar_historico_permanente(json_bytes, PERIODO_REF)
                         except Exception as exc:
@@ -254,6 +280,7 @@ with tab_rel:
                                 data=json_bytes,
                                 file_name=fname_json,
                                 mime='application/json',
+                                type='secondary',
                             )
                             _salvar_historico_permanente(json_bytes, PERIODO_REF)
                         except Exception as exc:
@@ -355,19 +382,20 @@ with tab_rel:
 
                     fname = f"Vendedor_Cliente_{MESES_ABR[mes-1]}{ano}_OTHIL.xlsx"
                     st.success(f'Planilha gerada: {fname}')
-                    # Perfil de upload (26/08/2026, pedido da Ingrid): fluxo
-                    # Login -> Upload -> Gerência, nunca fica numa tela de
-                    # Dashboard depois de enviar o PDF.
-                    acesso.redirecionar_pos_upload()
                     st.download_button(
                         label='Baixar Excel',
                         data=xlsx_bytes,
                         file_name=fname,
                         mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
                         use_container_width=True,
+                        type='secondary',
                     )
                     if totais_res.get('periodo'):
                         st.caption(f"Periodo do PDF de totais: {totais_res['periodo']}")
+                    # Fluxo Upload -> Gerência (pedido da Ingrid, 27/08/2026):
+                    # nunca fica numa tela de Dashboard depois de enviar o PDF
+                    # (o botão de baixar o Excel acima continua disponível).
+                    acesso.redirecionar_pos_upload()
 
                 except Exception as exc:
                     st.error(f'Erro ao gerar Excel: {exc}')
@@ -379,11 +407,8 @@ with tab_rel:
 # TAB 2 — On Track por Cliente
 # =============================================================================
 with tab_ontrack:
-    # Perfil de upload (26/08/2026, pedido da Ingrid): só a aba "Relatório
-    # Semanal" (upload) é permitida -- as outras 3 abas, que são Dashboard
-    # puro, ficam bloqueadas aqui.
-    acesso.bloquear_dashboard()
     st.header('📊 On Track por Cliente')
+    st.caption(f'Período de referência selecionado: **{lbl_atual}**')
 
     clientes_data  = st.session_state.get('clientes_on_track')
     historico_data = st.session_state.get('historico_vc')
@@ -500,152 +525,111 @@ with tab_ontrack:
         tot_dif  = tot_proj - tot_meta
 
         g_em, g_lb, g_ratio = _ot_status(tot_pct, elapsed_pct)
-        _COR = {'🟢': '#2D6A4F', '🟡': '#B8860B', '🔴': '#C00000', '—': '#888'}
-        cor_status = _COR.get(g_em, '#888')
-        cor_dif    = '#2D6A4F' if tot_dif >= 0 else '#C00000'
 
-        # ── Cards de resumo ───────────────────────────────────────────────
-        st.markdown(f"""
-        <div style="display:grid; grid-template-columns:repeat(6,1fr); gap:10px; margin-bottom:14px;">
-          <div style="background:#f8f9fa; border-left:4px solid #2D6A4F; border-radius:8px; padding:12px 10px;">
-            <div style="font-size:10px; color:#666; font-weight:700; letter-spacing:.05em;">META MENSAL</div>
-            <div style="font-size:16px; font-weight:700; color:#1B4332; margin-top:4px;">{_brl(tot_meta)}</div>
-          </div>
-          <div style="background:#f8f9fa; border-left:4px solid #4472C4; border-radius:8px; padding:12px 10px;">
-            <div style="font-size:10px; color:#666; font-weight:700; letter-spacing:.05em;">FATURAMENTO</div>
-            <div style="font-size:16px; font-weight:700; color:#1F4E79; margin-top:4px;">{_brl(tot_fat)}</div>
-          </div>
-          <div style="background:#f8f9fa; border-left:4px solid {cor_status}; border-radius:8px; padding:12px 10px;">
-            <div style="font-size:10px; color:#666; font-weight:700; letter-spacing:.05em;">% ATINGIDO</div>
-            <div style="font-size:16px; font-weight:700; color:{cor_status}; margin-top:4px;">{tot_pct*100:.1f}% {g_em}</div>
-          </div>
-          <div style="background:#f8f9fa; border-left:4px solid #C00000; border-radius:8px; padding:12px 10px;">
-            <div style="font-size:10px; color:#666; font-weight:700; letter-spacing:.05em;">VALOR RESTANTE</div>
-            <div style="font-size:16px; font-weight:700; color:#C00000; margin-top:4px;">{_brl(tot_rest)}</div>
-          </div>
-          <div style="background:#f8f9fa; border-left:4px solid #375623; border-radius:8px; padding:12px 10px;">
-            <div style="font-size:10px; color:#666; font-weight:700; letter-spacing:.05em;">PROJEÇÃO MÊS</div>
-            <div style="font-size:16px; font-weight:700; color:#375623; margin-top:4px;">{_brl(tot_proj)}</div>
-          </div>
-          <div style="background:#f8f9fa; border-left:4px solid {cor_dif}; border-radius:8px; padding:12px 10px;">
-            <div style="font-size:10px; color:#666; font-weight:700; letter-spacing:.05em;">DIFERENÇA PROJ.</div>
-            <div style="font-size:16px; font-weight:700; color:{cor_dif}; margin-top:4px;">{'▲' if tot_dif >= 0 else '▼'} {_brl(abs(tot_dif))}</div>
-          </div>
-        </div>
-        """, unsafe_allow_html=True)
+        # ── Cards de resumo (st.metric nativo) ──────────────────────────────
+        k1, k2, k3, k4, k5, k6 = st.columns(6)
+        k1.metric('Meta Mensal', _brl(tot_meta))
+        k2.metric('Faturamento', _brl(tot_fat))
+        k3.metric('% Atingido', f"{tot_pct*100:.1f}% {g_em}")
+        k4.metric('Valor Restante', _brl(tot_rest))
+        k5.metric('Projeção Mês', _brl(tot_proj))
+        _dif_sinal = '+' if tot_dif >= 0 else '-'
+        k6.metric('Diferença Proj.', _brl(tot_dif), delta=f"{_dif_sinal}{_brl(abs(tot_dif))}")
 
-        # Barra de progresso geral com marcador de ritmo esperado
-        prog_w  = min(tot_pct, 1.0) * 100
-        exp_w   = elapsed_pct * 100
-        cor_bar = cor_status
-        st.markdown(f"""
-        <div style="margin-bottom:16px;">
-          <div style="font-size:11px; color:#666; margin-bottom:4px;">
-            Progresso da Meta — Dia {days_elapsed} de {days_in_month} ({elapsed_pct*100:.0f}% do mês)
-          </div>
-          <div style="background:#e0e0e0; border-radius:6px; height:20px; position:relative;">
-            <div style="background:{cor_bar}; width:{prog_w:.1f}%; height:20px; border-radius:6px;
-                        display:flex; align-items:center; justify-content:flex-end; padding-right:6px;">
-              <span style="color:white; font-weight:700; font-size:11px;">{prog_w:.1f}%</span>
-            </div>
-            <div style="position:absolute; top:0; left:{exp_w:.1f}%; width:2px; height:20px;
-                        background:#333; opacity:0.4;" title="Ritmo esperado"></div>
-          </div>
-          <div style="font-size:10px; color:#999; margin-top:2px;">▲ Ritmo esperado: {exp_w:.0f}%  |  Dia {days_elapsed}/{days_in_month}  |  {days_remaining} dias restantes</div>
-        </div>
-        """, unsafe_allow_html=True)
+        # Barra de progresso geral (nativa) + ritmo esperado em texto
+        prog_w = min(tot_pct, 1.0)
+        exp_w  = elapsed_pct * 100
+        st.progress(
+            prog_w,
+            text=(f"Progresso da Meta — Dia {days_elapsed} de {days_in_month} "
+                  f"({elapsed_pct*100:.0f}% do mês) — {prog_w*100:.1f}% atingido"),
+        )
+        st.caption(
+            f"▲ Ritmo esperado: {exp_w:.0f}%  |  Dia {days_elapsed}/{days_in_month}  |  "
+            f"{days_remaining} dias restantes"
+        )
 
         st.divider()
 
         # ── Comparativo (componente central comparativo.py) ────────────────
-        st.subheader('📊 Comparativo')
-        periodo_ref_ot = periodo.periodo_ref('mensal', ref_date_ot.date())
-        slug_ant_ot = periodo.periodo_anterior('mensal', periodo_ref_ot)
-        slug_ano_ant_ot = periodo.periodo_ano_anterior('mensal', periodo_ref_ot)
+        with st.expander('📊 Comparativo', expanded=True):
+            periodo_ref_ot = periodo.periodo_ref('mensal', ref_date_ot.date())
+            slug_ant_ot = periodo.periodo_anterior('mensal', periodo_ref_ot)
+            slug_ano_ant_ot = periodo.periodo_ano_anterior('mensal', periodo_ref_ot)
 
-        def _fat_total_periodo(pref):
-            reg = ds.load_current(MODULO, 'mensal', pref)
-            if not reg:
-                return None
-            cdata = reg['valores'].get('clientes_data', {})
-            return sum(c.get('fat', 0) for cli in cdata.values() for c in cli.values())
+            def _fat_total_periodo(pref):
+                reg = ds.load_current(MODULO, 'mensal', pref)
+                if not reg:
+                    return None
+                cdata = reg['valores'].get('clientes_data', {})
+                return sum(c.get('fat', 0) for cli in cdata.values() for c in cli.values())
 
-        fat_ant_ot = _fat_total_periodo(slug_ant_ot)
-        fat_ano_ant_ot = _fat_total_periodo(slug_ano_ant_ot)
+            fat_ant_ot = _fat_total_periodo(slug_ant_ot)
+            fat_ano_ant_ot = _fat_total_periodo(slug_ano_ant_ot)
 
-        cc1, cc2 = st.columns(2)
-        with cc1:
-            st.markdown(f'**{lbl_atual} × {periodo.rotulo("mensal", slug_ant_ot)}**')
-            if fat_ant_ot is None:
-                st.caption('Sem dado salvo do mês anterior para comparar.')
-            else:
-                comp_m = comparativo.calcular(tot_fat, fat_ant_ot)
-                st.metric('Faturamento', _brl(tot_fat), delta=comparativo.formatar_variacao(comp_m))
-        with cc2:
-            st.markdown(f'**{lbl_atual} × {periodo.rotulo("mensal", slug_ano_ant_ot)} (ano anterior)**')
-            if fat_ano_ant_ot is None:
-                st.caption('Sem dado salvo da mesma época no ano anterior para comparar.')
-            else:
-                comp_a = comparativo.calcular(tot_fat, fat_ano_ant_ot)
-                st.metric('Faturamento', _brl(tot_fat), delta=comparativo.formatar_variacao(comp_a))
+            cc1, cc2 = st.columns(2)
+            with cc1:
+                st.markdown(f'**{lbl_atual} × {periodo.rotulo("mensal", slug_ant_ot)}**')
+                if fat_ant_ot is None:
+                    st.caption('Sem dado salvo do mês anterior para comparar.')
+                else:
+                    comp_m = comparativo.calcular(tot_fat, fat_ant_ot)
+                    st.metric('Faturamento', _brl(tot_fat), delta=comparativo.formatar_variacao(comp_m))
+            with cc2:
+                st.markdown(f'**{lbl_atual} × {periodo.rotulo("mensal", slug_ano_ant_ot)} (ano anterior)**')
+                if fat_ano_ant_ot is None:
+                    st.caption('Sem dado salvo da mesma época no ano anterior para comparar.')
+                else:
+                    comp_a = comparativo.calcular(tot_fat, fat_ano_ant_ot)
+                    st.metric('Faturamento', _brl(tot_fat), delta=comparativo.formatar_variacao(comp_a))
 
         st.divider()
 
         # ── Ranking de Vendedores ─────────────────────────────────────────
         if vend_filtro == 'Todos':
-            st.subheader('🏆 Ranking de Vendedores')
+            with st.expander('🏆 Ranking de Vendedores', expanded=True):
+                vend_rank: dict = {}
+                for r in rows:
+                    v = r['Vendedor']
+                    if v not in vend_rank:
+                        vend_rank[v] = {'fat': 0.0, 'meta': 0.0, 'mc_rs': 0.0}
+                    vend_rank[v]['fat']   += r['_fat']
+                    vend_rank[v]['meta']  += r['_meta']
+                    vend_rank[v]['mc_rs'] += r['_mc_rs']
 
-            vend_rank: dict = {}
-            for r in rows:
-                v = r['Vendedor']
-                if v not in vend_rank:
-                    vend_rank[v] = {'fat': 0.0, 'meta': 0.0, 'mc_rs': 0.0}
-                vend_rank[v]['fat']   += r['_fat']
-                vend_rank[v]['meta']  += r['_meta']
-                vend_rank[v]['mc_rs'] += r['_mc_rs']
+                rank_rows = []
+                for v, d in vend_rank.items():
+                    pct = d['fat'] / d['meta'] if d['meta'] > 0 else 0.0
+                    em, lb, ratio = _ot_status(pct, elapsed_pct)
+                    tend = '↑ Acima' if ratio >= 1.0 else ('→ No ritmo' if ratio >= 0.85 else '↓ Abaixo')
+                    rank_rows.append({'v': v, 'fat': d['fat'], 'meta': d['meta'],
+                                      'mc_rs': d['mc_rs'], 'pct': pct,
+                                      'em': em, 'lb': lb, 'ratio': ratio, 'tend': tend})
+                rank_rows.sort(key=lambda x: x['pct'], reverse=True)
 
-            rank_rows = []
-            for v, d in vend_rank.items():
-                pct = d['fat'] / d['meta'] if d['meta'] > 0 else 0.0
-                em, lb, ratio = _ot_status(pct, elapsed_pct)
-                tend = '↑ Acima' if ratio >= 1.0 else ('→ No ritmo' if ratio >= 0.85 else '↓ Abaixo')
-                tend_cor = '#2D6A4F' if ratio >= 1.0 else ('#B8860B' if ratio >= 0.85 else '#C00000')
-                rank_rows.append({'v': v, 'fat': d['fat'], 'meta': d['meta'],
-                                  'mc_rs': d['mc_rs'], 'pct': pct,
-                                  'em': em, 'lb': lb, 'ratio': ratio,
-                                  'tend': tend, 'tend_cor': tend_cor})
-            rank_rows.sort(key=lambda x: x['pct'], reverse=True)
+                medals = ['🥇', '🥈', '🥉']
+                df_rank_rows = []
+                for i, rv in enumerate(rank_rows):
+                    df_rank_rows.append({
+                        'Colocação':   medals[i] if i < 3 else f'#{i+1}',
+                        'Vendedor':    rv['v'],
+                        'Faturamento': rv['fat'],
+                        'Meta':        rv['meta'],
+                        '% Atingido':  rv['pct'] * 100,
+                        'Status':      f"{rv['em']} {rv['lb']}",
+                        'Tendência':   rv['tend'],
+                    })
+                df_rank = pd.DataFrame(df_rank_rows)
+                st.dataframe(
+                    df_rank.style.format({
+                        'Faturamento': _brl,
+                        'Meta':        _brl,
+                        '% Atingido':  _fmt_pct1,
+                    }),
+                    use_container_width=True, hide_index=True,
+                )
 
-            cards = '<div style="display:grid; grid-template-columns:repeat(auto-fill,minmax(270px,1fr)); gap:12px; margin-bottom:16px;">'
-            medals = ['🥇', '🥈', '🥉']
-            for i, rv in enumerate(rank_rows):
-                medal  = medals[i] if i < 3 else f'#{i+1}'
-                cor    = _COR.get(rv['em'], '#888')
-                prog   = min(rv['pct'], 1.0) * 100
-                exp_p  = elapsed_pct * 100
-                cards += f"""
-                <div style="background:white; border:1px solid #e0e0e0; border-radius:10px; padding:14px;
-                            box-shadow:0 1px 4px rgba(0,0,0,.07);">
-                  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
-                    <span style="font-size:15px; font-weight:700;">{medal} {rv['v']}</span>
-                    <span style="background:{cor}; color:white; padding:2px 9px; border-radius:12px;
-                                 font-size:10px; font-weight:700;">{rv['em']} {rv['lb']}</span>
-                  </div>
-                  <div style="font-size:12px; color:#444; margin-bottom:6px;">
-                    Fat: <b>{_brl(rv['fat'])}</b>&nbsp;&nbsp;/&nbsp;&nbsp;Meta: {_brl(rv['meta'])}
-                  </div>
-                  <div style="background:#e0e0e0; border-radius:4px; height:12px; position:relative; margin-bottom:4px;">
-                    <div style="background:{cor}; width:{prog:.1f}%; height:12px; border-radius:4px;"></div>
-                    <div style="position:absolute; top:0; left:{exp_p:.1f}%; width:2px; height:12px; background:#333; opacity:.4;"></div>
-                  </div>
-                  <div style="display:flex; justify-content:space-between; font-size:11px; color:#666;">
-                    <span>{rv['pct']*100:.1f}% atingido</span>
-                    <span style="color:{rv['tend_cor']}; font-weight:700;">{rv['tend']}</span>
-                  </div>
-                </div>"""
-            cards += '</div>'
-            st.markdown(cards, unsafe_allow_html=True)
-            st.divider()
+        st.divider()
 
         # ── Tabela detalhada ──────────────────────────────────────────────
         st.subheader(f'Detalhamento por Cliente — {len(rows)} cliente(s)')
@@ -655,20 +639,35 @@ with tab_ontrack:
             df_rows.append({
                 'Vendedor':      r['Vendedor'],
                 'Cliente':       r['Cliente'],
-                'Meta':          _brl(r['_meta']) if r['_tem_meta'] else '—',
-                'Faturamento':   _brl(r['_fat']),
-                '% Atingido':    f"{r['_pct_atg']*100:.1f}%" if r['_tem_meta'] else '—',
-                'Restante':      _brl(r['_restante']) if r['_tem_meta'] else '—',
-                'Méd. Diária':   _brl(r['_avg']),
-                'Méd. Nec/dia':  _brl(r['_media_nec']) if r['_tem_meta'] else '—',
-                'Projeção':      _brl(r['_projecao']),
-                'Dif. Projeção': ('+' if r['_diferenca'] >= 0 else '') + _brl(r['_diferenca']) if r['_tem_meta'] else '—',
-                'MC R$':         _brl(r['_mc_rs']),
-                'MC %':          f"{r['_mc_pct']:.1f}%",
+                'Meta':          r['_meta'] if r['_tem_meta'] else float('nan'),
+                'Faturamento':   r['_fat'],
+                '% Atingido':    (r['_pct_atg'] * 100) if r['_tem_meta'] else float('nan'),
+                'Restante':      r['_restante'] if r['_tem_meta'] else float('nan'),
+                'Méd. Diária':   r['_avg'],
+                'Méd. Nec/dia':  r['_media_nec'] if r['_tem_meta'] else float('nan'),
+                'Projeção':      r['_projecao'],
+                'Dif. Projeção': r['_diferenca'] if r['_tem_meta'] else float('nan'),
+                'MC R$':         r['_mc_rs'],
+                'MC %':          r['_mc_pct'],
                 'Status':        f"{r['_em']} {r['_lb']}",
             })
 
-        st.dataframe(pd.DataFrame(df_rows), use_container_width=True, hide_index=True)
+        df_detalhe = pd.DataFrame(df_rows)
+        st.dataframe(
+            df_detalhe.style.format({
+                'Meta':          _fmt_brl_or_dash,
+                'Faturamento':   _brl,
+                '% Atingido':    _fmt_pct1_or_dash,
+                'Restante':      _fmt_brl_or_dash,
+                'Méd. Diária':   _brl,
+                'Méd. Nec/dia':  _fmt_brl_or_dash,
+                'Projeção':      _brl,
+                'Dif. Projeção': _fmt_dif_or_dash,
+                'MC R$':         _brl,
+                'MC %':          _fmt_pct1,
+            }),
+            use_container_width=True, hide_index=True,
+        )
 
         st.divider()
 
@@ -701,9 +700,10 @@ with tab_ontrack:
                 file_name=f'ontrack_cliente_{lbl_atual.replace("/","")}.csv',
                 mime='text/csv',
                 use_container_width=True,
+                type='secondary',
             )
         with c_pub:
-            if st.button('📤 Publicar On Track para Gerência', use_container_width=True):
+            if st.button('📤 Publicar On Track para Gerência', use_container_width=True, type='primary'):
                 try:
                     os.makedirs(os.path.dirname(_ONTRACK_CLI_FILE), exist_ok=True)
                     snapshot = {
@@ -766,8 +766,8 @@ with tab_ontrack:
 # TAB 3 — Top 50 Clientes
 # =============================================================================
 with tab_top50:
-    acesso.bloquear_dashboard()
     st.header('🏆 Top 50 Clientes')
+    st.caption(f'Período de referência selecionado: **{lbl_atual}**')
 
     clientes_data_50 = st.session_state.get('clientes_on_track')
     historico_data_50 = st.session_state.get('historico_vc')
@@ -822,11 +822,11 @@ with tab_top50:
                 linhas_50.append({
                     'Vendedor': vendedor, 'Cliente': cliente,
                     '_fat': fat, '_vol': vol, '_mc_rs': mc_rs, '_mc_pct': mc_pct,
-                    '_pct_atg': pct_atg or 0, 'Faturamento': _brl(fat),
-                    'Volume (cx)': _num(vol), 'Margem (MC R$)': _brl(mc_rs),
-                    'Rentabilidade': f'{mc_pct:.1f}%',
+                    '_pct_atg': pct_atg or 0, 'Faturamento': fat,
+                    'Volume (cx)': vol, 'Margem (MC R$)': mc_rs,
+                    'Rentabilidade': mc_pct,
                     'Comparativo': comparativo.formatar_variacao(comp),
-                    '% Atingido': f'{pct_atg*100:.1f}%' if pct_atg is not None else '—',
+                    '% Atingido': (pct_atg * 100) if pct_atg is not None else float('nan'),
                     'On Track': status_txt,
                 })
 
@@ -845,13 +845,31 @@ with tab_top50:
             'Ranking', 'Vendedor', 'Cliente', 'Faturamento', 'Volume (cx)',
             'Margem (MC R$)', 'Rentabilidade', 'Comparativo', '% Atingido', 'On Track',
         ]]
-        st.dataframe(df_top50, use_container_width=True, hide_index=True)
+        st.dataframe(
+            df_top50.style.format({
+                'Faturamento':     _brl,
+                'Volume (cx)':     _num,
+                'Margem (MC R$)':  _brl,
+                'Rentabilidade':   _fmt_pct1,
+                '% Atingido':      _fmt_pct1_or_dash,
+            }),
+            use_container_width=True, hide_index=True,
+        )
 
-        csv_top50 = df_top50.to_csv(index=False, sep=';').encode('utf-8-sig')
+        # CSV mantém o mesmo texto formatado exibido anteriormente na tabela
+        df_top50_csv = df_top50.copy()
+        df_top50_csv['Faturamento']    = df_top50_csv['Faturamento'].map(_brl)
+        df_top50_csv['Volume (cx)']    = df_top50_csv['Volume (cx)'].map(_num)
+        df_top50_csv['Margem (MC R$)'] = df_top50_csv['Margem (MC R$)'].map(_brl)
+        df_top50_csv['Rentabilidade']  = df_top50_csv['Rentabilidade'].map(_fmt_pct1)
+        df_top50_csv['% Atingido']     = df_top50_csv['% Atingido'].map(_fmt_pct1_or_dash)
+
+        csv_top50 = df_top50_csv.to_csv(index=False, sep=';').encode('utf-8-sig')
         st.download_button(
             '⬇️ Exportar Top 50 (CSV)', data=csv_top50,
             file_name=f'top50_clientes_{lbl_atual.replace("/","")}.csv',
             mime='text/csv',
+            type='secondary',
         )
 
 
@@ -859,8 +877,8 @@ with tab_top50:
 # TAB 4 — Clientes por Vendedor
 # =============================================================================
 with tab_por_vend:
-    acesso.bloquear_dashboard()
     st.header('👤 Clientes por Vendedor')
+    st.caption(f'Período de referência selecionado: **{lbl_atual}**')
 
     clientes_data_pv = st.session_state.get('clientes_on_track')
     historico_data_pv = st.session_state.get('historico_vc')
@@ -912,10 +930,10 @@ with tab_por_vend:
 
             linhas_pv.append({
                 '_fat': fat,
-                'Cliente': cliente, 'Faturamento': _brl(fat), 'Volume (cx)': _num(vol),
-                'Margem (MC R$)': _brl(mc_rs), 'Rentabilidade': f'{mc_pct:.1f}%',
+                'Cliente': cliente, 'Faturamento': fat, 'Volume (cx)': vol,
+                'Margem (MC R$)': mc_rs, 'Rentabilidade': mc_pct,
                 'Comparativo': comparativo.formatar_variacao(comp),
-                'Participação no vendedor': f'{participacao*100:.1f}%',
+                'Participação no vendedor': participacao * 100,
                 'On Track': status_txt,
             })
 
@@ -928,11 +946,29 @@ with tab_por_vend:
             'Cliente', 'Faturamento', 'Volume (cx)', 'Margem (MC R$)', 'Rentabilidade',
             'Comparativo', 'Participação no vendedor', 'On Track',
         ]]
-        st.dataframe(df_pv, use_container_width=True, hide_index=True)
+        st.dataframe(
+            df_pv.style.format({
+                'Faturamento':               _brl,
+                'Volume (cx)':               _num,
+                'Margem (MC R$)':            _brl,
+                'Rentabilidade':             _fmt_pct1,
+                'Participação no vendedor':  _fmt_pct1,
+            }),
+            use_container_width=True, hide_index=True,
+        )
 
-        csv_pv = df_pv.to_csv(index=False, sep=';').encode('utf-8-sig')
+        # CSV mantém o mesmo texto formatado exibido anteriormente na tabela
+        df_pv_csv = df_pv.copy()
+        df_pv_csv['Faturamento']              = df_pv_csv['Faturamento'].map(_brl)
+        df_pv_csv['Volume (cx)']              = df_pv_csv['Volume (cx)'].map(_num)
+        df_pv_csv['Margem (MC R$)']           = df_pv_csv['Margem (MC R$)'].map(_brl)
+        df_pv_csv['Rentabilidade']            = df_pv_csv['Rentabilidade'].map(_fmt_pct1)
+        df_pv_csv['Participação no vendedor'] = df_pv_csv['Participação no vendedor'].map(_fmt_pct1)
+
+        csv_pv = df_pv_csv.to_csv(index=False, sep=';').encode('utf-8-sig')
         st.download_button(
             f'⬇️ Exportar clientes de {vendedor_sel_pv} (CSV)', data=csv_pv,
             file_name=f'clientes_{vendedor_sel_pv}_{lbl_atual.replace("/","")}.csv',
             mime='text/csv',
+            type='secondary',
         )
