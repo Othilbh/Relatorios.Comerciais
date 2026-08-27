@@ -23,6 +23,7 @@ import streamlit as st
 import sys, pathlib
 sys.path.insert(0, str(pathlib.Path(__file__).parent.parent))
 
+import acesso
 import comparativo
 import data_store as ds
 import periodo as periodo_mod
@@ -196,7 +197,19 @@ with st.expander('📤 Enviar novo Resumo do Estoque (PDF)', expanded=not itens_
                     else:
                         st.success(f"Resumo do Estoque de {periodo_mod.rotulo('mensal', periodo_ref_salvo)} "
                                    f"salvo (versão {registro['versao']}).")
-                    st.rerun()
+                    # Perfil de upload (26/08/2026, pedido da Ingrid): nunca fica
+                    # numa tela de Dashboard depois de salvar -- vai direto pra
+                    # Gerência, em vez do st.rerun() normal que mantém a pessoa
+                    # aqui pra ver o resultado do upload.
+                    if acesso.is_upload():
+                        acesso.redirecionar_pos_upload()
+                    else:
+                        st.rerun()
+
+# Perfil de upload: só a seção de upload acima é permitida -- os filtros,
+# KPIs e as 12 abas de relatório/Dashboard abaixo ficam bloqueados aqui,
+# mesmo que o usuário ainda não tenha enviado nada neste momento.
+acesso.parar_se_upload()
 
 if not itens_base:
     st.info('Ainda não há nenhum Resumo do Estoque salvo. Envie o PDF acima para montar os '
