@@ -21,7 +21,12 @@ quando, e nada se perde (histórico completo disponível abaixo).
 import pandas as pd
 import streamlit as st
 
+import acesso
 import margem_produto as mp
+
+# Página de cadastro/administração, sem upload de PDF -- bloqueada por
+# inteiro pro perfil de upload (26/08/2026, pedido explícito da Ingrid).
+acesso.bloquear_dashboard()
 
 st.title('🏷️ Cadastro de Marcas')
 st.caption(
