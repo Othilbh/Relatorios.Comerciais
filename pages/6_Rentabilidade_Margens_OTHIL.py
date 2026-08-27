@@ -19,10 +19,18 @@ import streamlit as st
 import sys, pathlib
 sys.path.insert(0, str(pathlib.Path(__file__).parent.parent))
 
+import acesso
 import comparativo
 import data_store as ds
 import periodo as periodo_mod
 import rentabilidade as rt
+
+# Página 100% Dashboard, sem upload nenhum -- bloqueada por inteiro pro
+# perfil de upload (26/08/2026, pedido explícito da Ingrid). Fica logo no
+# topo, antes de qualquer outra coisa rodar, pra bloquear também o acesso
+# direto por URL (defesa em profundidade, além dela já não aparecer no
+# menu lateral pra esse perfil -- ver app.py).
+acesso.bloquear_dashboard()
 
 MODULO = 'rentabilidade'
 
