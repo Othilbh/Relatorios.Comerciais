@@ -21,12 +21,7 @@ quando, e nada se perde (histórico completo disponível abaixo).
 import pandas as pd
 import streamlit as st
 
-import acesso
 import margem_produto as mp
-
-# Página de cadastro/administração, sem upload de PDF -- bloqueada por
-# inteiro pro perfil de upload (26/08/2026, pedido explícito da Ingrid).
-acesso.bloquear_dashboard()
 
 st.title('🏷️ Cadastro de Marcas')
 st.caption(
@@ -213,7 +208,7 @@ df_editado = st.data_editor(
 
 st.session_state['marcas_df'] = df_editado
 
-col_save, col_count = st.columns([1, 3])
+col_save, col_count = st.columns([2, 2])
 with col_count:
     st.caption(f'{len(df_editado)} marca(s) na tabela.')
 with col_save:
@@ -252,7 +247,7 @@ st.divider()
 # ---------------------------------------------------------------------------
 historico = mp.historico_marcas()
 if historico:
-    with st.expander(f'🕓 Histórico de versões ({len(historico)} anterior(es))'):
+    with st.expander(f'3. 🕓 Histórico de versões ({len(historico)} anterior(es))'):
         for v in historico:
             v_quando = (v.get('atualizado_em') or '')[:16].replace('T', ' ')
             v_qtd = len(v.get('valores', {}).get('marcas', {}))
