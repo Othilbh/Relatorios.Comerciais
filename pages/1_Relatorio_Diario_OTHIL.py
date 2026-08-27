@@ -17,6 +17,7 @@ sys.path.insert(0, str(pathlib.Path(__file__).parent.parent))
 from parsers_diario import parse_relatorio_diario, ValidationError
 from xlsx_diario import gerar_xlsx
 from dashboard_diario import gerar_dashboard
+import acesso
 import comparativo
 import data_store as ds
 import periodo as periodo_mod
@@ -661,6 +662,9 @@ def _render_tab(tipo, label_tipo):
             st.session_state[f'html_{key}']   = html_text
             st.session_state[f'slug_{key}']   = slug
             st.success(f'Dashboard salvo — {_label_slug(slug, tipo)}')
+            # Perfil de upload (26/08/2026, pedido da Ingrid): fluxo
+            # Login -> Upload -> Gerência, nunca fica numa tela de Dashboard.
+            acesso.redirecionar_pos_upload()
 
         if f'html_{key}' in st.session_state:
             slug = st.session_state[f'slug_{key}']
@@ -673,6 +677,13 @@ def _render_tab(tipo, label_tipo):
             )
             with st.expander('Pré-visualizar dashboard'):
                 components.html(st.session_state[f'html_{key}'], height=1400, scrolling=True)
+
+    # Perfil de upload (26/08/2026, pedido da Ingrid): nunca vê o
+    # download/preview do dashboard nem o histórico abaixo -- SEMPRE
+    # bloqueado aqui, independente de já ter lido um PDF ou não nesta
+    # sessão (por isso fica fora do "if resultado_{key}..." acima, e não
+    # só dentro dele).
+    acesso.parar_se_upload()
 
     # ── Histórico ────────────────────────────────────────────────────────────
     st.divider()
@@ -804,6 +815,9 @@ with tab_d:
                 )
                 st.session_state['html_text'] = html_text
                 st.session_state['html_nome'] = f'dashboard_gerencial_othil_{data_fmt_html}.html'
+                # Perfil de upload (26/08/2026, pedido da Ingrid): fluxo
+                # Login -> Upload -> Gerência, nunca fica numa tela de Dashboard.
+                acesso.redirecionar_pos_upload()
             if 'html_text' in st.session_state:
                 st.download_button(
                     '⬇️ Baixar ' + st.session_state['html_nome'],
@@ -818,6 +832,11 @@ with tab_d:
 
     else:
         st.info('Envie o PDF do dia para começar.')
+
+    # Perfil de upload (26/08/2026, pedido da Ingrid): nunca vê o preview do
+    # dashboard nem o histórico abaixo -- SEMPRE bloqueado aqui, independente
+    # de já ter lido um PDF ou não nesta sessão.
+    acesso.parar_se_upload()
 
     # Histórico diário -- sempre visível (não depende de ter subido um PDF
     # nesta sessão), com a mesma navegação por data usada em Semanal/Mensal.
