@@ -49,6 +49,50 @@ _MESES_QBR     = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','N
 _SENHA_FALLBACK = 'othil2024'
 
 
+# ── Cores por status de On Track — FONTE ÚNICA ────────────────────────────────
+# Antes existiam DUAS tabelas independentes de cor para os MESMOS 4 estados de
+# on_track.py (_GER_STATUS_COR, hex sólido usado nas pílulas/legendas, e
+# _GER_STATUS_LABEL_COR, pares pastel bg/fg usados nos cartões de Metas
+# Gerais) -- duas tabelas para o mesmo enum significavam manter cor em dois
+# lugares e deixá-las divergir. Agora há um único mapa por status, com tudo
+# que a tela precisa:
+#   cor         -> hex sólido (texto/legenda/barra de progresso)
+#   bg / fg     -> par pastel (fundo/texto) para qualquer bloco colorido
+#   delta_color -> valor aceito por st.metric(delta_color=...)
+#   md          -> nome de cor do markdown do Streamlit (:green[...] etc.),
+#                  usado nas legendas de status abaixo dos st.metric
+_GER_STATUS_CORES = {
+    on_track.STATUS_VERDE: {
+        'cor': '#2D6A4F', 'bg': '#D8EFE3', 'fg': '#1B4332',
+        'delta_color': 'normal', 'md': 'green',
+    },
+    on_track.STATUS_ATENCAO: {
+        'cor': '#B8860B', 'bg': '#FEF9C3', 'fg': '#7D6608',
+        'delta_color': 'off', 'md': 'orange',
+    },
+    on_track.STATUS_FORA: {
+        'cor': '#C00000', 'bg': '#FADADD', 'fg': '#7A1F2B',
+        'delta_color': 'inverse', 'md': 'red',
+    },
+    on_track.STATUS_SEM_META: {
+        'cor': '#6c757d', 'bg': '#EDEDED', 'fg': '#555555',
+        'delta_color': 'off', 'md': 'gray',
+    },
+}
+
+# Alias mantido para os pontos que só precisam do hex sólido — deriva do mapa
+# único acima, nunca mais uma segunda tabela mantida à mão.
+_GER_STATUS_COR = {_s: _v['cor'] for _s, _v in _GER_STATUS_CORES.items()}
+
+
+def _ger_legenda_status(ot):
+    """Legenda curta e colorida de status (🟢 On Track / 🟡 Atenção / ...),
+    exibida logo abaixo de um st.metric. Usa a cor de markdown nativa do
+    Streamlit vinda do mapa único _GER_STATUS_CORES."""
+    md = _GER_STATUS_CORES[ot['status']]['md']
+    st.caption(f":{md}[{ot['emoji']} {ot['label']}]")
+
+
 def _get_senha() -> str:
     try:
         return st.secrets['gerencia_senha']
@@ -205,10 +249,22 @@ def _rotulo_periodo(tipo, ref):
     return periodo_mod.rotulo(tipo, ref)
 
 
-def _render_secao_dash(tipo, titulo_secao, emoji):
-    st.header(f'{emoji} {titulo_secao}')
+def _nav_periodo_row(tipo, state_key, sufixo_key, itens_salvos):
+    """Linha ÚNICA de navegação de período: ◀ | seletor | ▶.
 
-    state_key = f'_ger_periodo_sel_{tipo}'
+    Padrão visual/interação único do app (mesmo bloco já adotado em
+    pages/1_Relatorio_Diario_OTHIL.py e pages/4_Quebra_OTHIL.py), no lugar
+    da antiga linha de setas + um expander SEPARADO de "🔎 Períodos salvos"
+    logo abaixo. A MECÂNICA de navegação continua exatamente a mesma: as
+    setas andam por DATA (periodo.py), então seguem funcionando para
+    QUALQUER período, com ou sem dado salvo; o seletor lista os períodos
+    salvos e sempre exibe também o período navegado no momento, marcado
+    "(sem dado)" quando não houver registro.
+
+    Devolve (ref_sel, ini, fim, tem_dado) -- os mesmos valores que os dois
+    chamadores (_render_secao_dash e _render_secao_margem_real, antes
+    duplicados linha a linha) calculavam por conta própria.
+    """
     if state_key not in st.session_state:
         st.session_state[state_key] = _periodo_atual_ref(tipo)
 
@@ -218,49 +274,64 @@ def _render_secao_dash(tipo, titulo_secao, emoji):
     def _ir_posterior():
         st.session_state[state_key] = _periodo_posterior(tipo, st.session_state[state_key])
 
-    col_prev, col_atual, col_next = st.columns([1, 5, 1])
-    with col_prev:
-        st.button('◀', key=f'ger_prev_{tipo}', help='Período anterior', on_click=_ir_anterior,
-                   use_container_width=True)
-    with col_next:
-        st.button('▶', key=f'ger_next_{tipo}', help='Próximo período', on_click=_ir_posterior,
-                   use_container_width=True)
+    labels_salvos = {}
+    for _s, _m in itens_salvos:
+        if tipo == 'diario':
+            labels_salvos[_s] = f"{_m.get('emissao', _s)}  —  {_m.get('periodo','-')}"
+        else:
+            labels_salvos[_s] = _label_slug(_s, tipo) + f"  ({_m.get('periodo','-')})"
 
     ref_sel = st.session_state[state_key]
+    opcoes = sorted(set(labels_salvos) | {ref_sel}, reverse=True)
+
+    def _fmt_opcao(r):
+        if r in labels_salvos:
+            return labels_salvos[r]
+        try:
+            return _rotulo_periodo(tipo, r) + ' (sem dado)'
+        except Exception:
+            return f'{r} (sem dado)'
+
+    col_prev, col_sel, col_next = st.columns([1, 6, 1], vertical_alignment='bottom')
+    with col_prev:
+        st.button('◀', key=f'ger_prev{sufixo_key}_{tipo}', help='Período anterior',
+                   on_click=_ir_anterior, use_container_width=True)
+    with col_next:
+        st.button('▶', key=f'ger_next{sufixo_key}_{tipo}', help='Próximo período',
+                   on_click=_ir_posterior, use_container_width=True)
+    with col_sel:
+        # Chave escopada por ref_sel (mesma técnica de
+        # pages/1_Relatorio_Diario_OTHIL.py): garante que o `index=` volte a
+        # ser aplicado sempre que o período mudar por clique nas setas, em
+        # vez de ficar preso ao valor anterior guardado pelo próprio widget.
+        escolha = st.selectbox(
+            f'Período ({len(labels_salvos)} salvo(s))', opcoes,
+            format_func=_fmt_opcao,
+            index=opcoes.index(ref_sel),
+            key=f'ger_quick_sel{sufixo_key}_{tipo}_{ref_sel}',
+        )
+    if escolha != ref_sel:
+        st.session_state[state_key] = escolha
+        st.rerun()
+
     ini, fim = _intervalo_periodo(tipo, ref_sel)
     tem_dado = ds.has_data(MOD_RELATORIO_DIARIO, tipo, ref_sel)
 
-    with col_atual:
-        if tipo == 'diario':
-            st.markdown(f'**{_rotulo_periodo(tipo, ref_sel)}**')
-        else:
-            st.markdown(f'**{ini.strftime("%d/%m/%Y")} – {fim.strftime("%d/%m/%Y")}**  ·  '
-                        f'{_rotulo_periodo(tipo, ref_sel)}')
-        st.caption('🟢 Período salvo ✓' if tem_dado else '⚪ Nenhum dado cadastrado para este período.')
+    if tipo == 'diario':
+        st.markdown(f'**{_rotulo_periodo(tipo, ref_sel)}**')
+    else:
+        st.markdown(f'**{ini.strftime("%d/%m/%Y")} – {fim.strftime("%d/%m/%Y")}**  ·  '
+                    f'{_rotulo_periodo(tipo, ref_sel)}')
+    st.caption('🟢 Período salvo ✓' if tem_dado else '⚪ Nenhum dado cadastrado para este período.')
 
-    dashboards = _listar_dashboards(tipo)
-    if dashboards:
-        with st.expander(f'🔎 Períodos salvos ({len(dashboards)}) — seleção rápida'):
-            st.caption('Atalho para pular direto a um período que já tem dado. A navegação ◀ ▶ acima '
-                       'continua funcionando para QUALQUER período, com ou sem dado.')
-            slugs_ord = [s for s, _ in dashboards]
-            labels_map = {}
-            for s, m in dashboards:
-                if tipo == 'diario':
-                    labels_map[s] = f"{m.get('emissao', s)}  —  {m.get('periodo','-')}"
-                else:
-                    labels_map[s] = _label_slug(s, tipo) + f"  ({m.get('periodo','-')})"
-            escolha_rapida = st.selectbox(
-                'Ir direto para', slugs_ord, format_func=lambda s: labels_map.get(s, s),
-                key=f'ger_quick_sel_{tipo}', index=None, placeholder='Selecione um período salvo...')
-            if escolha_rapida:
-                st.session_state[state_key] = escolha_rapida
-                # Ver comentário equivalente em pages/1_Relatorio_Diario_OTHIL.py:
-                # sem apagar a key do widget aqui, o próximo rerun recria o
-                # selectbox já com esta opção selecionada (index=None só vale
-                # na primeira criação), disparando um st.rerun() infinito.
-                del st.session_state[f'ger_quick_sel_{tipo}']
-                st.rerun()
+    return ref_sel, ini, fim, tem_dado
+
+
+def _render_secao_dash(tipo, titulo_secao, emoji):
+    st.header(f'{emoji} {titulo_secao}')
+
+    ref_sel, ini, fim, tem_dado = _nav_periodo_row(
+        tipo, f'_ger_periodo_sel_{tipo}', '', _listar_dashboards(tipo))
 
     st.divider()
 
@@ -328,55 +399,12 @@ def _listar_periodos_margem_real(tipo):
 def _render_secao_margem_real(tipo, titulo_secao, emoji):
     st.header(f'{emoji} {titulo_secao}')
 
-    state_key = f'_ger_periodo_sel_mr_{tipo}'
-    if state_key not in st.session_state:
-        st.session_state[state_key] = _periodo_atual_ref(tipo)
-
-    def _ir_anterior():
-        st.session_state[state_key] = _periodo_anterior(tipo, st.session_state[state_key])
-
-    def _ir_posterior():
-        st.session_state[state_key] = _periodo_posterior(tipo, st.session_state[state_key])
-
-    col_prev, col_atual, col_next = st.columns([1, 5, 1])
-    with col_prev:
-        st.button('◀', key=f'ger_prev_mr_{tipo}', help='Período anterior', on_click=_ir_anterior,
-                   use_container_width=True)
-    with col_next:
-        st.button('▶', key=f'ger_next_mr_{tipo}', help='Próximo período', on_click=_ir_posterior,
-                   use_container_width=True)
-
-    ref_sel = st.session_state[state_key]
-    ini, fim = _intervalo_periodo(tipo, ref_sel)
-    tem_dado = ds.has_data(MOD_RELATORIO_DIARIO, tipo, ref_sel)
-
-    with col_atual:
-        if tipo == 'diario':
-            st.markdown(f'**{_rotulo_periodo(tipo, ref_sel)}**')
-        else:
-            st.markdown(f'**{ini.strftime("%d/%m/%Y")} – {fim.strftime("%d/%m/%Y")}**  ·  '
-                        f'{_rotulo_periodo(tipo, ref_sel)}')
-        st.caption('🟢 Período salvo ✓' if tem_dado else '⚪ Nenhum dado cadastrado para este período.')
-
-    periodos_disponiveis = _listar_periodos_margem_real(tipo)
-    if periodos_disponiveis:
-        with st.expander(f'🔎 Períodos salvos ({len(periodos_disponiveis)}) — seleção rápida'):
-            st.caption('Atalho pra pular direto a um período que já tem dado. A navegação ◀ ▶ acima '
-                       'continua funcionando pra QUALQUER período, com ou sem dado.')
-            slugs_ord = [s for s, _ in periodos_disponiveis]
-            labels_map = {}
-            for s, v in periodos_disponiveis:
-                if tipo == 'diario':
-                    labels_map[s] = f"{v.get('emissao', s)}  —  {v.get('periodo','-')}"
-                else:
-                    labels_map[s] = _label_slug(s, tipo) + f"  ({v.get('periodo','-')})"
-            escolha_rapida = st.selectbox(
-                'Ir direto para', slugs_ord, format_func=lambda s: labels_map.get(s, s),
-                key=f'ger_quick_sel_mr_{tipo}', index=None, placeholder='Selecione um período salvo...')
-            if escolha_rapida:
-                st.session_state[state_key] = escolha_rapida
-                del st.session_state[f'ger_quick_sel_mr_{tipo}']
-                st.rerun()
+    # Mesma linha ◀ | seletor | ▶ do Dashboard Gerencial -- as duas seções
+    # eram cópias quase idênticas uma da outra; agora compartilham
+    # _nav_periodo_row (a única diferença real, a lista de períodos com dado,
+    # continua vindo da fonte específica de cada uma).
+    ref_sel, ini, fim, tem_dado = _nav_periodo_row(
+        tipo, f'_ger_periodo_sel_mr_{tipo}', '_mr', _listar_periodos_margem_real(tipo))
 
     st.divider()
 
@@ -607,14 +635,18 @@ def _render_quebra_secao(tipo: str, titulo: str, emoji: str):
     if idx_key not in st.session_state:
         st.session_state[idx_key] = 0
 
-    col_prev, col_sel, col_next = st.columns([1, 6, 1])
+    # Mesma linha única ◀ | seletor | ▶ das demais seções (alinhamento pela
+    # base em vez dos antigos st.write('') vazios usados como espaçador).
+    # A mecânica aqui continua sendo por ÍNDICE na lista de salvos, como
+    # sempre foi -- só o layout foi padronizado.
+    col_prev, col_sel, col_next = st.columns([1, 6, 1], vertical_alignment='bottom')
     with col_prev:
-        st.write('')
-        if st.button('◀', key=f'ger_qbr_prev_{tipo}'):
+        if st.button('◀', key=f'ger_qbr_prev_{tipo}', help='Período anterior',
+                      use_container_width=True):
             st.session_state[idx_key] = min(st.session_state[idx_key] + 1, len(slugs) - 1)
     with col_next:
-        st.write('')
-        if st.button('▶', key=f'ger_qbr_next_{tipo}'):
+        if st.button('▶', key=f'ger_qbr_next_{tipo}', help='Próximo período',
+                      use_container_width=True):
             st.session_state[idx_key] = max(st.session_state[idx_key] - 1, 0)
     with col_sel:
         escolha = st.selectbox(
@@ -695,14 +727,6 @@ def _listar_recorrencias_ger():
 _FECHAMENTOS_DIR = os.path.join(_GERENCIA_DIR, 'fechamentos')
 
 
-_GER_STATUS_COR = {
-    on_track.STATUS_VERDE:    '#2D6A4F',
-    on_track.STATUS_ATENCAO:  '#B8860B',
-    on_track.STATUS_FORA:     '#C00000',
-    on_track.STATUS_SEM_META: '#6c757d',
-}
-
-
 def _on_track_status_ger(atingido: float, dia: int, total_dias: int = 7):
     """(emoji, label, hex_color) — via lógica central de On Track
     (on_track.py), tempo decorrido em dias de venda da semana comercial
@@ -777,13 +801,33 @@ def _render_ontrack_publicado():
             snap = json.load(f)
     else:
         labels_ot = [_label_fech(s) + f"  —  {d.get('periodo', '-')}" for s, d in historico_ot]
-        escolha_ot = st.selectbox(
-            f'{len(historico_ot)} semana(s) disponível(is):',
-            labels_ot,
-            index=0,
-            key='ger_ot_meta_sel',
-        )
+        # Linha única ◀ | seletor | ▶, mesmo padrão das demais seções (antes
+        # era só a lista suspensa, sem setas). A lista em si e a leitura do
+        # snapshot continuam iguais -- o índice apenas passou a ficar no
+        # session_state pra as setas poderem andar nele.
+        idx_key_ot = '_ger_ot_meta_idx'
+        if idx_key_ot not in st.session_state:
+            st.session_state[idx_key_ot] = 0
+
+        col_prev_ot, col_sel_ot, col_next_ot = st.columns([1, 6, 1], vertical_alignment='bottom')
+        with col_prev_ot:
+            if st.button('◀', key='ger_ot_meta_prev', help='Semana anterior',
+                          use_container_width=True):
+                st.session_state[idx_key_ot] = min(st.session_state[idx_key_ot] + 1,
+                                                    len(labels_ot) - 1)
+        with col_next_ot:
+            if st.button('▶', key='ger_ot_meta_next', help='Próxima semana',
+                          use_container_width=True):
+                st.session_state[idx_key_ot] = max(st.session_state[idx_key_ot] - 1, 0)
+        with col_sel_ot:
+            escolha_ot = st.selectbox(
+                f'{len(historico_ot)} semana(s) disponível(is):',
+                labels_ot,
+                index=min(st.session_state[idx_key_ot], len(labels_ot) - 1),
+                key='ger_ot_meta_sel',
+            )
         idx_ot = labels_ot.index(escolha_ot)
+        st.session_state[idx_key_ot] = idx_ot
         snap = historico_ot[idx_ot][1]
 
     pub_em     = snap.get('publicado_em', '')[:16].replace('T', ' ')
@@ -982,14 +1026,13 @@ def _render_fechamentos_semanais():
     if idx_key not in st.session_state:
         st.session_state[idx_key] = 0
 
-    col_prev, col_sel, col_next = st.columns([1, 6, 1])
+    # Linha única ◀ | seletor | ▶ padronizada com as demais seções.
+    col_prev, col_sel, col_next = st.columns([1, 6, 1], vertical_alignment='bottom')
     with col_prev:
-        st.write('')
-        if st.button('◀', key='ger_fech_prev', help='Semana anterior'):
+        if st.button('◀', key='ger_fech_prev', help='Semana anterior', use_container_width=True):
             st.session_state[idx_key] = min(st.session_state[idx_key] + 1, len(slugs) - 1)
     with col_next:
-        st.write('')
-        if st.button('▶', key='ger_fech_next', help='Próxima semana'):
+        if st.button('▶', key='ger_fech_next', help='Próxima semana', use_container_width=True):
             st.session_state[idx_key] = max(st.session_state[idx_key] - 1, 0)
     with col_sel:
         escolha = st.selectbox(
@@ -1086,13 +1129,32 @@ def _render_ontrack_clientes():
             snap = json.load(f)
     else:
         labels_cli = [_label_slug(s, 'mensal') + f"  —  {d.get('periodo', '-')}" for s, d in historico_cli]
-        escolha_cli = st.selectbox(
-            f'{len(historico_cli)} mês(es) disponível(is):',
-            labels_cli,
-            index=0,
-            key='ger_ot_cli_sel',
-        )
+        # Linha única ◀ | seletor | ▶, mesmo padrão das demais seções (antes
+        # era só a lista suspensa, sem setas). A lista e a leitura do
+        # snapshot continuam iguais.
+        idx_key_cli = '_ger_ot_cli_idx'
+        if idx_key_cli not in st.session_state:
+            st.session_state[idx_key_cli] = 0
+
+        col_prev_cli, col_sel_cli, col_next_cli = st.columns([1, 6, 1], vertical_alignment='bottom')
+        with col_prev_cli:
+            if st.button('◀', key='ger_ot_cli_prev', help='Mês anterior',
+                          use_container_width=True):
+                st.session_state[idx_key_cli] = min(st.session_state[idx_key_cli] + 1,
+                                                     len(labels_cli) - 1)
+        with col_next_cli:
+            if st.button('▶', key='ger_ot_cli_next', help='Próximo mês',
+                          use_container_width=True):
+                st.session_state[idx_key_cli] = max(st.session_state[idx_key_cli] - 1, 0)
+        with col_sel_cli:
+            escolha_cli = st.selectbox(
+                f'{len(historico_cli)} mês(es) disponível(is):',
+                labels_cli,
+                index=min(st.session_state[idx_key_cli], len(labels_cli) - 1),
+                key='ger_ot_cli_sel',
+            )
         idx_cli = labels_cli.index(escolha_cli)
+        st.session_state[idx_key_cli] = idx_cli
         snap = historico_cli[idx_cli][1]
 
     pub_em         = snap.get('publicado_em', '')[:16].replace('T', ' ')
@@ -1131,37 +1193,19 @@ def _render_ontrack_clientes():
 
     g_em, g_lb, _ = _ot_status_cli(tot_pct, elapsed_pct)
     cor_s  = _COR.get(g_em, '#888')
-    cor_d  = '#2D6A4F' if tot_dif >= 0 else '#C00000'
 
-    # Cards de resumo
-    st.markdown(f"""
-    <div style="display:grid; grid-template-columns:repeat(6,1fr); gap:10px; margin-bottom:14px;">
-      <div style="background:#f8f9fa; border-left:4px solid #2D6A4F; border-radius:8px; padding:12px 10px;">
-        <div style="font-size:10px; color:#666; font-weight:700;">META MENSAL</div>
-        <div style="font-size:15px; font-weight:700; color:#1B4332; margin-top:4px;">{_brl(tot_meta)}</div>
-      </div>
-      <div style="background:#f8f9fa; border-left:4px solid #4472C4; border-radius:8px; padding:12px 10px;">
-        <div style="font-size:10px; color:#666; font-weight:700;">FATURAMENTO</div>
-        <div style="font-size:15px; font-weight:700; color:#1F4E79; margin-top:4px;">{_brl(tot_fat)}</div>
-      </div>
-      <div style="background:#f8f9fa; border-left:4px solid {cor_s}; border-radius:8px; padding:12px 10px;">
-        <div style="font-size:10px; color:#666; font-weight:700;">% ATINGIDO</div>
-        <div style="font-size:15px; font-weight:700; color:{cor_s}; margin-top:4px;">{tot_pct*100:.1f}% {g_em}</div>
-      </div>
-      <div style="background:#f8f9fa; border-left:4px solid #C00000; border-radius:8px; padding:12px 10px;">
-        <div style="font-size:10px; color:#666; font-weight:700;">VALOR RESTANTE</div>
-        <div style="font-size:15px; font-weight:700; color:#C00000; margin-top:4px;">{_brl(tot_rest)}</div>
-      </div>
-      <div style="background:#f8f9fa; border-left:4px solid #375623; border-radius:8px; padding:12px 10px;">
-        <div style="font-size:10px; color:#666; font-weight:700;">PROJEÇÃO MÊS</div>
-        <div style="font-size:15px; font-weight:700; color:#375623; margin-top:4px;">{_brl(tot_proj)}</div>
-      </div>
-      <div style="background:#f8f9fa; border-left:4px solid {cor_d}; border-radius:8px; padding:12px 10px;">
-        <div style="font-size:10px; color:#666; font-weight:700;">DIFERENÇA PROJ.</div>
-        <div style="font-size:15px; font-weight:700; color:{cor_d}; margin-top:4px;">{'▲' if tot_dif >= 0 else '▼'} {_brl(abs(tot_dif))}</div>
-      </div>
-    </div>
-    """, unsafe_allow_html=True)
+    # Cards de resumo em st.metric NATIVO (antes: grid de 6 divs cinza com
+    # borda esquerda colorida montadas à mão). Mesmos 6 indicadores, mesma
+    # ordem e mesmos valores -- o emoji de status segue no "% Atingido" e a
+    # seta ▲/▼ segue na "Diferença Proj.".
+    cm1, cm2, cm3, cm4, cm5, cm6 = st.columns(6)
+    cm1.metric('Meta Mensal',     _brl(tot_meta))
+    cm2.metric('Faturamento',     _brl(tot_fat))
+    cm3.metric('% Atingido',      f'{tot_pct*100:.1f}% {g_em}')
+    cm3.caption(f'{g_em} {g_lb}')
+    cm4.metric('Valor Restante',  _brl(tot_rest))
+    cm5.metric('Projeção Mês',    _brl(tot_proj))
+    cm6.metric('Diferença Proj.', f"{'▲' if tot_dif >= 0 else '▼'} {_brl(abs(tot_dif))}")
 
     # Barra de progresso
     prog_w = min(tot_pct, 1.0) * 100
@@ -1819,46 +1863,26 @@ def _render_prevperdas_secao(tipo, titulo):
 
 # ── Metas Gerais ────────────────────────────────────────────────────────────
 
-_GER_STATUS_LABEL_COR = {
-    on_track.STATUS_VERDE:    ('#D8EFE3', '#1B4332'),
-    on_track.STATUS_ATENCAO:  ('#FEF9C3', '#7D6608'),
-    on_track.STATUS_FORA:     ('#FADADD', '#7A1F2B'),
-    on_track.STATUS_SEM_META: ('#EDEDED', '#555555'),
-}
-
-
 def _render_indicador_mg(titulo, unidade_fmt, meta, realizado, ot, completude_msg=None):
-    # Cartão compactado (26/08/2026, pedido explícito da Ingrid: "reduzir o
-    # tamanho/altura do cabeçalho... dando mais espaço para os dados
-    # realmente relevantes") -- mesmo conteúdo de antes, só com
-    # padding/fonte/espaçamento menores.
-    bg, fg = _GER_STATUS_LABEL_COR[ot['status']]
-    html = f"""
-    <div style="background:{bg}; color:{fg}; border-radius:8px; padding:0.5rem 0.7rem; margin-bottom:0.35rem;">
-        <div style="font-weight:600; font-size:0.8rem;">{ot['emoji']} {titulo}</div>
-        <div style="font-size:1.15rem; font-weight:700; margin-top:0.1rem;">
-            {unidade_fmt(realizado) if realizado is not None else '—'}
-        </div>
-        <div style="font-size:0.72rem; opacity:0.85;">
-            Meta: {unidade_fmt(meta) if meta else '—'}
-            {'  |  ' + ot['label'] if meta else ''}
-            {f"  |  {ot['pct_atingido']*100:.0f}% da meta" if ot.get('pct_atingido') is not None else ''}
-        </div>
-        {f'<div style="font-size:0.68rem; opacity:0.75; margin-top:0.1rem;">Projeção de fechamento: {unidade_fmt(ot["projecao_fechamento"])}</div>' if ot.get('projecao_fechamento') is not None else ''}
-    </div>
-    """
-    # Remove linhas em branco (só espaço) do HTML montado. Quando um dos
-    # trechos condicionais acima fica vazio (ex.: sem meta definida ainda,
-    # como acontecia com Volume e Quebra em "Sem meta" -- rótulo, % da meta
-    # e projeção todos vazios), sobra uma linha só com espaços no meio do
-    # bloco. O parser de Markdown do Streamlit encerra o "HTML block" na
-    # primeira linha em branco -- então o resto (inclusive o "</div>" final)
-    # deixa de ser reconhecido como HTML e vira um bloco de código cru (por
-    # estar indentado), aparecendo literalmente na tela em vez do card
-    # estilizado. Sem nenhuma linha em branco no meio, o bloco inteiro é
-    # reconhecido como HTML de ponta a ponta.
-    html = '\n'.join(line for line in html.split('\n') if line.strip())
-    st.markdown(html, unsafe_allow_html=True)
+    # Indicador em st.metric NATIVO (antes: cartão HTML/CSS de fundo pastel
+    # montado à mão). Mesmo conteúdo de sempre -- realizado em destaque,
+    # meta/% atingido/projeção/completude como detalhe --, agora no visual
+    # padrão do Streamlit, igual a todos os outros indicadores do app. O
+    # sinal de status, que antes era a cor de fundo do cartão, continua
+    # presente em três lugares: emoji no rótulo, cor do delta (mapeada do
+    # status em _GER_STATUS_CORES) e legenda colorida logo abaixo.
+    st.metric(
+        label=f"{ot['emoji']} {titulo}",
+        value=unidade_fmt(realizado) if realizado is not None else '—',
+        delta=(f"{ot['pct_atingido'] * 100:.0f}% da meta"
+               if ot.get('pct_atingido') is not None else None),
+        delta_color=_GER_STATUS_CORES[ot['status']]['delta_color'],
+    )
+    st.caption(f"Meta: {unidade_fmt(meta) if meta else '—'}")
+    if meta:
+        _ger_legenda_status(ot)
+    if ot.get('projecao_fechamento') is not None:
+        st.caption(f'Projeção de fechamento: {unidade_fmt(ot["projecao_fechamento"])}')
     if completude_msg:
         st.caption(completude_msg)
 
@@ -1878,24 +1902,29 @@ def _render_indicador_quebra(meta_cx, realizado_cx, meta_rs, realizado_rs, fatur
         ot = mg.status_quebra(meta_rs, realizado_rs, tipo_periodo, periodo_ref)
     else:
         ot = mg.status_quebra(meta_cx, realizado_cx, tipo_periodo, periodo_ref)
-    bg, fg = _GER_STATUS_LABEL_COR[ot['status']]
 
+    # Mesmas informações de sempre, só reorganizadas para st.metric nativo +
+    # legendas (ver comentário em _render_indicador_mg acima): o que era a
+    # "linha principal" do cartão vira o value do metric, o "% do teto" vira
+    # o delta, e teto/cx/projeção/aviso viram st.caption.
     if usa_rs:
         titulo = 'Quebra'
         linha_principal = f'R$ {_num_vc(realizado_rs, 2)}'
         pct_fat = mg.quebra_pct_faturamento(meta_rs, faturamento_meta)
-        linha_secundaria = (
+        delta_txt = (f'{ot["pct_atingido"] * 100:.0f}% do teto'
+                      if ot.get('pct_atingido') is not None else None)
+        mostra_status = True
+        detalhes = [
             f'Teto: R$ {_num_vc(meta_rs, 2)}'
             + (f' ({_num_vc(pct_fat, 2)}% da Meta de Faturamento)' if pct_fat is not None else '')
-            + f'  |  {ot["label"]}'
-            + (f'  |  {ot["pct_atingido"] * 100:.0f}% do teto' if ot.get('pct_atingido') is not None else '')
-        )
-        linha_cx = (
-            f'{_num_vc(realizado_cx, 0)} cx'
-            + (f'  |  Teto: {_num_vc(meta_cx, 0)} cx' if meta_cx else '')
-        ) if realizado_cx is not None else None
-        projecao_txt = (f'Projeção de fechamento: R$ {_num_vc(ot["projecao_fechamento"], 2)}'
-                         if ot.get('projecao_fechamento') is not None else None)
+        ]
+        if realizado_cx is not None:
+            detalhes.append(
+                f'{_num_vc(realizado_cx, 0)} cx'
+                + (f'  |  Teto: {_num_vc(meta_cx, 0)} cx' if meta_cx else '')
+            )
+        if ot.get('projecao_fechamento') is not None:
+            detalhes.append(f'Projeção de fechamento: R$ {_num_vc(ot["projecao_fechamento"], 2)}')
     else:
         titulo = 'Quebra (Teto)'
         if meta_rs:
@@ -1905,41 +1934,36 @@ def _render_indicador_quebra(meta_cx, realizado_cx, meta_rs, realizado_rs, fatur
             )
         else:
             linha_principal = '—'
-        linha_secundaria = (
+        delta_txt = (f'{ot["pct_atingido"] * 100:.0f}% do teto em cx'
+                      if ot.get('pct_atingido') is not None else None)
+        mostra_status = bool(meta_cx)
+        detalhes = [
             ('Realizado: ' + _num_vc(realizado_cx, 0) + ' cx' if realizado_cx is not None else 'Realizado: —')
             + (f'  |  Teto: {_num_vc(meta_cx, 0)} cx' if meta_cx else '')
-            + (f'  |  {ot["label"]}' if meta_cx else '')
-            + (f'  |  {ot["pct_atingido"] * 100:.0f}% do teto em cx' if ot.get('pct_atingido') is not None else '')
-        )
-        linha_cx = None
-        projecao_txt = (f'Projeção de fechamento (cx): {_num_vc(ot["projecao_fechamento"], 0)}'
-                         if ot.get('projecao_fechamento') is not None else None)
+        ]
+        if ot.get('projecao_fechamento') is not None:
+            detalhes.append(f'Projeção de fechamento (cx): {_num_vc(ot["projecao_fechamento"], 0)}')
 
     aviso_txt = None
     if not meta_rs:
-        aviso_txt = 'Defina o Teto de Quebra em R$ acima pra ver valor/% aqui.'
+        aviso_txt = ('Defina o Teto de Quebra em R$ no formulário "🎯 Definir/editar meta" '
+                      'pra ver valor/% aqui.')
     elif not usa_rs:
         aviso_txt = ('Realizado em R$ ainda não disponível pra este período -- o PDF de Quebra '
                       'precisa ser reprocessado (reenviado) pra extrair o custo.')
 
-    # Cartão compactado -- mesma lógica de conteúdo, padding/fonte menores
-    # (ver comentário em _render_indicador_mg acima).
-    html = f"""
-    <div style="background:{bg}; color:{fg}; border-radius:8px; padding:0.5rem 0.7rem; margin-bottom:0.35rem;">
-        <div style="font-weight:600; font-size:0.8rem;">{ot['emoji']} {titulo}</div>
-        <div style="font-size:1.15rem; font-weight:700; margin-top:0.1rem;">
-            {linha_principal}
-        </div>
-        <div style="font-size:0.72rem; opacity:0.85;">
-            {linha_secundaria}
-        </div>
-        {f'<div style="font-size:0.7rem; opacity:0.8; margin-top:0.05rem;">{linha_cx}</div>' if linha_cx else ''}
-        {f'<div style="font-size:0.68rem; opacity:0.75; margin-top:0.1rem;">{projecao_txt}</div>' if projecao_txt else ''}
-        {f'<div style="font-size:0.68rem; opacity:0.7; margin-top:0.1rem;">{aviso_txt}</div>' if aviso_txt else ''}
-    </div>
-    """
-    html = '\n'.join(line for line in html.split('\n') if line.strip())
-    st.markdown(html, unsafe_allow_html=True)
+    st.metric(
+        label=f"{ot['emoji']} {titulo}",
+        value=linha_principal,
+        delta=delta_txt,
+        delta_color=_GER_STATUS_CORES[ot['status']]['delta_color'],
+    )
+    for _linha_det in detalhes:
+        st.caption(_linha_det)
+    if mostra_status:
+        _ger_legenda_status(ot)
+    if aviso_txt:
+        st.caption(aviso_txt)
     if completude_msg:
         st.caption(completude_msg)
 
@@ -1981,6 +2005,56 @@ def _render_metas_gerais():
     # =========================================================================
     with tab_empresa:
         meta_atual = mg.carregar_meta(tipo_mg, ref_mg) or {}
+
+        # ── Indicadores primeiro ─────────────────────────────────────────────
+        # Ordem de leitura invertida em relação à versão anterior (que abria
+        # com o formulário de meta e o histórico de alterações, empurrando os
+        # KPIs pra baixo): quem abre a aba quer ver PRIMEIRO como a empresa
+        # está no período. As ferramentas de edição/auditoria da meta
+        # (formulário "🎯 Definir/editar meta" e "🕘 Histórico de alterações")
+        # continuam idênticas, só passaram para logo abaixo dos indicadores.
+        pct_tempo_mg = periodo_mod.pct_tempo_decorrido(tipo_mg, ref_mg)
+        _completude_msgs = {
+            'sem_dado': f'⚪ Sem dado publicado ainda para {periodo_mod.rotulo(tipo_mg, ref_mg)} (fonte: {rv.get("origem","-")}).',
+            'parcial':  f'🟡 Dado parcial: {len(rv.get("meses_com_dado", []))}/{len(rv.get("meses_total", []))} mês(es) do período têm publicação.',
+            'completo': None,
+        }
+
+        st.subheader('Indicadores da Empresa')
+        ic1, ic2, ic3, ic4 = st.columns(4)
+        with ic1:
+            # NÃO usar `or 0` no realizado: rv.get(...) retorna None quando
+            # ainda não há dado publicado (diferente de "publicado e deu
+            # zero"), e on_track.calcular já trata None corretamente
+            # (status ⚪ Sem meta/dado). Convertendo para 0 aqui, o cálculo
+            # interpretava como "0% atingido" e mostrava 🔴 Fora do Track
+            # incorretamente assim que o período começava, mesmo sem nenhum
+            # dado real publicado ainda.
+            ot_fat = on_track.calcular(meta_atual.get('faturamento') or 0, rv.get('faturamento'),
+                                        tipo_mg, ref_mg, pct_tempo_decorrido=pct_tempo_mg)
+            _render_indicador_mg('Faturamento', lambda x: f'R$ {_num_vc(x, 0)}',
+                                  meta_atual.get('faturamento'), rv.get('faturamento'), ot_fat,
+                                  _completude_msgs.get(rv['completude']))
+        with ic2:
+            ot_vol = on_track.calcular(meta_atual.get('volume') or 0, rv.get('volume'),
+                                        tipo_mg, ref_mg, pct_tempo_decorrido=pct_tempo_mg)
+            _render_indicador_mg('Volume (CX)', lambda x: f'{_num_vc(x, 0)} cx',
+                                  meta_atual.get('volume'), rv.get('volume'), ot_vol,
+                                  _completude_msgs.get(rv['completude']))
+        with ic3:
+            ot_marg = on_track.calcular(meta_atual.get('margem_pct') or 0, rv.get('margem_pct'),
+                                         tipo_mg, ref_mg, pct_tempo_decorrido=pct_tempo_mg)
+            _render_indicador_mg('Margem (%)', lambda x: f'{x:.2f}%',
+                                  meta_atual.get('margem_pct'), rv.get('margem_pct'), ot_marg,
+                                  _completude_msgs.get(rv['completude']))
+        with ic4:
+            _render_indicador_quebra(meta_atual.get('quebra_max_cx'), rq.get('total_cx'),
+                                      meta_atual.get('quebra_max_rs'), rq.get('total_custo'),
+                                      meta_atual.get('faturamento'), tipo_mg, ref_mg,
+                                      _completude_msgs.get(rq['completude']))
+
+        st.divider()
+
         with st.expander(f'🎯 Definir/editar meta — {periodo_mod.rotulo(tipo_mg, ref_mg)}'):
             with st.form(key='mg_form_meta'):
                 mc1, mc2 = st.columns(2)
@@ -1999,7 +2073,7 @@ def _render_metas_gerais():
                         value=float(meta_atual.get('quebra_max_rs') or 0.0), step=1000.0,
                         help='Opcional -- independente do Teto em CX acima (não converte um no outro). '
                              'Usado só pra calcular quanto isso representa em % da Meta de Faturamento, '
-                             'exibido no indicador de Quebra abaixo.')
+                             'exibido no indicador de Quebra acima.')
                 if st.form_submit_button('💾 Salvar meta', type='primary'):
                     _reg_meta = mg.salvar_meta(tipo_mg, ref_mg, meta_fat, meta_vol, meta_marg, meta_qbr,
                                                 quebra_max_rs=meta_qbr_rs or None,
@@ -2041,46 +2115,6 @@ def _render_metas_gerais():
                                               if _vals.get('quebra_max_rs') else '—'),
                     })
                 st.dataframe(pd.DataFrame(_linhas_hist), hide_index=True, use_container_width=True)
-
-        pct_tempo_mg = periodo_mod.pct_tempo_decorrido(tipo_mg, ref_mg)
-        _completude_msgs = {
-            'sem_dado': f'⚪ Sem dado publicado ainda para {periodo_mod.rotulo(tipo_mg, ref_mg)} (fonte: {rv.get("origem","-")}).',
-            'parcial':  f'🟡 Dado parcial: {len(rv.get("meses_com_dado", []))}/{len(rv.get("meses_total", []))} mês(es) do período têm publicação.',
-            'completo': None,
-        }
-
-        st.subheader('Indicadores da Empresa')
-        ic1, ic2, ic3, ic4 = st.columns(4)
-        with ic1:
-            # NÃO usar `or 0` no realizado: rv.get(...) retorna None quando
-            # ainda não há dado publicado (diferente de "publicado e deu
-            # zero"), e on_track.calcular já trata None corretamente
-            # (status ⚪ Sem meta/dado). Convertendo para 0 aqui, o cálculo
-            # interpretava como "0% atingido" e mostrava 🔴 Fora do Track
-            # incorretamente assim que o período começava, mesmo sem nenhum
-            # dado real publicado ainda.
-            ot_fat = on_track.calcular(meta_atual.get('faturamento') or 0, rv.get('faturamento'),
-                                        tipo_mg, ref_mg, pct_tempo_decorrido=pct_tempo_mg)
-            _render_indicador_mg('Faturamento', lambda x: f'R$ {_num_vc(x, 0)}',
-                                  meta_atual.get('faturamento'), rv.get('faturamento'), ot_fat,
-                                  _completude_msgs.get(rv['completude']))
-        with ic2:
-            ot_vol = on_track.calcular(meta_atual.get('volume') or 0, rv.get('volume'),
-                                        tipo_mg, ref_mg, pct_tempo_decorrido=pct_tempo_mg)
-            _render_indicador_mg('Volume (CX)', lambda x: f'{_num_vc(x, 0)} cx',
-                                  meta_atual.get('volume'), rv.get('volume'), ot_vol,
-                                  _completude_msgs.get(rv['completude']))
-        with ic3:
-            ot_marg = on_track.calcular(meta_atual.get('margem_pct') or 0, rv.get('margem_pct'),
-                                         tipo_mg, ref_mg, pct_tempo_decorrido=pct_tempo_mg)
-            _render_indicador_mg('Margem (%)', lambda x: f'{x:.2f}%',
-                                  meta_atual.get('margem_pct'), rv.get('margem_pct'), ot_marg,
-                                  _completude_msgs.get(rv['completude']))
-        with ic4:
-            _render_indicador_quebra(meta_atual.get('quebra_max_cx'), rq.get('total_cx'),
-                                      meta_atual.get('quebra_max_rs'), rq.get('total_custo'),
-                                      meta_atual.get('faturamento'), tipo_mg, ref_mg,
-                                      _completude_msgs.get(rq['completude']))
 
         # Comparativo vs período anterior removido a pedido explícito da
         # Ingrid em 26/08/2026 ("remover completamente"), pra deixar a tela
@@ -2584,84 +2618,143 @@ if st.button('🔒 Sair', key='_gerencia_logout'):
 st.divider()
 
 # ── Grupos de abas ───────────────────────────────────────────────────────────
-(grp_vendas, grp_margem_real, grp_metas, grp_metas_gerais, grp_rentabilidade, grp_produtos,
- grp_clientes, grp_recorrencia, grp_quebras, grp_prevperdas) = st.tabs([
+# As mesmas 10 seções de sempre, agora agrupadas por assunto em 5 abas-pai com
+# st.tabs aninhado (mesma técnica de pages/7_Relatorios_Produtos_OTHIL.py) --
+# 10 abas lado a lado no topo já não cabiam na tela sem rolagem horizontal.
+# Nenhuma seção foi removida, renomeada ou teve conteúdo alterado: cada bloco
+# `with ...:` abaixo é exatamente o que já existia, só reposicionado sob a aba
+# de grupo correspondente.
+grp_top_metas, grp_top_dashboards, grp_top_resultados, grp_top_operacao, grp_top_clientes = st.tabs([
+    '🎯 Metas',
     '📊 Dashboards',
-    '💵 Margem Real',
-    '🎯 Metas Semanais',
-    '🌐 Metas Gerais',
-    '💰 Rentabilidade',
-    '📦 Produtos',
+    '💰 Resultados',
+    '📦 Operação',
     '👥 Clientes',
-    '🔄 Recorrência',
-    '📦 Quebras',
-    '🚨 Prevenção de Perdas',
 ])
 
-# ── VENDAS ────────────────────────────────────────────────────────────────────
-with grp_vendas:
-    tab_d, tab_s, tab_m = st.tabs([
-        '📅 Diário',
-        '📆 Semanal',
-        '🗓️ Mensal',
+# ══ GRUPO: METAS ══════════════════════════════════════════════════════════════
+with grp_top_metas:
+    grp_metas, grp_metas_gerais = st.tabs([
+        '🎯 Metas Semanais',
+        '🌐 Metas Gerais',
     ])
-    with tab_d:
-        _render_secao_dash('diario', 'Dashboards Diários', '📅')
-    with tab_s:
-        _render_secao_dash('semanal', 'Dashboards Semanais', '📆')
-    with tab_m:
-        _render_secao_dash('mensal', 'Dashboards Mensais', '🗓️')
 
-# ── MARGEM REAL ────────────────────────────────────────────────────────────────
-with grp_margem_real:
-    st.caption(
-        'Custo real = Custo do relatório ÷ (1 + % administrativo do produto) — retira do Custo '
-        'a despesa administrativa que já vem embutida nele (variável por produto, cadastrada em '
-        '**Cadastro de Marcas**). MC % real = MC R$ real ÷ Custo real × 100, sem o +15pp '
-        'operacional usado nos outros indicadores. Sempre recalculada com o percentual mais atual '
-        'do cadastro, mesmo para períodos antigos.'
-    )
-    tab_mr_d, tab_mr_s, tab_mr_m = st.tabs([
-        '📅 Diário',
-        '📆 Semanal',
-        '🗓️ Mensal',
+    # ── METAS SEMANAIS ────────────────────────────────────────────────────────
+    with grp_metas:
+        tab_ot, tab_fech = st.tabs([
+            '📊 On Track',
+            '🏁 Fechamentos Semanais',
+        ])
+        with tab_ot:
+            _render_ontrack_publicado()
+        with tab_fech:
+            _render_fechamentos_semanais()
+
+    # ── METAS GERAIS ──────────────────────────────────────────────────────────
+    with grp_metas_gerais:
+        _render_metas_gerais()
+
+# ══ GRUPO: DASHBOARDS ═════════════════════════════════════════════════════════
+with grp_top_dashboards:
+    grp_vendas, grp_margem_real = st.tabs([
+        '📊 Dashboards',
+        '💵 Margem Real',
     ])
-    with tab_mr_d:
-        _render_secao_margem_real('diario', 'Margem Real — Diário', '📅')
-    with tab_mr_s:
-        _render_secao_margem_real('semanal', 'Margem Real — Semanal', '📆')
-    with tab_mr_m:
-        _render_secao_margem_real('mensal', 'Margem Real — Mensal', '🗓️')
 
-# ── METAS ─────────────────────────────────────────────────────────────────────
-with grp_metas:
-    tab_ot, tab_fech = st.tabs([
-        '📊 On Track',
-        '🏁 Fechamentos Semanais',
+    # ── VENDAS ────────────────────────────────────────────────────────────────
+    with grp_vendas:
+        tab_d, tab_s, tab_m = st.tabs([
+            '📅 Diário',
+            '📆 Semanal',
+            '🗓️ Mensal',
+        ])
+        with tab_d:
+            _render_secao_dash('diario', 'Dashboards Diários', '📅')
+        with tab_s:
+            _render_secao_dash('semanal', 'Dashboards Semanais', '📆')
+        with tab_m:
+            _render_secao_dash('mensal', 'Dashboards Mensais', '🗓️')
+
+    # ── MARGEM REAL ───────────────────────────────────────────────────────────
+    with grp_margem_real:
+        st.caption(
+            'Custo real = Custo do relatório ÷ (1 + % administrativo do produto) — retira do Custo '
+            'a despesa administrativa que já vem embutida nele (variável por produto, cadastrada em '
+            '**Cadastro de Marcas**). MC % real = MC R$ real ÷ Custo real × 100, sem o +15pp '
+            'operacional usado nos outros indicadores. Sempre recalculada com o percentual mais atual '
+            'do cadastro, mesmo para períodos antigos.'
+        )
+        tab_mr_d, tab_mr_s, tab_mr_m = st.tabs([
+            '📅 Diário',
+            '📆 Semanal',
+            '🗓️ Mensal',
+        ])
+        with tab_mr_d:
+            _render_secao_margem_real('diario', 'Margem Real — Diário', '📅')
+        with tab_mr_s:
+            _render_secao_margem_real('semanal', 'Margem Real — Semanal', '📆')
+        with tab_mr_m:
+            _render_secao_margem_real('mensal', 'Margem Real — Mensal', '🗓️')
+
+# ══ GRUPO: RESULTADOS ═════════════════════════════════════════════════════════
+with grp_top_resultados:
+    grp_rentabilidade, grp_produtos, grp_recorrencia = st.tabs([
+        '💰 Rentabilidade',
+        '📦 Produtos',
+        '🔄 Recorrência',
     ])
-    with tab_ot:
-        _render_ontrack_publicado()
-    with tab_fech:
-        _render_fechamentos_semanais()
 
-# ── METAS GERAIS ──────────────────────────────────────────────────────────────
-with grp_metas_gerais:
-    _render_metas_gerais()
+    # ── RENTABILIDADE ─────────────────────────────────────────────────────────
+    with grp_rentabilidade:
+        _render_rentabilidade_resumo()
 
-# ── RENTABILIDADE ─────────────────────────────────────────────────────────────
-with grp_rentabilidade:
-    _render_rentabilidade_resumo()
+    # ── PRODUTOS ──────────────────────────────────────────────────────────────
+    with grp_produtos:
+        _render_produtos_resumo()
 
-# ── PRODUTOS ──────────────────────────────────────────────────────────────────
-with grp_produtos:
-    _render_produtos_resumo()
+    # ── RECORRÊNCIA ───────────────────────────────────────────────────────────
+    with grp_recorrencia:
+        _render_recorrencia_resumo()
 
-# ── RECORRÊNCIA ───────────────────────────────────────────────────────────────
-with grp_recorrencia:
-    _render_recorrencia_resumo()
+# ══ GRUPO: OPERAÇÃO ═══════════════════════════════════════════════════════════
+with grp_top_operacao:
+    grp_quebras, grp_prevperdas = st.tabs([
+        '📦 Quebras',
+        '🚨 Prevenção de Perdas',
+    ])
 
-# ── CLIENTES ──────────────────────────────────────────────────────────────────
-with grp_clientes:
+    # ── QUEBRAS ───────────────────────────────────────────────────────────────
+    with grp_quebras:
+        tab_qbr_s, tab_qbr_m, tab_qbr_comp = st.tabs([
+            '📦 Semanal',
+            '📦 Mensal',
+            '🔀 Comparativo',
+        ])
+        with tab_qbr_s:
+            _render_quebra_secao('semanal', 'Quebras Semanais', '📦')
+        with tab_qbr_m:
+            _render_quebra_secao('mensal', 'Quebras Mensais', '📦')
+        with tab_qbr_comp:
+            _render_quebra_comparativo()
+
+    # ── PREVENÇÃO DE PERDAS ───────────────────────────────────────────────────
+    with grp_prevperdas:
+        tab_pp_sv, tab_pp_me, tab_pp_cruz = st.tabs([
+            '🕐 1 Semana Sem Venda',
+            '📦 1 Mês em Estoque',
+            '🔗 Cruzamento com Quebra',
+        ])
+        with tab_pp_sv:
+            _render_prevperdas_secao('sem_venda', '1 Semana Sem Venda')
+        with tab_pp_me:
+            _render_prevperdas_secao('mes_estoque', '1 Mês em Estoque')
+        with tab_pp_cruz:
+            _render_cruzamento_quebra()
+
+# ══ GRUPO: CLIENTES ═══════════════════════════════════════════════════════════
+# Único grupo com uma seção só -- as 3 sub-abas de Clientes ficam direto sob a
+# aba-pai, sem um nível intermediário que não separaria nada.
+with grp_top_clientes:
     tab_cli_ot, tab_cli_top50, tab_cli_pv = st.tabs([
         '📊 On Track por Cliente', '🏆 Top 50 Clientes', '👤 Clientes por Vendedor',
     ])
@@ -2673,31 +2766,3 @@ with grp_clientes:
         _render_clientes_por_vendedor_ger()
     # Ranking de Recorrência mudou para a aba própria '🔄 Recorrência' (mais fácil de
     # achar, e junto ali agora tem os 5 tipos de período + histórico versionado).
-
-# ── QUEBRAS ───────────────────────────────────────────────────────────────────
-with grp_quebras:
-    tab_qbr_s, tab_qbr_m, tab_qbr_comp = st.tabs([
-        '📦 Semanal',
-        '📦 Mensal',
-        '🔀 Comparativo',
-    ])
-    with tab_qbr_s:
-        _render_quebra_secao('semanal', 'Quebras Semanais', '📦')
-    with tab_qbr_m:
-        _render_quebra_secao('mensal', 'Quebras Mensais', '📦')
-    with tab_qbr_comp:
-        _render_quebra_comparativo()
-
-# ── PREVENÇÃO DE PERDAS ───────────────────────────────────────────────────────
-with grp_prevperdas:
-    tab_pp_sv, tab_pp_me, tab_pp_cruz = st.tabs([
-        '🕐 1 Semana Sem Venda',
-        '📦 1 Mês em Estoque',
-        '🔗 Cruzamento com Quebra',
-    ])
-    with tab_pp_sv:
-        _render_prevperdas_secao('sem_venda', '1 Semana Sem Venda')
-    with tab_pp_me:
-        _render_prevperdas_secao('mes_estoque', '1 Mês em Estoque')
-    with tab_pp_cruz:
-        _render_cruzamento_quebra()
