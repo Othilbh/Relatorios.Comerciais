@@ -37,6 +37,7 @@ from xlsx_vendedor_cliente import (
     parse_e_agregar, VENDOR_TAB, _normalize,
 )
 from parsers_vendedor import parse_totais_vendedor
+import acesso
 import periodo
 import comparativo
 import on_track
@@ -354,6 +355,10 @@ with tab_rel:
 
                     fname = f"Vendedor_Cliente_{MESES_ABR[mes-1]}{ano}_OTHIL.xlsx"
                     st.success(f'Planilha gerada: {fname}')
+                    # Perfil de upload (26/08/2026, pedido da Ingrid): fluxo
+                    # Login -> Upload -> Gerência, nunca fica numa tela de
+                    # Dashboard depois de enviar o PDF.
+                    acesso.redirecionar_pos_upload()
                     st.download_button(
                         label='Baixar Excel',
                         data=xlsx_bytes,
@@ -374,6 +379,10 @@ with tab_rel:
 # TAB 2 — On Track por Cliente
 # =============================================================================
 with tab_ontrack:
+    # Perfil de upload (26/08/2026, pedido da Ingrid): só a aba "Relatório
+    # Semanal" (upload) é permitida -- as outras 3 abas, que são Dashboard
+    # puro, ficam bloqueadas aqui.
+    acesso.bloquear_dashboard()
     st.header('📊 On Track por Cliente')
 
     clientes_data  = st.session_state.get('clientes_on_track')
@@ -757,6 +766,7 @@ with tab_ontrack:
 # TAB 3 — Top 50 Clientes
 # =============================================================================
 with tab_top50:
+    acesso.bloquear_dashboard()
     st.header('🏆 Top 50 Clientes')
 
     clientes_data_50 = st.session_state.get('clientes_on_track')
@@ -849,6 +859,7 @@ with tab_top50:
 # TAB 4 — Clientes por Vendedor
 # =============================================================================
 with tab_por_vend:
+    acesso.bloquear_dashboard()
     st.header('👤 Clientes por Vendedor')
 
     clientes_data_pv = st.session_state.get('clientes_on_track')
