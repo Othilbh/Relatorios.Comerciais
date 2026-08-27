@@ -9,6 +9,7 @@ import streamlit as st
 import pandas as pd
 
 from parser_quebra import parse_quebra
+import acesso
 import comparativo
 import data_store as ds
 
@@ -213,9 +214,17 @@ def _render_tab(tipo: str, label_tipo: str):
                             f"Período: {dados.get('periodo', '-')}"
                         )
                         st.session_state[f'qbr_{tipo}_idx'] = 0
+                        # Perfil de upload (26/08/2026, pedido da Ingrid):
+                        # fluxo Login -> Upload -> Gerência, nunca fica numa
+                        # tela de Dashboard depois de enviar o PDF.
+                        if acesso.is_upload():
+                            acesso.redirecionar_pos_upload()
                         st.rerun()
                     except Exception as e:
                         st.error(f'Erro ao processar PDF: {e}')
+
+    # Perfil de upload: nunca vê o histórico/dashboard de Quebra abaixo.
+    acesso.parar_se_upload()
 
     st.divider()
 
@@ -265,6 +274,9 @@ def _render_tab(tipo: str, label_tipo: str):
 # ── Comparativo ───────────────────────────────────────────────────────────────
 
 def _render_comparativo():
+    # Aba 100% Dashboard, sem upload -- bloqueada por inteiro pro perfil
+    # de upload (26/08/2026, pedido explícito da Ingrid).
+    acesso.bloquear_dashboard()
     st.header('🔀 Comparativo entre Períodos')
 
     tipo = st.radio(
