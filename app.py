@@ -2,8 +2,6 @@
 import os
 import streamlit as st
 
-import acesso
-
 st.set_page_config(
     page_title='OTHIL — Relatórios Comerciais',
     page_icon='🌿',
@@ -74,71 +72,25 @@ try:
 except FileNotFoundError:
     pass
 
-# ── Perfil de acesso (26/08/2026, pedido explícito da Ingrid: quem faz
-# upload dos PDFs não deve ter acesso aos Dashboards) ───────────────────────
-# Por padrão (sem nada digitado aqui) o app funciona EXATAMENTE como sempre
-# funcionou -- acesso normal a tudo, sem nenhuma fricção nova pra Ingrid ou
-# pra quem já usa o app hoje. Só quem entra com a senha do perfil de upload
-# passa a ficar restrito.
-if acesso.is_upload():
-    with st.sidebar:
-        st.caption('🔒 Perfil: Upload de PDFs')
-        if st.button('Sair do perfil restrito', key='_acesso_sair'):
-            acesso.sair()
-            st.rerun()
-else:
-    with st.sidebar.expander('🔑 Entrar', expanded=False):
-        _senha_login = st.text_input('Senha de acesso', type='password', key='_acesso_senha')
-        if st.button('Entrar', key='_acesso_entrar'):
-            if acesso.tentar_login(_senha_login):
-                st.rerun()
-            else:
-                st.error('Senha incorreta.')
-
-if acesso.is_upload():
-    # Só as páginas com upload de PDF pra geração de relatório, mais a
-    # Gerência (destino final do fluxo). Metas Semanais, Rentabilidade e
-    # Margens e Cadastro de Marcas ficam de fora daqui -- e também
-    # bloqueadas por acesso direto de URL (ver acesso.bloquear_dashboard()
-    # em cada uma delas).
-    pg = st.navigation(
-        {
-            "": [
-                st.Page("pages/home.py", title="Início", icon="🏠", default=True),
-            ],
-            "Módulos": [
-                st.Page("pages/1_Relatorio_Diario_OTHIL.py", title="Relatório Diário", icon="📊"),
-                st.Page("pages/2_Recorrencia_OTHIL.py", title="Recorrência", icon="🔄"),
-                st.Page("pages/3_Vendedor_Cliente_OTHIL.py", title="Vendedor-Cliente", icon="👥"),
-                st.Page("pages/4_Quebra_OTHIL.py", title="Quebras", icon="📦"),
-                st.Page("pages/5_Prevencao_Perdas_OTHIL.py", title="Prevenção de Perdas", icon="🚨"),
-                st.Page("pages/7_Relatorios_Produtos_OTHIL.py", title="Relatórios de Produtos", icon="📦"),
-            ],
-            "Administração": [
-                st.Page("pages/gerencia.py", title="Gerência", icon="🔐"),
-            ],
-        }
-    )
-else:
-    pg = st.navigation(
-        {
-            "": [
-                st.Page("pages/home.py", title="Início", icon="🏠", default=True),
-            ],
-            "Módulos": [
-                st.Page("pages/metas_semanais.py", title="Metas Semanais", icon="🎯"),
-                st.Page("pages/1_Relatorio_Diario_OTHIL.py", title="Relatório Diário", icon="📊"),
-                st.Page("pages/2_Recorrencia_OTHIL.py", title="Recorrência", icon="🔄"),
-                st.Page("pages/3_Vendedor_Cliente_OTHIL.py", title="Vendedor-Cliente", icon="👥"),
-                st.Page("pages/4_Quebra_OTHIL.py", title="Quebras", icon="📦"),
-                st.Page("pages/5_Prevencao_Perdas_OTHIL.py", title="Prevenção de Perdas", icon="🚨"),
-                st.Page("pages/6_Rentabilidade_Margens_OTHIL.py", title="Rentabilidade e Margens", icon="💰"),
-                st.Page("pages/7_Relatorios_Produtos_OTHIL.py", title="Relatórios de Produtos", icon="📦"),
-            ],
-            "Administração": [
-                st.Page("pages/gerencia.py", title="Gerência", icon="🔐"),
-                st.Page("pages/8_Cadastro_Produtos_OTHIL.py", title="Cadastro de Marcas", icon="🏷️"),
-            ],
-        }
-    )
+pg = st.navigation(
+    {
+        "": [
+            st.Page("pages/home.py", title="Início", icon="🏠", default=True),
+        ],
+        "Módulos": [
+            st.Page("pages/metas_semanais.py", title="Metas Semanais", icon="🎯"),
+            st.Page("pages/1_Relatorio_Diario_OTHIL.py", title="Relatório Diário", icon="📊"),
+            st.Page("pages/2_Recorrencia_OTHIL.py", title="Recorrência", icon="🔄"),
+            st.Page("pages/3_Vendedor_Cliente_OTHIL.py", title="Vendedor-Cliente", icon="👥"),
+            st.Page("pages/4_Quebra_OTHIL.py", title="Quebras", icon="📦"),
+            st.Page("pages/5_Prevencao_Perdas_OTHIL.py", title="Prevenção de Perdas", icon="🚨"),
+            st.Page("pages/6_Rentabilidade_Margens_OTHIL.py", title="Rentabilidade e Margens", icon="💰"),
+            st.Page("pages/7_Relatorios_Produtos_OTHIL.py", title="Relatórios de Produtos", icon="📦"),
+        ],
+        "Administração": [
+            st.Page("pages/gerencia.py", title="Gerência", icon="🔐"),
+            st.Page("pages/8_Cadastro_Produtos_OTHIL.py", title="Cadastro de Marcas", icon="🏷️"),
+        ],
+    }
+)
 pg.run()
