@@ -287,7 +287,7 @@ def _exibir_metricas_resumo(resumo, tipo):
         col.metric(lab, val)
 
 
-def _bloco_importar_historico(tipo, label_tipo, state_key, ref_sugerido=None):
+def _bloco_importar_historico(tipo, label_tipo, state_key, ref_sugerido=None, expanded=None):
     """Cadastro de dados de um período retroativo (item 4 do pedido) --
     mesma estrutura de dados dos registros normais (ds.save_record no
     módulo 'relatorio_diario'), identificado pelo período de referência
@@ -295,7 +295,7 @@ def _bloco_importar_historico(tipo, label_tipo, state_key, ref_sugerido=None):
     daquele período (reaproveita 100% o parser existente, preserva os
     itens/detalhe) ou, se o PDF não existir mais, informar os totais
     manualmente (sem detalhe por item -- ver aviso na tela)."""
-    aberto_por_sugestao = ref_sugerido is not None
+    aberto_por_sugestao = expanded if expanded is not None else (ref_sugerido is not None)
     # Todas as chaves de widget deste bloco são "escopadas" pelo período
     # sugerido (ctx). Isso é ESSENCIAL: sem isso, um st.date_input(key=...,
     # value=...) só aceita o `value=` na primeira vez que é criado -- em
@@ -443,11 +443,41 @@ def _bloco_importar_historico(tipo, label_tipo, state_key, ref_sugerido=None):
                     st.rerun()
 
 
+def _exibir_comparativo(tipo, ref_sel, resumo):
+    """Comparativo vs período anterior (por DATA, não pelo registro salvo
+    mais próximo). Fatorado para ser reutilizável tanto no Histórico quanto
+    logo após uma geração nova (mesma lógica, sem duplicar código)."""
+    ref_ant = _periodo_anterior(tipo, ref_sel)
+    reg_ant = ds.load_current(MODULO, tipo, ref_ant)
+    if not reg_ant:
+        st.caption(f'Sem dados para comparação no período anterior ({_rotulo_periodo(tipo, ref_ant)}).')
+        return
+    resumo_ant = reg_ant.get('valores', {}).get('resumo') or {}
+    campos_cmp = [('Faturamento', 'faturamento', _fmt_moeda),
+                  ('MC R$', 'mc_rs', _fmt_moeda),
+                  ('MC %', 'mc_pct', lambda x: f'{x:.2f}%'.replace('.', ',')),
+                  ('Caixas', 'caixas', lambda x: _fmt_num(x, 3)),
+                  ('Clientes', 'clientes', lambda x: _fmt_num(x, 0))]
+    # MC % e Vendedores ficavam de fora deste comparativo, mesmo sendo
+    # mostrados nos cartões acima (_exibir_metricas_resumo) -- MC % é a
+    # métrica mais citada do negócio (margem de contribuição) e não
+    # tinha variação % nenhuma aqui. Vendedores só existe no resumo do
+    # Diário (não no Semanal/Mensal), por isso só entra quando presente.
+    if 'vendedores' in resumo and 'vendedores' in resumo_ant:
+        campos_cmp.append(('Vendedores', 'vendedores', lambda x: _fmt_num(x, 0)))
+    cols_cmp = st.columns(len(campos_cmp))
+    for col, (lab, chave, fmt) in zip(cols_cmp, campos_cmp):
+        comp = comparativo.calcular(resumo.get(chave, 0), resumo_ant.get(chave))
+        col.metric(lab, fmt(resumo.get(chave, 0)), delta=comparativo.formatar_variacao(comp))
+    st.caption(f'Base de comparação: {_rotulo_periodo(tipo, ref_ant)}.')
+
+
 def _navegar_e_exibir_historico(tipo, label_tipo):
-    """Navegação ← período → por DATA + Períodos Salvos (seleção rápida,
-    não substitui a navegação manual) + comparativo vs período anterior
+    """Navegação ◀ seletor ▶ por DATA (uma única linha, seletor já cobre a
+    seleção rápida entre períodos salvos) + comparativo vs período anterior
     (calculado por data, não pelo registro salvo mais próximo) +
-    importação de dados históricos quando o período não tem dado."""
+    importação de dados históricos, sempre no mesmo lugar (expandida
+    quando o período não tem dado, recolhida quando já tem)."""
     state_key = f'_periodo_sel_{tipo}'
     if state_key not in st.session_state:
         st.session_state[state_key] = _periodo_atual_ref(tipo)
@@ -462,52 +492,68 @@ def _navegar_e_exibir_historico(tipo, label_tipo):
     def _ir_posterior():
         st.session_state[state_key] = _periodo_posterior(tipo, st.session_state[state_key])
 
-    col_prev, col_atual, col_next = st.columns([1, 5, 1])
+    ref_sel = st.session_state[state_key]
+    dashboards_meta = dict(_listar_dashboards(tipo))
+    # Opções do seletor: todos os períodos com dado salvo + o período
+    # atualmente navegado (mesmo sem dado), pra ele sempre aparecer
+    # selecionado -- sem index de lista, sem perder a navegação por
+    # QUALQUER período (com ou sem dado) que as setas ◀ ▶ já garantiam.
+    opcoes_periodo = sorted(set(dashboards_meta.keys()) | {ref_sel}, reverse=True)
+
+    # Uma única linha ◀ | seletor | ▶ (mesmo padrão visual de
+    # pages/4_Quebra_OTHIL.py), substituindo a antiga linha de setas +
+    # expander separado de "seleção rápida" mais abaixo -- a lógica de
+    # navegação por DATA (funções acima) continua exatamente a mesma, só
+    # muda o layout.
+    col_prev, col_sel, col_next = st.columns([1, 5, 1])
     with col_prev:
         st.button('◀', key=f'nav_prev_{tipo}', help='Período anterior', on_click=_ir_anterior,
                    use_container_width=True)
     with col_next:
         st.button('▶', key=f'nav_next_{tipo}', help='Próximo período', on_click=_ir_posterior,
                    use_container_width=True)
+    with col_sel:
+        # Chave escopada por ref_sel (mesma técnica já usada em
+        # _bloco_importar_historico): garante que `index=` seja reaplicado
+        # sempre que o período mudar (por clique nas setas, por exemplo),
+        # em vez de ficar preso ao valor anterior do widget.
+        escolha = st.selectbox(
+            'Período', opcoes_periodo,
+            format_func=lambda r: _rotulo_periodo(tipo, r) + ('' if r in dashboards_meta else ' (sem dado)'),
+            index=opcoes_periodo.index(ref_sel),
+            key=f'nav_sel_{tipo}_{ref_sel}',
+        )
+    if escolha != ref_sel:
+        st.session_state[state_key] = escolha
+        st.rerun()
 
-    ref_sel = st.session_state[state_key]
     ini, fim = _intervalo_periodo(tipo, ref_sel)
     tem_dado = ds.has_data(MODULO, tipo, ref_sel)
 
-    with col_atual:
-        if tipo == 'diario':
-            st.markdown(f'**{_rotulo_periodo(tipo, ref_sel)}**')
-        else:
-            st.markdown(f'**{ini.strftime("%d/%m/%Y")} – {fim.strftime("%d/%m/%Y")}**  ·  '
+    # Rótulo do período em destaque (badge), em vez de texto em markdown
+    # simples -- fica mais visível qual período está sendo exibido.
+    if tipo == 'diario':
+        rotulo_atual = _rotulo_periodo(tipo, ref_sel)
+    else:
+        rotulo_atual = (f'{ini.strftime("%d/%m/%Y")} – {fim.strftime("%d/%m/%Y")}  ·  '
                         f'{_rotulo_periodo(tipo, ref_sel)}')
-        st.caption('🟢 Período salvo ✓' if tem_dado else '⚪ Nenhum dado cadastrado para este período.')
-
-    dashboards_meta = dict(_listar_dashboards(tipo))
-    if dashboards_meta:
-        with st.expander(f'🔎 Períodos salvos ({len(dashboards_meta)}) — seleção rápida'):
-            st.caption('Atalho para pular direto a um período que já tem dado. A navegação ◀ ▶ acima '
-                       'continua funcionando para QUALQUER período, com ou sem dado.')
-            slugs_ord = sorted(dashboards_meta.keys(), reverse=True)
-            escolha_rapida = st.selectbox(
-                'Ir direto para', slugs_ord, format_func=lambda r: _rotulo_periodo(tipo, r),
-                key=f'quick_sel_{tipo}', index=None, placeholder='Selecione um período salvo...')
-            if escolha_rapida:
-                st.session_state[state_key] = escolha_rapida
-                # Sem isto, o valor escolhido fica preso na key do widget e,
-                # como index=None só é aplicado na primeira criação dele, o
-                # próximo rerun recriaria o selectbox já com essa mesma opção
-                # selecionada -- disparando escolha_rapida verdadeiro de novo
-                # e um st.rerun() infinito (a página trava em "Running").
-                del st.session_state[f'quick_sel_{tipo}']
-                st.rerun()
+    if tem_dado:
+        st.info(f'🟢 **{rotulo_atual}** — período salvo ✓')
+    else:
+        st.info(f'⚪ **{rotulo_atual}** — nenhum dado cadastrado para este período.')
 
     st.divider()
 
+    # Ponto único de entrada do "Importar dados históricos" (antes existia
+    # duas vezes: uma auto-expandida quando não havia dado, outra recolhida
+    # mais abaixo depois de todo o detalhe do período já com dado) --
+    # mesmo lugar sempre, só o estado expandido/recolhido muda.
+    _bloco_importar_historico(tipo, label_tipo, state_key, ref_sugerido=ref_sel, expanded=not tem_dado)
+
     if not tem_dado:
-        st.info(f'Nenhum dado cadastrado para o período de {ini.strftime("%d/%m/%Y")} a '
-                f'{fim.strftime("%d/%m/%Y")}.')
-        _bloco_importar_historico(tipo, label_tipo, state_key, ref_sugerido=ref_sel)
         return
+
+    st.divider()
 
     registro = ds.load_current(MODULO, tipo, ref_sel)
     valores = registro.get('valores', {}) or {}
@@ -537,30 +583,8 @@ def _navegar_e_exibir_historico(tipo, label_tipo):
 
     _exibir_metricas_resumo(resumo, tipo)
 
-    ref_ant = _periodo_anterior(tipo, ref_sel)
-    reg_ant = ds.load_current(MODULO, tipo, ref_ant)
     st.subheader('📊 Comparativo vs período anterior')
-    if reg_ant:
-        resumo_ant = reg_ant.get('valores', {}).get('resumo') or {}
-        campos_cmp = [('Faturamento', 'faturamento', _fmt_moeda),
-                      ('MC R$', 'mc_rs', _fmt_moeda),
-                      ('MC %', 'mc_pct', lambda x: f'{x:.2f}%'.replace('.', ',')),
-                      ('Caixas', 'caixas', lambda x: _fmt_num(x, 3)),
-                      ('Clientes', 'clientes', lambda x: _fmt_num(x, 0))]
-        # MC % e Vendedores ficavam de fora deste comparativo, mesmo sendo
-        # mostrados nos cartões acima (_exibir_metricas_resumo) -- MC % é a
-        # métrica mais citada do negócio (margem de contribuição) e não
-        # tinha variação % nenhuma aqui. Vendedores só existe no resumo do
-        # Diário (não no Semanal/Mensal), por isso só entra quando presente.
-        if 'vendedores' in resumo and 'vendedores' in resumo_ant:
-            campos_cmp.append(('Vendedores', 'vendedores', lambda x: _fmt_num(x, 0)))
-        cols_cmp = st.columns(len(campos_cmp))
-        for col, (lab, chave, fmt) in zip(cols_cmp, campos_cmp):
-            comp = comparativo.calcular(resumo.get(chave, 0), resumo_ant.get(chave))
-            col.metric(lab, fmt(resumo.get(chave, 0)), delta=comparativo.formatar_variacao(comp))
-        st.caption(f'Base de comparação: {_rotulo_periodo(tipo, ref_ant)}.')
-    else:
-        st.caption(f'Sem dados para comparação no período anterior ({_rotulo_periodo(tipo, ref_ant)}).')
+    _exibir_comparativo(tipo, ref_sel, resumo)
 
     html_periodo = _obter_html_periodo(tipo, ref_sel, valores)
     if html_periodo:
@@ -573,10 +597,7 @@ def _navegar_e_exibir_historico(tipo, label_tipo):
         )
     else:
         st.info('Visual do dashboard não disponível para reexibir agora -- os números acima ficaram salvos. '
-                'Reenvie o PDF desse período (via "Importar dados históricos" abaixo) para gerar o visual.')
-
-    st.divider()
-    _bloco_importar_historico(tipo, label_tipo, state_key)
+                'Reenvie o PDF desse período (via "Importar dados históricos" acima) para gerar o visual.')
 
 
 # ── Bloco reutilizável: upload + gerar + histórico ────────────────────────────
@@ -622,6 +643,8 @@ def _render_tab(tipo, label_tipo):
                 f"⚠️ {len(resultado['divergencias'])} divergência(s) detectadas. "
                 "O dashboard é gerado mesmo assim."
             )
+            with st.expander('Ver divergências'):
+                st.dataframe(resultado['divergencias'], use_container_width=True, hide_index=True)
         else:
             st.success('PDF lido com sucesso.')
 
@@ -634,6 +657,7 @@ def _render_tab(tipo, label_tipo):
         mc_rs      = fat_total - custo_tot
         mc_pct     = mc_rs / custo_tot * 100 if custo_tot else 0.0
 
+        st.header('2. Resumo do período')
         st.caption(f'Período: {periodo}  |  Emissão: {emissao}')
         c1, c2, c3, c4, c5 = st.columns(5)
         c1.metric('Faturamento', _fmt_moeda(fat_total))
@@ -642,7 +666,7 @@ def _render_tab(tipo, label_tipo):
         c4.metric('Caixas',      _fmt_num(caixas_tot, 3))
         c5.metric('Clientes',    clientes)
 
-        st.header(f'2. Gerar Dashboard {label_tipo}')
+        st.header(f'3. Gerar Dashboard {label_tipo}')
         if st.button(f'📈 Gerar Dashboard {label_tipo}', type='primary', key=f'btn_dash_{key}'):
             with st.spinner('Gerando dashboard...'):
                 with tempfile.NamedTemporaryFile(suffix='.html', delete=False,
@@ -662,6 +686,8 @@ def _render_tab(tipo, label_tipo):
             st.session_state[f'html_{key}']   = html_text
             st.session_state[f'slug_{key}']   = slug
             st.success(f'Dashboard salvo — {_label_slug(slug, tipo)}')
+            st.caption('📊 vs período anterior')
+            _exibir_comparativo(tipo, slug, resumo_tab)
             # Perfil de upload (26/08/2026, pedido da Ingrid): fluxo
             # Login -> Upload -> Gerência, nunca fica numa tela de Dashboard.
             acesso.redirecionar_pos_upload()
@@ -675,7 +701,7 @@ def _render_tab(tipo, label_tipo):
                 mime='text/html',
                 key=f'dl_{key}',
             )
-            with st.expander('Pré-visualizar dashboard'):
+            with st.expander('Pré-visualizar dashboard', expanded=True):
                 components.html(st.session_state[f'html_{key}'], height=1400, scrolling=True)
 
     # Perfil de upload (26/08/2026, pedido da Ingrid): nunca vê o
@@ -687,7 +713,7 @@ def _render_tab(tipo, label_tipo):
 
     # ── Histórico ────────────────────────────────────────────────────────────
     st.divider()
-    st.header(f'3. Histórico {label_tipo}')
+    st.header(f'4. Histórico {label_tipo}')
     _navegar_e_exibir_historico(tipo, label_tipo)
 
 
@@ -815,6 +841,9 @@ with tab_d:
                 )
                 st.session_state['html_text'] = html_text
                 st.session_state['html_nome'] = f'dashboard_gerencial_othil_{data_fmt_html}.html'
+                st.success(f'Dashboard salvo — {_rotulo_periodo("diario", slug_d)}')
+                st.caption('📊 vs período anterior')
+                _exibir_comparativo('diario', slug_d, resumo_d)
                 # Perfil de upload (26/08/2026, pedido da Ingrid): fluxo
                 # Login -> Upload -> Gerência, nunca fica numa tela de Dashboard.
                 acesso.redirecionar_pos_upload()
@@ -827,7 +856,7 @@ with tab_d:
                 )
 
         if 'html_text' in st.session_state:
-            with st.expander('Pré-visualizar dashboard'):
+            with st.expander('Pré-visualizar dashboard', expanded=True):
                 components.html(st.session_state['html_text'], height=1400, scrolling=True)
 
     else:
