@@ -125,6 +125,7 @@ def _render_dashboard(dados: dict, tipo: str, slug: str, dados_ant: dict = None,
 
     # ── Comparativo automático vs período anterior salvo (menor é melhor)
     if dados_ant is not None:
+        st.divider()
         total_ant = dados_ant.get('total_cx', 0)
         comp_auto = comparativo.calcular(total, total_ant, menor_e_melhor=True)
         st.metric(
@@ -134,55 +135,63 @@ def _render_dashboard(dados: dict, tipo: str, slug: str, dados_ant: dict = None,
             delta_color='inverse',
         )
 
-    # Filtro por categoria
-    grupos = dados.get('grupos', [])
-    categorias_disponiveis = sorted({g['categoria'] for g in grupos})
+    st.divider()
 
-    cats_sel = st.multiselect(
-        '🔍 Filtrar por categoria:',
-        options=categorias_disponiveis,
-        default=categorias_disponiveis,
-        key=f'qbr_cat_filter_{slug}',
-    )
+    # Filtro + gráfico + tabela + download agrupados visualmente: o filtro
+    # de categoria abaixo controla tudo dentro deste container.
+    with st.container(border=True):
+        grupos = dados.get('grupos', [])
+        categorias_disponiveis = sorted({g['categoria'] for g in grupos})
 
-    grupos_filtrados = [g for g in grupos if g['categoria'] in cats_sel] if cats_sel else []
+        cats_sel = st.multiselect(
+            '🔍 Filtrar por categoria:',
+            options=categorias_disponiveis,
+            default=categorias_disponiveis,
+            key=f'qbr_cat_filter_{slug}',
+        )
 
-    # Recalcula categorias com base no filtro
-    cat_dict: dict[str, float] = {}
-    for g in grupos_filtrados:
-        cat_dict[g['categoria']] = cat_dict.get(g['categoria'], 0.0) + g['cx']
-    categorias_filtradas = sorted(cat_dict.items(), key=lambda x: -x[1])
+        grupos_filtrados = [g for g in grupos if g['categoria'] in cats_sel] if cats_sel else []
 
-    # Gráfico por categoria
-    if categorias_filtradas:
-        st.subheader('Por Categoria de Produto')
-        df_cat = pd.DataFrame(categorias_filtradas, columns=['categoria', 'cx']).set_index('categoria')
-        st.bar_chart(df_cat['cx'], color='#2D6A4F')
+        # Recalcula categorias com base no filtro
+        cat_dict: dict[str, float] = {}
+        for g in grupos_filtrados:
+            cat_dict[g['categoria']] = cat_dict.get(g['categoria'], 0.0) + g['cx']
+        categorias_filtradas = sorted(cat_dict.items(), key=lambda x: -x[1])
 
-    # Tabela por grupo
-    if grupos_filtrados:
-        st.subheader('Por Grupo de Produto')
-        df_g = pd.DataFrame(grupos_filtrados)[['grupo', 'categoria', 'cx']]
-        df_g.columns = ['Grupo', 'Categoria', 'CX Quebradas']
-        st.dataframe(df_g, use_container_width=True, hide_index=True)
-    elif cats_sel:
-        st.info('Nenhum grupo encontrado para a seleção.')
+        st.divider()
 
-    # Download JSON — respeita o filtro de categoria aplicado na tela (antes
-    # a exportação sempre baixava os dados completos, ignorando o filtro)
-    dados_export = dict(dados)
-    dados_export['grupos'] = grupos_filtrados
-    dados_export['categorias'] = [{'categoria': c, 'cx': v} for c, v in categorias_filtradas]
-    dados_export['total_cx'] = sum(g['cx'] for g in grupos_filtrados)
-    dados_export['filtro_categorias_aplicado'] = cats_sel
-    dados_export['gerado_em_exportacao'] = datetime.datetime.now().isoformat(timespec='seconds')
-    st.download_button(
-        f'⬇️ Baixar dados filtrados ({_label_slug(slug, tipo)})',
-        data=json.dumps(dados_export, ensure_ascii=False, indent=2).encode('utf-8'),
-        file_name=f'quebra_{tipo}_{slug}_OTHIL.json',
-        mime='application/json',
-        key=f'dl_{tipo}_{slug}',
-    )
+        # Gráfico por categoria
+        if categorias_filtradas:
+            st.subheader('Por Categoria de Produto')
+            df_cat = pd.DataFrame(categorias_filtradas, columns=['categoria', 'cx']).set_index('categoria')
+            st.bar_chart(df_cat['cx'], color='#2D6A4F')
+
+        st.divider()
+
+        # Tabela por grupo
+        if grupos_filtrados:
+            st.subheader('Por Grupo de Produto')
+            df_g = pd.DataFrame(grupos_filtrados)[['grupo', 'categoria', 'cx']]
+            df_g.columns = ['Grupo', 'Categoria', 'CX Quebradas']
+            st.dataframe(df_g, use_container_width=True, hide_index=True)
+        elif cats_sel:
+            st.info('Nenhum grupo encontrado para a seleção.')
+
+        # Download JSON — respeita o filtro de categoria aplicado na tela (antes
+        # a exportação sempre baixava os dados completos, ignorando o filtro)
+        dados_export = dict(dados)
+        dados_export['grupos'] = grupos_filtrados
+        dados_export['categorias'] = [{'categoria': c, 'cx': v} for c, v in categorias_filtradas]
+        dados_export['total_cx'] = sum(g['cx'] for g in grupos_filtrados)
+        dados_export['filtro_categorias_aplicado'] = cats_sel
+        dados_export['gerado_em_exportacao'] = datetime.datetime.now().isoformat(timespec='seconds')
+        st.download_button(
+            f'⬇️ Baixar dados filtrados ({_label_slug(slug, tipo)})',
+            data=json.dumps(dados_export, ensure_ascii=False, indent=2).encode('utf-8'),
+            file_name=f'quebra_{tipo}_{slug}_OTHIL.json',
+            mime='application/json',
+            key=f'dl_{tipo}_{slug}',
+        )
 
 
 # ── Tab ───────────────────────────────────────────────────────────────────────
@@ -190,40 +199,38 @@ def _render_dashboard(dados: dict, tipo: str, slug: str, dados_ant: dict = None,
 def _render_tab(tipo: str, label_tipo: str):
     st.header(f'📋 {label_tipo}')
 
-    with st.expander('📤 Enviar novo relatório', expanded=True):
-        pdf_up = st.file_uploader(
-            'PDF de Quebra (Resumo do Estoque)',
-            type='pdf',
-            key=f'qbr_{tipo}_pdf',
-        )
-        data_ref = st.date_input(
-            'Data de referência (qualquer dia do período)',
-            value=datetime.date.today(),
-            key=f'qbr_{tipo}_data',
-        )
-        if pdf_up:
-            if st.button('📊 Processar e Salvar', key=f'qbr_{tipo}_btn', type='primary'):
-                with st.spinner('Processando PDF...'):
-                    try:
-                        dados = parse_quebra(pdf_up)
-                        slug = _slug_semanal(data_ref) if tipo == 'semanal' else _slug_mensal(data_ref)
-                        _salvar(dados, tipo, slug, usuario=st.session_state.get('usuario_nome'))
-                        st.success(
-                            f"✅ Salvo! {_label_slug(slug, tipo)} — "
-                            f"{_fmt_num(dados['total_cx'], 0)} CX quebradas  |  "
-                            f"Período: {dados.get('periodo', '-')}"
-                        )
-                        st.session_state[f'qbr_{tipo}_idx'] = 0
-                        # Perfil de upload (26/08/2026, pedido da Ingrid):
-                        # fluxo Login -> Upload -> Gerência, nunca fica numa
-                        # tela de Dashboard depois de enviar o PDF.
-                        if acesso.is_upload():
-                            acesso.redirecionar_pos_upload()
-                        st.rerun()
-                    except Exception as e:
-                        st.error(f'Erro ao processar PDF: {e}')
+    st.subheader('📤 Enviar novo relatório')
+    st.caption('PDF de Quebra (Resumo do Estoque, classificação QUEBRA).')
+    pdf_up = st.file_uploader(
+        'PDF de Quebra (Resumo do Estoque)',
+        type='pdf',
+        key=f'qbr_{tipo}_pdf',
+    )
+    data_ref = st.date_input(
+        'Data de referência (qualquer dia do período)',
+        value=datetime.date.today(),
+        key=f'qbr_{tipo}_data',
+    )
+    if pdf_up:
+        if st.button('📊 Processar e Salvar', key=f'qbr_{tipo}_btn', type='primary'):
+            with st.spinner('Processando PDF...'):
+                try:
+                    dados = parse_quebra(pdf_up)
+                    slug = _slug_semanal(data_ref) if tipo == 'semanal' else _slug_mensal(data_ref)
+                    _salvar(dados, tipo, slug, usuario=st.session_state.get('usuario_nome'))
+                    st.success(
+                        f"✅ Salvo! {_label_slug(slug, tipo)} — "
+                        f"{_fmt_num(dados['total_cx'], 0)} CX quebradas  |  "
+                        f"Período: {dados.get('periodo', '-')}"
+                    )
+                    st.session_state[f'qbr_{tipo}_idx'] = 0
+                    # Fluxo Upload -> Gerência (pedido da Ingrid, 27/08/2026):
+                    # nunca fica numa tela de Dashboard depois de enviar o PDF.
+                    acesso.redirecionar_pos_upload()
+                except Exception as e:
+                    st.error(f'Erro ao processar PDF: {e}')
 
-    # Perfil de upload: nunca vê o histórico/dashboard de Quebra abaixo.
+    # Nunca mostra o histórico/dashboard de Quebra aqui -- só na Gerência.
     acesso.parar_se_upload()
 
     st.divider()
@@ -244,13 +251,11 @@ def _render_tab(tipo: str, label_tipo: str):
     if idx_key not in st.session_state:
         st.session_state[idx_key] = 0
 
-    col_prev, col_sel, col_next = st.columns([1, 6, 1])
+    col_prev, col_sel, col_next = st.columns([1, 6, 1], vertical_alignment='bottom')
     with col_prev:
-        st.write('')
         if st.button('◀', key=f'qbr_prev_{tipo}', help='Período anterior'):
             st.session_state[idx_key] = min(st.session_state[idx_key] + 1, len(slugs) - 1)
     with col_next:
-        st.write('')
         if st.button('▶', key=f'qbr_next_{tipo}', help='Próximo período'):
             st.session_state[idx_key] = max(st.session_state[idx_key] - 1, 0)
     with col_sel:
@@ -274,9 +279,6 @@ def _render_tab(tipo: str, label_tipo: str):
 # ── Comparativo ───────────────────────────────────────────────────────────────
 
 def _render_comparativo():
-    # Aba 100% Dashboard, sem upload -- bloqueada por inteiro pro perfil
-    # de upload (26/08/2026, pedido explícito da Ingrid).
-    acesso.bloquear_dashboard()
     st.header('🔀 Comparativo entre Períodos')
 
     tipo = st.radio(
@@ -366,6 +368,10 @@ def _render_comparativo():
 
     # ── Comparativo por grupo ─────────────────────────────────────────────
     st.subheader('Por Grupo de Produto')
+    # Sem gráfico aqui de propósito: "grupo" é bem mais granular que
+    # "categoria" (dezenas de grupos por período, contra ~20 categorias
+    # fixas em categorias.py), então uma barra por grupo ficaria ilegível.
+    st.caption('Gráfico omitido aqui — muitos grupos tornariam a barra ilegível; veja a tabela abaixo.')
 
     grp_a = {g['grupo']: g for g in dados_a.get('grupos', [])}
     grp_b = {g['grupo']: g for g in dados_b.get('grupos', [])}
