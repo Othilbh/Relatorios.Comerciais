@@ -184,7 +184,12 @@ def parse_e_agregar(file_objs):
         for it in itens:
             if it.get('vendedor') in _EXCLUIDOS:
                 continue
-            v = it['vendedor']
+            # 'vendedor' pode vir None quando o nome bruto do PDF não bateu
+            # com nenhum vendedor conhecido (VENDOR_ALIASES) -- nesse caso,
+            # usa o nome bruto mesmo como chave, em vez de None (que
+            # quebrava o sorted() mais abaixo, TypeError 'str'/'NoneType').
+            # Preserva os dados em vez de descartar a linha.
+            v = it['vendedor'] or it.get('vendedor_raw') or 'Vendedor não identificado'
             c = _client_base_norm(it['cliente_nome'])   # chave normalizada para consolidacao
             raw[v][c]['vol']   += it.get('qtd', 0)
             raw[v][c]['fat']   += it.get('faturamento', 0)
@@ -217,7 +222,8 @@ def agregar_totais_historicos(file_obj):
     for it in itens:
         if it.get('vendedor') in _EXCLUIDOS:
             continue
-        v = it['vendedor']
+        # Mesmo ajuste de parse_e_agregar: nunca usar None como chave.
+        v = it['vendedor'] or it.get('vendedor_raw') or 'Vendedor não identificado'
         raw[v]['vol']   += it.get('qtd', 0)
         raw[v]['fat']   += it.get('faturamento', 0)
         raw[v]['custo'] += it.get('custo_total', 0)
@@ -679,6 +685,7 @@ def gerar_xlsx(historico, pdf_clientes_atual, totais_atual,
     for p_dict in (ant_ano_h.get('vendedores', {}), ant_mes_h.get('vendedores', {})):
         all_vendors.update(p_dict.keys())
     all_vendors -= _EXCLUIDOS
+    all_vendors.discard(None)
 
     vendor_list = [v for v in VENDOR_ORDER if v in all_vendors]
     for v in sorted(all_vendors):
