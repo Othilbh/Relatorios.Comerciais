@@ -76,8 +76,8 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-ic_meta, txt_meta, cor_meta = _status_modulo(_OT_META)
-ic_cli,  txt_cli,  cor_cli  = _status_modulo(_OT_CLI)
+ic_meta, txt_meta, _cor_meta = _status_modulo(_OT_META)
+ic_cli,  txt_cli,  _cor_cli  = _status_modulo(_OT_CLI)
 
 st.markdown(
     "<div style='text-align:center; font-size:0.78rem; font-weight:600; color:#888;"
@@ -87,30 +87,8 @@ st.markdown(
 )
 
 col1, col2 = st.columns(2)
-
-with col1:
-    st.markdown(
-        "<div style='background:#F4F6F5; border:1px solid #d4e6db;"
-        " border-left:4px solid " + cor_meta + "; border-radius:8px;"
-        " padding:0.65rem 0.9rem;'>"
-        "<div style='font-size:0.75rem; color:#666; margin-bottom:2px;'>On Track Metas</div>"
-        "<div style='font-size:0.95rem; font-weight:600; color:" + cor_meta + ";'>"
-        + ic_meta + " " + txt_meta +
-        "</div></div>",
-        unsafe_allow_html=True,
-    )
-
-with col2:
-    st.markdown(
-        "<div style='background:#F4F6F5; border:1px solid #d4e6db;"
-        " border-left:4px solid " + cor_cli + "; border-radius:8px;"
-        " padding:0.65rem 0.9rem;'>"
-        "<div style='font-size:0.75rem; color:#666; margin-bottom:2px;'>On Track Clientes</div>"
-        "<div style='font-size:0.95rem; font-weight:600; color:" + cor_cli + ";'>"
-        + ic_cli + " " + txt_cli +
-        "</div></div>",
-        unsafe_allow_html=True,
-    )
+col1.metric('On Track Metas', f'{ic_meta} {txt_meta}')
+col2.metric('On Track Clientes', f'{ic_cli} {txt_cli}')
 
 st.markdown(
     "<div style='text-align:center; color:#999; font-size:0.92rem; margin-top:1rem;'>"
