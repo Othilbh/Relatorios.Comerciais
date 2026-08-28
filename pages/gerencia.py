@@ -1036,22 +1036,11 @@ def _render_fechamentos_semanais():
     gerado = dados.get('gerado_em', '')[:16].replace('T', ' ')
     st.caption(f"Período: {dados.get('periodo', '-')}  |  Salvo em: {gerado}")
 
-    prods     = dados.get('produtos', [])
-    h_meta    = sum(r.get('estoque_total', 0) for r in prods)
-    h_vend    = sum(l['vendido'] for r in prods for l in r.get('linhas', []))
-    h_atg     = h_vend / h_meta if h_meta else 0
+    prods = dados.get('produtos', [])
 
-    c1, c2, c3 = st.columns(3)
-    c1.metric('Meta total (cx)', f'{_num_vc(h_meta, 0)}')
-    c2.metric('Vendido (cx)',    f'{_num_vc(h_vend, 0)}')
-    c3.metric('% Atingido',     f'{h_atg*100:.1f}%')
-
-    tg = dados.get('totais_rs', {}).get('total_geral', {})
-    if tg:
-        r1, r2, r3 = st.columns(3)
-        r1.metric('Faturamento', f"R$ {_num_vc(tg.get('fat', 0), 2)}")
-        r2.metric('MC R$',       f"R$ {_num_vc(tg.get('mc_rs', 0), 2)}")
-        r3.metric('MC %',        f"{tg.get('resultado_real', 0):.2f}%")
+    # KPIs gerais / Faturamento Geral removidos daqui a pedido explícito da
+    # Ingrid (28/08/2026), mesmo ajuste feito em "On Track Atual" -- tela
+    # mais enxuta, indo direto pra matriz Produto × Vendedor abaixo.
 
     st.divider()
 
