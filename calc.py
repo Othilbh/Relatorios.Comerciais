@@ -282,13 +282,15 @@ def compute_metas(vendas_rows, produtos_config, vendedor_pcts, estoque_rows=None
       no relatório de Lucratividade por Vendedor.
     vendedor_pcts: dict {nome_vendedor: percentual (0-100)}
     estoque_rows: lista OPCIONAL de linhas do PDF "Estoque Físico"
-      (parsers.parse_estoque), cada uma com pelo menos 'codigo', 'qtde_vendida'
-      e 'md_venda' (R$ médio de venda por caixa, já calculado pelo sistema de
+      (parsers.parse_estoque), cada uma com pelo menos 'codigo', 'qtde_vendida',
+      'md_venda' (R$ médio de venda por caixa, já calculado pelo sistema de
       origem -- Mercatus/Previsão, coluna "Md Venda" do relatório -- pedido
       explícito da Ingrid por ser "mais acertivo" que calcular por conta
-      própria a partir do PDF de vendas). Casada pelo MESMO código usado pra
-      achar Vendido. Se omitida/vazia (PDF de Estoque Físico não enviado --
-      é opcional nesta tela), 'media_rs_cx' fica None em todos os produtos.
+      própria a partir do PDF de vendas) e 'custo_unitario' (coluna "Custo"
+      do mesmo relatório). Casada pelo MESMO código usado pra achar Vendido.
+      Se omitida/vazia (PDF de Estoque Físico não enviado -- é opcional
+      nesta tela), 'media_rs_cx' e 'media_custo_cx' ficam None em todos os
+      produtos.
 
     Retorna lista de dicts:
       {
@@ -297,6 +299,7 @@ def compute_metas(vendas_rows, produtos_config, vendedor_pcts, estoque_rows=None
           {'vendedor', 'pct', 'meta', 'vendido', 'falta', 'atingido'}, ...
         ],
         'media_rs_cx': float | None,
+        'media_custo_cx': float | None,
       }
     'media_rs_cx' = média do "Md Venda" (R$/cx, vindo pronto do Estoque
     Físico) das linhas de estoque que casam com os códigos configurados
@@ -307,6 +310,8 @@ def compute_metas(vendas_rows, produtos_config, vendedor_pcts, estoque_rows=None
     nenhuma linha de estoque que bate com esse produto tem Qtde Vendida > 0
     (nada pra ponderar -- nunca inventa um valor), inclusive quando o PDF de
     Estoque Físico simplesmente não foi enviado.
+    'media_custo_cx' = mesma lógica acima, mas para 'custo_unitario' (coluna
+    "Custo" do Estoque Físico) em vez de "Md Venda".
     """
     estoque_rows = estoque_rows or []
     results = []
@@ -325,6 +330,8 @@ def compute_metas(vendas_rows, produtos_config, vendedor_pcts, estoque_rows=None
 
         soma_rs_ponderada = 0.0
         soma_peso = 0.0
+        soma_custo_ponderada = 0.0
+        soma_peso_custo = 0.0
         for er in estoque_rows:
             cn_er = normalize_codigo(er.get('codigo', ''))
             if not any(codigo_matches(cn_er, e) for e in entries):
@@ -334,7 +341,12 @@ def compute_metas(vendas_rows, produtos_config, vendedor_pcts, estoque_rows=None
             if peso > 0 and md is not None:
                 soma_rs_ponderada += md * peso
                 soma_peso += peso
+            custo_unit = er.get('custo_unitario')
+            if peso > 0 and custo_unit is not None:
+                soma_custo_ponderada += custo_unit * peso
+                soma_peso_custo += peso
         media_rs_cx = (soma_rs_ponderada / soma_peso) if soma_peso else None
+        media_custo_cx = (soma_custo_ponderada / soma_peso_custo) if soma_peso_custo else None
 
         linhas = []
         for vend, pct in vendedor_pcts.items():
@@ -360,12 +372,21 @@ def compute_metas(vendas_rows, produtos_config, vendedor_pcts, estoque_rows=None
             'linhas': linhas,
             'media_rs_cx': media_rs_cx,
             # Somas brutas (não só a razão pronta) -- pra quem agrupa vários
-            # produtos (ex.: subtotal por prioridade no PDF Resumo Geral)
+            # produtos (ex.: subtotal por prioridade no PDF/Resumo Geral)
             # poder calcular a média ponderada certa (soma dos R$ ponderados
             # ÷ soma dos pesos), em vez de fazer média simples das médias de
             # cada produto (que distorceria o resultado quando os produtos
             # têm volumes bem diferentes entre si).
             'media_rs_cx_soma_ponderada': soma_rs_ponderada,
             'media_rs_cx_peso': soma_peso,
+            # Mesma lógica acima, mas para o custo unitário ('Custo' do
+            # Estoque Físico) em vez do "Md Venda" -- pedido explícito da
+            # Ingrid (28/08/2026) pra mostrar média de custo ao lado da
+            # média de venda no Resumo Geral. None quando nenhuma linha de
+            # estoque que bate com esse produto tem Qtde Vendida > 0 e
+            # Custo (mesma regra de 'media_rs_cx' -- nunca inventa valor).
+            'media_custo_cx': media_custo_cx,
+            'media_custo_cx_soma_ponderada': soma_custo_ponderada,
+            'media_custo_cx_peso': soma_peso_custo,
         })
     return results
