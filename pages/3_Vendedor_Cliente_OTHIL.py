@@ -34,7 +34,7 @@ _ONTRACK_CLI_DIR = os.path.join(
 
 from xlsx_vendedor_cliente import (
     salvar_historico, carregar_historico, gerar_xlsx, ler_xlsx_historico,
-    parse_e_agregar, VENDOR_TAB, _normalize,
+    parse_e_agregar, agregar_produtos_por_cliente, VENDOR_TAB, _normalize,
 )
 from parsers_vendedor import parse_totais_vendedor
 import acesso
@@ -42,6 +42,9 @@ import periodo
 import comparativo
 import on_track
 import data_store as ds
+import metas_gerais as mg
+import metas_clientes as mc_cli
+import calc
 
 MODULO = 'vendedor_cliente'
 MODULO_ONTRACK = 'vendedor_cliente_ontrack'
@@ -86,6 +89,7 @@ if st.session_state.get('_vc_periodo_carregado') != PERIODO_REF:
         st.session_state['clientes_on_track'] = _registro_vc['valores'].get('clientes_data')
         st.session_state['totais_on_track']   = _registro_vc['valores'].get('totais_dict')
         st.session_state['historico_vc']      = _registro_vc['valores'].get('historico')
+        st.session_state['produtos_por_cliente_vc'] = _registro_vc['valores'].get('produtos_por_cliente')
         st.session_state['ref_date_vc']       = ref_date
     st.session_state['_vc_periodo_carregado'] = PERIODO_REF
 
@@ -175,7 +179,16 @@ def _salvar_historico_permanente(json_bytes: bytes, periodo_ref: str):
 
 
 def _get_meta_fat(historico_data: dict, vend: str, cli_key: str):
-    """Busca meta de faturamento do cliente no histórico."""
+    """Busca meta de faturamento do cliente -- PRIMEIRO na meta definida
+    manualmente no app (metas_clientes, 28/08/2026, pedido explícito da
+    Ingrid: "construir edição no app" em vez de depender só da planilha),
+    e só se não houver nada definido ali, cai pro valor antigo vindo da
+    coluna 'META' do Excel de histórico (nunca apagado -- as duas fontes
+    convivem, evita quebrar quem ainda não preencheu tudo pelo app novo)."""
+    meta_app = mc_cli.get_meta_cliente('mensal', PERIODO_REF, vend, cli_key)
+    if meta_app is not None:
+        return meta_app
+
     if not historico_data:
         return None
     tab = VENDOR_TAB.get(vend, vend.upper())
@@ -194,9 +207,9 @@ def _get_meta_fat(historico_data: dict, vend: str, cli_key: str):
     return None
 
 # ── Tabs ──────────────────────────────────────────────────────────────────────
-tab_rel, tab_ontrack, tab_top50, tab_por_vend = st.tabs([
+tab_rel, tab_ontrack, tab_top50, tab_por_vend, tab_meta_vend = st.tabs([
     '📋 Relatório Semanal', '📊 On Track por Cliente',
-    '🏆 Top 50 Clientes', '👤 Clientes por Vendedor',
+    '🏆 Top 50 Clientes', '👤 Clientes por Vendedor', '🎯 Meta do Vendedor',
 ])
 
 # =============================================================================
@@ -360,9 +373,18 @@ with tab_rel:
                         clientes_data = parse_e_agregar(
                             [io.BytesIO(b) for b in clientes_bytes]
                         )
+                        # Mesma fonte (clientes_bytes) reaproveitada pra também
+                        # reter quais PRODUTOS foram vendidos a cada cliente --
+                        # parse_e_agregar acima descarta o produto (só soma
+                        # fat/vol/custo agregados); esta função paralela não
+                        # descarta, alimentando a aba "Produtos por Cliente".
+                        produtos_por_cliente = agregar_produtos_por_cliente(
+                            [io.BytesIO(b) for b in clientes_bytes]
+                        )
                         st.session_state['clientes_on_track'] = clientes_data
                         st.session_state['totais_on_track']   = totais_dict
                         st.session_state['historico_vc']      = historico
+                        st.session_state['produtos_por_cliente_vc'] = produtos_por_cliente
                         st.session_state['ref_date_vc']       = ref_date
                         st.session_state['_vc_periodo_carregado'] = PERIODO_REF
                         ds.save_record(
@@ -371,6 +393,7 @@ with tab_rel:
                                 'clientes_data': clientes_data,
                                 'totais_dict': totais_dict,
                                 'historico': historico,
+                                'produtos_por_cliente': produtos_por_cliente,
                             },
                             usuario=st.session_state.get('usuario_nome'),
                         )
@@ -972,3 +995,176 @@ with tab_por_vend:
             mime='text/csv',
             type='secondary',
         )
+
+
+# =============================================================================
+# TAB 5 — Meta do Vendedor (meta própria + metas por cliente + produtos)
+# =============================================================================
+# Pedido explícito da Ingrid (28/08/2026): "ter uma planilha ou um quadro
+# que abranja a meta geral deste vendedor + as metas por cliente em uma sub
+# aba com a meta geral... + uma aba que pode até ser a mesma que permita
+# que o vendedor veja todos os seus clientes e quais produtos estão sendo
+# vendidos para estes clientes."
+with tab_meta_vend:
+    st.header('🎯 Meta do Vendedor')
+    st.caption(f'Período de referência selecionado: **{lbl_atual}**')
+    st.caption(
+        'Meta própria de faturamento deste vendedor — independente da Meta '
+        'Geral da empresa ("uma meta própria, definida à parte"). Mesma '
+        'persistência usada na Gerência → Metas Gerais → aba Vendedor → '
+        'OnTrack Semanal por Vendedor: editar aqui ou lá atualiza o mesmo valor.'
+    )
+
+    clientes_data_mv = st.session_state.get('clientes_on_track')
+    produtos_pc_mv    = st.session_state.get('produtos_por_cliente_vc')
+    historico_data_mv = st.session_state.get('historico_vc')
+
+    _nomes_vend_cfg_mv = list(calc.VENDEDORES_PADRAO.keys())
+    vendedor_sel_mv = st.selectbox('Selecionar vendedor', sorted(_nomes_vend_cfg_mv), key='mv_vendedor_sel')
+
+    # ── Meta própria do vendedor ─────────────────────────────────────────
+    _metas_vend_atuais_mv = mg.carregar_metas_vendedores('mensal', PERIODO_REF)
+    _meta_vend_sel = _metas_vend_atuais_mv.get(vendedor_sel_mv) or 0.0
+
+    with st.expander(f'🎯 Definir/editar meta de {vendedor_sel_mv}', expanded=not bool(_meta_vend_sel)):
+        with st.form(key='mv_form_meta_vendedor'):
+            _nova_meta_vend = st.number_input(
+                f'Meta de Faturamento (R$) — {vendedor_sel_mv}', min_value=0.0,
+                value=float(_meta_vend_sel), step=1000.0, key='mv_meta_input',
+            )
+            if st.form_submit_button('💾 Salvar meta do vendedor', type='primary'):
+                _novas_todas_mv = dict(_metas_vend_atuais_mv)
+                _novas_todas_mv[vendedor_sel_mv] = _nova_meta_vend
+                mg.salvar_metas_vendedores('mensal', PERIODO_REF, _novas_todas_mv,
+                                            usuario=st.session_state.get('usuario_nome'))
+                st.success('Meta do vendedor salva.')
+                st.rerun()
+
+    # ── Realizado (mesma fonte de fat usada em Clientes por Vendedor) ────
+    if not clientes_data_mv:
+        st.info('Gere o relatório do mês na aba **📋 Relatório Semanal** primeiro pra ver o realizado.')
+        clientes_vendedor_mv = {}
+    else:
+        clientes_vendedor_mv = clientes_data_mv.get(vendedor_sel_mv, {})
+        fat_realizado_mv = sum(d.get('fat', 0) for d in clientes_vendedor_mv.values())
+        if _meta_vend_sel:
+            r_ot_mv = on_track.calcular(_meta_vend_sel, fat_realizado_mv, 'mensal', PERIODO_REF)
+            mv1, mv2, mv3 = st.columns(3)
+            mv1.metric('Meta', _brl(_meta_vend_sel))
+            mv2.metric('Faturamento', _brl(fat_realizado_mv))
+            mv3.metric('% Atingido', f"{fat_realizado_mv / _meta_vend_sel * 100:.1f}%")
+            st.progress(min(fat_realizado_mv / _meta_vend_sel, 1.0),
+                        text=f"{r_ot_mv['emoji']} {r_ot_mv['label']}")
+        else:
+            st.metric('Faturamento', _brl(fat_realizado_mv))
+            st.caption('Defina a meta acima pra ver % atingido e status.')
+
+    st.divider()
+
+    sub_metas_cli, sub_prod_cli = st.tabs(['💰 Metas por Cliente', '📦 Produtos por Cliente'])
+
+    # ── Sub-aba: Metas por Cliente ───────────────────────────────────────
+    with sub_metas_cli:
+        if not clientes_vendedor_mv:
+            st.info(f'Nenhum cliente encontrado para {vendedor_sel_mv} em {lbl_atual} ainda.')
+        else:
+            _linhas_mc = []
+            for _cli, _dados_cli in clientes_vendedor_mv.items():
+                _fat_cli = _dados_cli.get('fat', 0)
+                _meta_cli = _get_meta_fat(historico_data_mv, vendedor_sel_mv, _cli) or 0
+                if _meta_cli:
+                    _r_ot_cli = on_track.calcular(_meta_cli, _fat_cli, 'mensal', PERIODO_REF)
+                    _status_txt_cli = f"{_r_ot_cli['emoji']} {_r_ot_cli['label']}"
+                    _pct_cli = _fat_cli / _meta_cli * 100
+                else:
+                    _status_txt_cli = '—'
+                    _pct_cli = float('nan')
+                _linhas_mc.append({
+                    'Cliente': _cli,
+                    'Meta': _meta_cli if _meta_cli else float('nan'),
+                    'Faturamento': _fat_cli,
+                    '% Atingido': _pct_cli,
+                    'Status': _status_txt_cli,
+                })
+            _linhas_mc.sort(key=lambda r: r['Faturamento'], reverse=True)
+            st.dataframe(
+                pd.DataFrame(_linhas_mc).style.format({
+                    'Meta':        _fmt_brl_or_dash,
+                    'Faturamento': _brl,
+                    '% Atingido':  _fmt_pct1_or_dash,
+                }),
+                use_container_width=True, hide_index=True,
+            )
+
+            with st.expander('✏️ Definir/editar meta por cliente'):
+                st.caption(
+                    'Meta de faturamento (R$) por cliente, definida diretamente aqui — fica '
+                    'salva e passa a valer nas outras abas também (On Track por Cliente, '
+                    'Top 50, Clientes por Vendedor). Deixe em 0 pra continuar usando a meta '
+                    'antiga da planilha Excel de histórico, se houver uma.'
+                )
+                _metas_cli_atuais = mc_cli.carregar_metas_cliente_vendedor(
+                    'mensal', PERIODO_REF, vendedor_sel_mv)
+                with st.form(key='mv_form_metas_clientes'):
+                    _novas_metas_cli = {}
+                    for _cli in sorted(clientes_vendedor_mv.keys()):
+                        _novas_metas_cli[_cli] = st.number_input(
+                            _cli, min_value=0.0,
+                            value=float(_metas_cli_atuais.get(_cli) or 0.0), step=500.0,
+                            key=f'mv_meta_cli_{vendedor_sel_mv}_{_cli}',
+                        )
+                    if st.form_submit_button('💾 Salvar metas por cliente', type='primary'):
+                        mc_cli.salvar_metas_clientes(
+                            'mensal', PERIODO_REF, vendedor_sel_mv, _novas_metas_cli,
+                            usuario=st.session_state.get('usuario_nome'))
+                        st.success('Metas por cliente salvas.')
+                        st.rerun()
+
+    # ── Sub-aba: Produtos por Cliente (relatório mais recente) ──────────
+    with sub_prod_cli:
+        if not produtos_pc_mv:
+            st.info(
+                'Sem dado de produtos por cliente para este período ainda — gere o '
+                'relatório novamente na aba **📋 Relatório Semanal** (esta aba passou a '
+                'existir em 28/08/2026; relatórios gerados antes disso não têm esse dado '
+                'salvo, é preciso reenviar os PDFs Vendedor-Cliente uma vez).'
+            )
+        else:
+            produtos_vendedor_mv = produtos_pc_mv.get(vendedor_sel_mv, {})
+            if not produtos_vendedor_mv:
+                st.info(f'Nenhum produto encontrado para {vendedor_sel_mv} em {lbl_atual}.')
+            else:
+                st.caption(f'Relatório mais recente gerado — {lbl_atual}.')
+                _cli_prod_sel = st.selectbox(
+                    'Ver produtos de um cliente específico',
+                    sorted(produtos_vendedor_mv.keys()), key='mv_cliente_produtos_sel',
+                )
+                _produtos_cli_sel = produtos_vendedor_mv.get(_cli_prod_sel, {})
+                _linhas_prod_sel = sorted(
+                    [{'Produto': p, 'Volume (cx)': d['vol'], 'Faturamento': d['fat']}
+                     for p, d in _produtos_cli_sel.items()],
+                    key=lambda r: r['Faturamento'], reverse=True,
+                )
+                st.dataframe(
+                    pd.DataFrame(_linhas_prod_sel).style.format({
+                        'Volume (cx)': _num, 'Faturamento': _brl,
+                    }),
+                    use_container_width=True, hide_index=True,
+                )
+
+                st.divider()
+                st.caption(f'Todos os clientes de {vendedor_sel_mv} — produtos vendidos ({lbl_atual})')
+                _linhas_prod_todos = []
+                for _cli_p, _prods_p in produtos_vendedor_mv.items():
+                    for _p_nome, _p_dados in _prods_p.items():
+                        _linhas_prod_todos.append({
+                            'Cliente': _cli_p, 'Produto': _p_nome,
+                            'Volume (cx)': _p_dados['vol'], 'Faturamento': _p_dados['fat'],
+                        })
+                _linhas_prod_todos.sort(key=lambda r: (r['Cliente'], -r['Faturamento']))
+                st.dataframe(
+                    pd.DataFrame(_linhas_prod_todos).style.format({
+                        'Volume (cx)': _num, 'Faturamento': _brl,
+                    }),
+                    use_container_width=True, hide_index=True,
+                )
