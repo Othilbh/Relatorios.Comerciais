@@ -1,0 +1,163 @@
+{
+  "current": {
+    "id": "6fa3ecf5-c537-4e5d-94c4-5849d0db3778",
+    "modulo_origem": "prevencao_perdas",
+    "tipo_periodo": "diario",
+    "periodo_ref": "2026-08-28_mes_estoque",
+    "data_referencia": "2026-08-28",
+    "criado_em": "2026-08-28T10:14:55+00:00",
+    "atualizado_em": "2026-08-28T10:14:55+00:00",
+    "usuario": "Ingrid",
+    "versao": 1,
+    "valores": {
+      "publicado_em": "2026-08-28T10:14:55.661282",
+      "emissao": "28/08/2026",
+      "periodo": "27/08/2026",
+      "tipo": "mes_estoque",
+      "resumo": {
+        "total": 12,
+        "criticos": 9,
+        "alta_prioridade": 0,
+        "atencao": 3,
+        "valor_risco": 555037.0499999999,
+        "sem_venda_7d": 0,
+        "estoque_30d": 12
+      },
+      "produtos": [
+        {
+          "prioridade": "🔴 Crítico",
+          "produto": "TAMARA KHOUET ALIG BDJ 200GR",
+          "responsavel": "REGINALDO",
+          "dias_estoque": 59,
+          "dias_sem_venda": 0,
+          "saldo_cx": 6380.0,
+          "qtd_vendida": 110.0,
+          "valor_estoque": 445005.0,
+          "acao": "Promoção urgente / Vender urgente"
+        },
+        {
+          "prioridade": "🔴 Crítico",
+          "produto": "TAMARA KHAJUR BDJ 200GR",
+          "responsavel": "AFANAIS",
+          "dias_estoque": 158,
+          "dias_sem_venda": 0,
+          "saldo_cx": 810.0,
+          "qtd_vendida": 6.0,
+          "valor_estoque": 59859.0,
+          "acao": "Promoção urgente / Vender urgente"
+        },
+        {
+          "prioridade": "🔴 Crítico",
+          "produto": "PINK LADY 1/2",
+          "responsavel": "REGINALDO",
+          "dias_estoque": 64,
+          "dias_sem_venda": 1,
+          "saldo_cx": 88.0,
+          "qtd_vendida": 0.0,
+          "valor_estoque": 7424.56,
+          "acao": "Promoção urgente / Vender urgente"
+        },
+        {
+          "prioridade": "🔴 Crítico",
+          "produto": "GRAN SMITH 113 VERFRUT",
+          "responsavel": "FARLEY",
+          "dias_estoque": 79,
+          "dias_sem_venda": 1,
+          "saldo_cx": 33.0,
+          "qtd_vendida": 0.0,
+          "valor_estoque": 5657.19,
+          "acao": "Promoção urgente / Vender urgente"
+        },
+        {
+          "prioridade": "🔴 Crítico",
+          "produto": "TAMARA GOLDEN EXPORT",
+          "responsavel": "FARLEY",
+          "dias_estoque": 261,
+          "dias_sem_venda": 1,
+          "saldo_cx": 19.0,
+          "qtd_vendida": 0.0,
+          "valor_estoque": 1705.06,
+          "acao": "Promoção urgente / Vender urgente"
+        },
+        {
+          "prioridade": "🔴 Crítico",
+          "produto": "8KG ITALIA OURO VERDE",
+          "responsavel": "DORA",
+          "dias_estoque": 46,
+          "dias_sem_venda": 1,
+          "saldo_cx": 10.0,
+          "qtd_vendida": 0.0,
+          "valor_estoque": 1092.5,
+          "acao": "Promoção urgente / Vender urgente"
+        },
+        {
+          "prioridade": "🔴 Crítico",
+          "produto": "PORTUGUESA 60/65 SABOR",
+          "responsavel": "JULIANA",
+          "dias_estoque": 44,
+          "dias_sem_venda": 1,
+          "saldo_cx": 8.0,
+          "qtd_vendida": 0.0,
+          "valor_estoque": 1086.88,
+          "acao": "Promoção urgente / Vender urgente"
+        },
+        {
+          "prioridade": "🔴 Crítico",
+          "produto": "GALA 180 HOSHI",
+          "responsavel": "AFANAIS",
+          "dias_estoque": 60,
+          "dias_sem_venda": 1,
+          "saldo_cx": 18.0,
+          "qtd_vendida": 0.0,
+          "valor_estoque": 997.56,
+          "acao": "Promoção urgente / Vender urgente"
+        },
+        {
+          "prioridade": "🔴 Crítico",
+          "produto": "TANGERINA IMP CX PARDA COMPOSOL",
+          "responsavel": "JULIANA",
+          "dias_estoque": 53,
+          "dias_sem_venda": 1,
+          "saldo_cx": 4.0,
+          "qtd_vendida": 0.0,
+          "valor_estoque": 320.96,
+          "acao": "Promoção urgente / Vender urgente"
+        },
+        {
+          "prioridade": "🟡 Atenção",
+          "produto": "ROMA IMP POMFRESH",
+          "responsavel": "REGINALDO",
+          "dias_estoque": 30,
+          "dias_sem_venda": 0,
+          "saldo_cx": 350.0,
+          "qtd_vendida": 6.0,
+          "valor_estoque": 28304.5,
+          "acao": "Monitorar / Ação preventiva"
+        },
+        {
+          "prioridade": "🟡 Atenção",
+          "produto": "ARGENTINA 110 BREVI AZUL",
+          "responsavel": "RONISTONIS",
+          "dias_estoque": 44,
+          "dias_sem_venda": 0,
+          "saldo_cx": 12.0,
+          "qtd_vendida": 3.0,
+          "valor_estoque": 2571.36,
+          "acao": "Monitorar / Ação preventiva"
+        },
+        {
+          "prioridade": "🟡 Atenção",
+          "produto": "CUMB CRINSON CHERRY BELLA",
+          "responsavel": "AFANAIS",
+          "dias_estoque": 38,
+          "dias_sem_venda": 0,
+          "saldo_cx": 14.0,
+          "qtd_vendida": 1.0,
+          "valor_estoque": 1012.48,
+          "acao": "Monitorar / Ação preventiva"
+        }
+      ]
+    }
+  },
+  "history": []
+}
