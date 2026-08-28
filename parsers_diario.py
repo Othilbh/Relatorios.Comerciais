@@ -68,8 +68,27 @@ _KNOWN_COMPLEMENTOS = sorted([
 # venda inteira era perdida (não sobrava nem fallback: o pdftotext é tentado
 # primeiro e só cai pra pdfplumber se a lista de linhas vier vazia, o que não
 # acontece aqui porque outros produtos da mesma página continuam batendo).
+#
+# Terceiro caso (achado com um PDF real da Ingrid, 28/08/2026): quando a
+# descrição é comprida demais, a linha do produto quebra e a quantidade
+# inteira fica sozinha na linha física SEGUINTE -- ex.: uma linha termina
+# em "...AMARELO-LUCIANO -CX    LUCIANO" (SEM nenhum número, nem colado) e
+# só a linha de baixo tem "112,000   0,000   13.440,00...". O código já
+# tinha um mecanismo pronto pra esperar a quantidade na linha seguinte
+# (pending_qty, ver mais abaixo), mas ele só era acionado quando CX_RE
+# batia NA linha (exigindo um dígito logo depois de "CX"/complemento) --
+# aqui não tem dígito nenhum na linha, então CX_RE nunca batia, a linha
+# inteira vazava pra "pending_lines" (texto solto) SEM acionar o
+# pending_qty, e o código/descrição certos se perdiam: o próximo produto
+# que realmente batesse com CX_RE "herdava" por engano o código da linha
+# vazada (o dígito inicial de "pending_lines" acumulado), fazendo os dois
+# produtos ficarem errados ao mesmo tempo. Adicionando "|\s*$" no lookahead
+# faz CX_RE também bater nesse caso (fim de linha logo após "CX"/nome), o
+# que aciona corretamente o pending_qty já existente -- tail fica vazio,
+# _extrai_qtde_fat_tail(tail) retorna None como já era esperado, e a
+# quantidade é recuperada certinho na linha seguinte.
 _COMPLEMENTO_ALT = '|'.join(re.escape(n) for n in _KNOWN_COMPLEMENTOS)
-CX_RE = re.compile(r'CX\s*(?:(?:' + _COMPLEMENTO_ALT + r')\s*)?(?=[\d\-,.])')
+CX_RE = re.compile(r'CX\s*(?:(?:' + _COMPLEMENTO_ALT + r')\s*)?(?=[\d\-,.]|\s*$)')
 
 
 class ValidationError(Exception):
@@ -444,9 +463,21 @@ def parse_vendas_pdftotext(file) -> list[dict]:
                 })
                 pending_qty = None
                 continue
-            # Não achou número nesta linha -- desiste de esperar (evita
-            # contaminar a leitura normal da linha atual) em vez de manter
-            # um estado pendente indefinidamente.
+            # Sem número nesta linha. Visto em PDF real (28/08/2026): às
+            # vezes o nome do vendedor responsável TAMBÉM quebra sozinho
+            # pra sua própria linha física (ex.: "- REGINALDO", sem "CX" e
+            # sem nenhum número), entre a linha do código/CX e a linha dos
+            # números -- ou seja, a quantidade pode estar a MAIS de uma
+            # linha de distância. Se esta linha for só texto solto (não
+            # começa com dígito -- não parece início de outro código -- e
+            # não bate com CX_RE -- não é a linha "CX" de outro produto),
+            # continua esperando na próxima linha em vez de desistir na
+            # primeira tentativa; só desiste quando a linha parecer
+            # claramente outra coisa (outro produto começando, ou vazia),
+            # pra não arriscar interpretar errado uma linha sem relação.
+            stripped_wait = line.strip()
+            if stripped_wait and not re.match(r'^\d', stripped_wait) and not CX_RE.search(line):
+                continue
             pending_qty = None
 
         # Linha de produto (tem "CX " seguido de número)
