@@ -208,6 +208,56 @@ def parse_e_agregar(file_objs):
     return out
 
 
+def agregar_produtos_por_cliente(file_objs):
+    """Parse um ou mais PDFs Vendedor-Cliente e retorna, por vendedor e
+    cliente, QUAIS PRODUTOS foram vendidos e quanto -- pedido explícito da
+    Ingrid, 28/08/2026: "uma aba que permita que o vendedor veja todos os
+    seus clientes e quais produtos estão sendo vendidos para estes
+    clientes". Mesma fonte e mesma normalização de cliente de
+    parse_e_agregar (parsers_diario.parse_relatorio_diario), mas SEM
+    descartar o campo 'produto' de cada item -- parse_e_agregar soma tudo
+    junto por cliente; esta função soma por PRODUTO dentro de cada
+    cliente também.
+
+    Aceita um único file-like object OU uma lista deles (multi-upload).
+    Retorna {vendedor: {cliente_base: {produto: {vol, fat}}}}.
+    """
+    if file_objs is None:
+        return {}
+    if not isinstance(file_objs, (list, tuple)):
+        file_objs = [file_objs]
+
+    raw = defaultdict(lambda: defaultdict(lambda: defaultdict(lambda: {'vol': 0.0, 'fat': 0.0})))
+
+    for file_obj in file_objs:
+        if file_obj is None:
+            continue
+        try:
+            result = parse_relatorio_diario(file_obj)
+            itens  = result['itens']
+        except Exception:
+            continue
+        for it in itens:
+            if it.get('vendedor') in _EXCLUIDOS:
+                continue
+            # Mesmo ajuste de parse_e_agregar: nunca usar None como chave.
+            v = it['vendedor'] or it.get('vendedor_raw') or 'Vendedor não identificado'
+            c = _client_base_norm(it['cliente_nome'])
+            p = it.get('produto') or 'Produto não identificado'
+            raw[v][c][p]['vol'] += it.get('qtd', 0)
+            raw[v][c][p]['fat'] += it.get('faturamento', 0)
+
+    out = {}
+    for v, clientes in raw.items():
+        out[v] = {}
+        for c, produtos in clientes.items():
+            out[v][c] = {
+                p: {'vol': round(d['vol']), 'fat': round(d['fat'], 2)}
+                for p, d in produtos.items()
+            }
+    return out
+
+
 def agregar_totais_historicos(file_obj):
     """Soma todos os itens por vendedor -> total real (inclui todos os clientes)."""
     if file_obj is None:
