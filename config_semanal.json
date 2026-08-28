@@ -1,124 +1,94 @@
 {
   "produtos": [
     {
-      "nome": "WILLIANS 110 DOLE PONTO AZUL",
-      "codigos_texto": "0101100110\n",
-      "estoque": 61,
+      "nome": "PINK LADY 1/2",
+      "codigos_texto": "050201332",
+      "estoque": 84,
       "prioridade": "🚨 Grande Urgência"
     },
     {
-      "nome": "PACKHAMS PROFESOR",
-      "codigos_texto": "010207470\n010207480\n010207490\n",
-      "estoque": 272,
+      "nome": "PACKAMS",
+      "codigos_texto": "0102073*\n0102074*",
+      "estoque": 355,
       "prioridade": "🚨 Grande Urgência"
     },
     {
-      "nome": "PACKMANS LOS PIONEIROS",
-      "codigos_texto": "0102073100\n0102073110\n",
-      "estoque": 280,
+      "nome": "MELAO DINO REI/CEPI",
+      "codigos_texto": "87038*",
+      "estoque": 214,
       "prioridade": "🚨 Grande Urgência"
     },
     {
-      "nome": "PACKMANS 1/2 MONO AZUL",
-      "codigos_texto": "020200501\n",
-      "estoque": 23,
+      "nome": "THOMPSON GURUVA",
+      "codigos_texto": "830100824",
+      "estoque": 400,
       "prioridade": "🚨 Grande Urgência"
     },
     {
-      "nome": "MELAO DINO",
-      "codigos_texto": "8703807\n87038101\n87038102\n87038103\n",
-      "estoque": 304,
+      "nome": "THOMPSON FRUTIBRAS",
+      "codigos_texto": "830100820",
+      "estoque": 537,
       "prioridade": "🚨 Grande Urgência"
-    },
-    {
-      "nome": "ROMA",
-      "codigos_texto": "8704714\n8704715",
-      "estoque": 300,
-      "prioridade": "🚨 Grande Urgência"
-    },
-    {
-      "nome": "CUMB CRINSON CHERRY BELLA",
-      "codigos_texto": "830100696\n",
-      "estoque": 24,
-      "prioridade": "🚨 Grande Urgência"
-    },
-    {
-      "nome": "AMEIXA 50-55 TANY",
-      "codigos_texto": "250100102\n",
-      "estoque": 232,
-      "prioridade": "🚨 Grande Urgência"
-    },
-    {
-      "nome": "NECTARINA ",
-      "codigos_texto": "26010492\n26010491",
-      "estoque": 65,
-      "prioridade": "🚨 Grande Urgência"
-    },
-    {
-      "nome": "CUMB THOMPSON GURUVA",
-      "codigos_texto": "830100824\n",
-      "estoque": 623,
-      "prioridade": "🚨 Grande Urgência"
-    },
-    {
-      "nome": "CUMB THOMPSON FRUTIBRAS",
-      "codigos_texto": "830100820\n",
-      "estoque": 0,
-      "prioridade": "🚨 Grande Urgência"
-    },
-    {
-      "nome": "BERGAMOTA",
-      "codigos_texto": "390600146\n390600147\n390600137\n",
-      "estoque": 500,
-      "prioridade": "🔥 Alta Prioridade"
-    },
-    {
-      "nome": "PIMETAO REI",
-      "codigos_texto": "8707103\n8707111\n8707112\n",
-      "estoque": 100,
-      "prioridade": "🔥 Alta Prioridade"
-    },
-    {
-      "nome": "8KG THOMPSON AUTUM CAPELLARO",
-      "codigos_texto": "830200705\n",
-      "estoque": 150,
-      "prioridade": "🔥 Alta Prioridade"
-    },
-    {
-      "nome": "CUMB VITORIA HONEY",
-      "codigos_texto": "830100914\n",
-      "estoque": 1256,
-      "prioridade": "🔥 Alta Prioridade"
     },
     {
       "nome": "BENITAKA",
-      "codigos_texto": "830200306\n",
-      "estoque": 169,
+      "codigos_texto": "830200306",
+      "estoque": 124,
+      "prioridade": "🚨 Grande Urgência"
+    },
+    {
+      "nome": "NUBIA/JUBILEE",
+      "codigos_texto": "830201514\n830201902",
+      "estoque": 960,
+      "prioridade": "🚨 Grande Urgência"
+    },
+    {
+      "nome": "PIMENTAO REI",
+      "codigos_texto": "8707103\n8707111\n8707112",
+      "estoque": 150,
+      "prioridade": "🚨 Grande Urgência"
+    },
+    {
+      "nome": "MURCOTT",
+      "codigos_texto": "39040035",
+      "estoque": 188,
+      "prioridade": "🚨 Grande Urgência"
+    },
+    {
+      "nome": "GALA HOSHI 180",
+      "codigos_texto": "701245180",
+      "estoque": 18,
+      "prioridade": "🚨 Grande Urgência"
+    },
+    {
+      "nome": "DOLE AZUL",
+      "codigos_texto": "0101100100\n0101100110\n0101100120\n0101100135\n010110080\n010110090",
+      "estoque": 560,
       "prioridade": "🔥 Alta Prioridade"
     },
     {
-      "nome": "NUBIA/JUBILLE SPECIALE",
-      "codigos_texto": "830100716\n830201902\n\n",
-      "estoque": 698,
+      "nome": "BERGAMOTTA",
+      "codigos_texto": "390600146\n390600147\n390600137",
+      "estoque": 1300,
       "prioridade": "🔥 Alta Prioridade"
     },
     {
       "nome": "MELAO PELE DE SAPO",
-      "codigos_texto": "3102010004\n3102010005\n3102010006\n",
-      "estoque": 227,
-      "prioridade": "Normal"
+      "codigos_texto": "3102011*",
+      "estoque": 160,
+      "prioridade": "🔥 Alta Prioridade"
     },
     {
-      "nome": "MELAO REI",
-      "codigos_texto": "3102009*",
-      "estoque": 1400,
-      "prioridade": "Normal"
-    },
-    {
-      "nome": "MIRTILO",
-      "codigos_texto": "87005910\n87005909\n87005903\n87005904\n",
+      "nome": "CHERRY GRANGRAPE",
+      "codigos_texto": "830100623",
       "estoque": 300,
-      "prioridade": "Normal"
+      "prioridade": "🔥 Alta Prioridade"
+    },
+    {
+      "nome": "THOMPSON GRANDVALLE",
+      "codigos_texto": "830100828",
+      "estoque": 220,
+      "prioridade": "🔥 Alta Prioridade"
     }
   ],
   "vendedor_pcts": {
@@ -131,5 +101,5 @@
     "Juliana": 7,
     "Luca": 7
   },
-  "periodo": "21/08 a 28/08"
+  "periodo": "28/08 a 28/08"
 }
