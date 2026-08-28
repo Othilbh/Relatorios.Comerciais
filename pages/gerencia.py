@@ -787,6 +787,7 @@ def _render_ontrack_publicado():
     st.header('📊 On Track Atual')
 
     historico_ot = _listar_ontrack_metas_hist()
+    slug_ot = None
 
     if not historico_ot:
         # backward compat: tentar arquivo único (publicações salvas antes
@@ -828,6 +829,7 @@ def _render_ontrack_publicado():
             )
         idx_ot = labels_ot.index(escolha_ot)
         st.session_state[idx_key_ot] = idx_ot
+        slug_ot = historico_ot[idx_ot][0]
         snap = historico_ot[idx_ot][1]
 
     pub_em     = snap.get('publicado_em', '')[:16].replace('T', ' ')
@@ -837,14 +839,27 @@ def _render_ontrack_publicado():
 
     st.caption(f"Período: **{periodo}**  |  Publicado em: **{pub_em}**")
 
+    # Dia calculado em relação à semana SELECIONADA acima (slug_ot), não à
+    # que o calendário de hoje sugeriria por conta própria -- numa
+    # sexta-feira, o dia de hoje é ao mesmo tempo o fechamento da semana
+    # selecionada (se for ela) e a abertura da próxima; calc.dia_semana_atual()
+    # sozinho sempre assume a segunda leitura (dia 1), o que ficava errado
+    # quando a semana selecionada era na verdade a que estava terminando
+    # (pedido da Ingrid, 28/08/2026).
+    _dia_default = (calc.dia_semana_no_periodo(slug_ot) if slug_ot
+                     else calc.dia_semana_atual())
+    # Chave inclui a semana selecionada -- sem isso, o slider ficaria
+    # "preso" no valor da última semana visitada ao trocar de período
+    # (mesmo bug de fundo: mistura o estado de duas semanas diferentes).
     dia = st.slider(
         'Dia da semana (para status On Track)', 1, 7,
-        value=calc.dia_semana_atual(),
-        format='Dia %d de 7', key='ger_ot_dia',
+        value=_dia_default,
+        format='Dia %d de 7', key=f'ger_ot_dia_{slug_ot or "legado"}',
         help='Semana comercial sexta a sexta (sem domingo, que não tem '
              'venda): Sexta=1  Sábado=2  Segunda=3  Terça=4  Quarta=5  '
              'Quinta=6  Sexta (fecha a semana)=7 -- mesma convenção da '
-             'aba Metas Semanais.',
+             'aba Metas Semanais. Calculado em relação à semana '
+             'selecionada acima, não à data de hoje sozinha.',
     )
 
     st.divider()
