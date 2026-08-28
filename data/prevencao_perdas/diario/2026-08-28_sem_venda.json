@@ -1,0 +1,295 @@
+{
+  "current": {
+    "id": "634aae03-5fe2-47c0-9d8a-3e707aff2558",
+    "modulo_origem": "prevencao_perdas",
+    "tipo_periodo": "diario",
+    "periodo_ref": "2026-08-28_sem_venda",
+    "data_referencia": "2026-08-28",
+    "criado_em": "2026-08-28T10:14:37+00:00",
+    "atualizado_em": "2026-08-28T10:14:37+00:00",
+    "usuario": "Ingrid",
+    "versao": 1,
+    "valores": {
+      "publicado_em": "2026-08-28T10:14:37.082722",
+      "emissao": "28/08/2026",
+      "periodo": "20/08/2026",
+      "tipo": "sem_venda",
+      "resumo": {
+        "total": 24,
+        "criticos": 2,
+        "alta_prioridade": 14,
+        "atencao": 8,
+        "valor_risco": 336766.93000000005,
+        "sem_venda_7d": 24,
+        "estoque_30d": 1
+      },
+      "produtos": [
+        {
+          "prioridade": "🔴 Crítico",
+          "produto": "CUMB THOMPSON GRANDVALLE",
+          "responsavel": "JULIANA",
+          "dias_estoque": 17,
+          "dias_sem_venda": 8,
+          "saldo_cx": 220.0,
+          "qtd_vendida": 0.0,
+          "valor_estoque": 15947.8,
+          "acao": "Promoção urgente / Vender urgente"
+        },
+        {
+          "prioridade": "🔴 Crítico",
+          "produto": "PORTUGUESA 60/65 SABOR",
+          "responsavel": "JULIANA",
+          "dias_estoque": 44,
+          "dias_sem_venda": 8,
+          "saldo_cx": 8.0,
+          "qtd_vendida": 0.0,
+          "valor_estoque": 1086.88,
+          "acao": "Promoção urgente / Vender urgente"
+        },
+        {
+          "prioridade": "🟠 Alta Prioridade",
+          "produto": "CUMB NUBIA/JUBILEE RCA",
+          "responsavel": "REGINALDO",
+          "dias_estoque": 4,
+          "dias_sem_venda": 8,
+          "saldo_cx": 880.0,
+          "qtd_vendida": 0.0,
+          "valor_estoque": 43172.8,
+          "acao": "Priorizar venda / Contatar vendedor"
+        },
+        {
+          "prioridade": "🟠 Alta Prioridade",
+          "produto": "PACKHAMS ARALI 110",
+          "responsavel": "AFANAIS",
+          "dias_estoque": 4,
+          "dias_sem_venda": 8,
+          "saldo_cx": 318.0,
+          "qtd_vendida": 0.0,
+          "valor_estoque": 40204.74,
+          "acao": "Priorizar venda / Contatar vendedor"
+        },
+        {
+          "prioridade": "🟠 Alta Prioridade",
+          "produto": "PESSEGO FRUITS PONENT",
+          "responsavel": "AMARELODORA",
+          "dias_estoque": 2,
+          "dias_sem_venda": 8,
+          "saldo_cx": 224.0,
+          "qtd_vendida": 0.0,
+          "valor_estoque": 34592.32,
+          "acao": "Priorizar venda / Contatar vendedor"
+        },
+        {
+          "prioridade": "🟠 Alta Prioridade",
+          "produto": "GALA 110 BRANCA POMERANA",
+          "responsavel": "AFANAIS",
+          "dias_estoque": 1,
+          "dias_sem_venda": 8,
+          "saldo_cx": 224.0,
+          "qtd_vendida": 0.0,
+          "valor_estoque": 28743.68,
+          "acao": "Priorizar venda / Contatar vendedor"
+        },
+        {
+          "prioridade": "🟠 Alta Prioridade",
+          "produto": "KIWI CUMB FRESH FRUIT",
+          "responsavel": "AFANAIS",
+          "dias_estoque": 4,
+          "dias_sem_venda": 8,
+          "saldo_cx": 55.0,
+          "qtd_vendida": 0.0,
+          "valor_estoque": 17065.4,
+          "acao": "Priorizar venda / Contatar vendedor"
+        },
+        {
+          "prioridade": "🟠 Alta Prioridade",
+          "produto": "CUMB VITORIA VALEXFRUIT",
+          "responsavel": "REGINALDO",
+          "dias_estoque": 4,
+          "dias_sem_venda": 8,
+          "saldo_cx": 330.0,
+          "qtd_vendida": 0.0,
+          "valor_estoque": 16315.2,
+          "acao": "Priorizar venda / Contatar vendedor"
+        },
+        {
+          "prioridade": "🟠 Alta Prioridade",
+          "produto": "PACKHAMS ARALI 80",
+          "responsavel": "RONISTONIS",
+          "dias_estoque": 4,
+          "dias_sem_venda": 8,
+          "saldo_cx": 112.0,
+          "qtd_vendida": 0.0,
+          "valor_estoque": 14894.88,
+          "acao": "Priorizar venda / Contatar vendedor"
+        },
+        {
+          "prioridade": "🟠 Alta Prioridade",
+          "produto": "NECTARINA FRUITS PONENT AMARELO",
+          "responsavel": "LUCIANO",
+          "dias_estoque": 2,
+          "dias_sem_venda": 8,
+          "saldo_cx": 112.0,
+          "qtd_vendida": 0.0,
+          "valor_estoque": 14370.72,
+          "acao": "Priorizar venda / Contatar vendedor"
+        },
+        {
+          "prioridade": "🟠 Alta Prioridade",
+          "produto": "PACKHAMS 100 EL CHICHE",
+          "responsavel": "FARLEY",
+          "dias_estoque": 4,
+          "dias_sem_venda": 8,
+          "saldo_cx": 98.0,
+          "qtd_vendida": 0.0,
+          "valor_estoque": 13190.8,
+          "acao": "Priorizar venda / Contatar vendedor"
+        },
+        {
+          "prioridade": "🟠 Alta Prioridade",
+          "produto": "CUMB ISIS VERMELHA DOCE CAPELLARO",
+          "responsavel": "RONISTONIS",
+          "dias_estoque": 2,
+          "dias_sem_venda": 8,
+          "saldo_cx": 220.0,
+          "qtd_vendida": 0.0,
+          "valor_estoque": 12366.2,
+          "acao": "Priorizar venda / Contatar vendedor"
+        },
+        {
+          "prioridade": "🟠 Alta Prioridade",
+          "produto": "MELAO PELE SAPO CEPI TP 6 14KG",
+          "responsavel": "RONISTONIS",
+          "dias_estoque": 3,
+          "dias_sem_venda": 8,
+          "saldo_cx": 264.0,
+          "qtd_vendida": 0.0,
+          "valor_estoque": 12144.0,
+          "acao": "Priorizar venda / Contatar vendedor"
+        },
+        {
+          "prioridade": "🟠 Alta Prioridade",
+          "produto": "GALA 135 LABELLE",
+          "responsavel": "FARLEY",
+          "dias_estoque": 4,
+          "dias_sem_venda": 8,
+          "saldo_cx": 112.0,
+          "qtd_vendida": 0.0,
+          "valor_estoque": 10016.16,
+          "acao": "Priorizar venda / Contatar vendedor"
+        },
+        {
+          "prioridade": "🟠 Alta Prioridade",
+          "produto": "CAQUI HOTH 20X1",
+          "responsavel": "RONISTONIS",
+          "dias_estoque": 28,
+          "dias_sem_venda": 8,
+          "saldo_cx": 10.0,
+          "qtd_vendida": 0.0,
+          "valor_estoque": 937.8,
+          "acao": "Priorizar venda / Contatar vendedor"
+        },
+        {
+          "prioridade": "🟠 Alta Prioridade",
+          "produto": "LARANJA IMP BAHIA CITRUS CX AZUL",
+          "responsavel": "RONISTONIS",
+          "dias_estoque": 29,
+          "dias_sem_venda": 8,
+          "saldo_cx": 1.0,
+          "qtd_vendida": 0.0,
+          "valor_estoque": 34.83,
+          "acao": "Priorizar venda / Contatar vendedor"
+        },
+        {
+          "prioridade": "🟡 Atenção",
+          "produto": "CUMB CRINSON CHERRY PURO",
+          "responsavel": "NECTAREGINALDO",
+          "dias_estoque": 3,
+          "dias_sem_venda": 8,
+          "saldo_cx": 105.0,
+          "qtd_vendida": 0.0,
+          "valor_estoque": 9645.3,
+          "acao": "Monitorar / Ação preventiva"
+        },
+        {
+          "prioridade": "🟡 Atenção",
+          "produto": "CUMB RED GLOBE CAPELLARO",
+          "responsavel": "DORA",
+          "dias_estoque": 2,
+          "dias_sem_venda": 8,
+          "saldo_cx": 110.0,
+          "qtd_vendida": 0.0,
+          "valor_estoque": 8732.9,
+          "acao": "Monitorar / Ação preventiva"
+        },
+        {
+          "prioridade": "🟡 Atenção",
+          "produto": "PACKHAMS 80 BONA TERRA",
+          "responsavel": "DORA",
+          "dias_estoque": 4,
+          "dias_sem_venda": 8,
+          "saldo_cx": 56.0,
+          "qtd_vendida": 0.0,
+          "valor_estoque": 8182.16,
+          "acao": "Monitorar / Ação preventiva"
+        },
+        {
+          "prioridade": "🟡 Atenção",
+          "produto": "PACKHAMS 70 TRAFUL",
+          "responsavel": "DORA",
+          "dias_estoque": 4,
+          "dias_sem_venda": 8,
+          "saldo_cx": 56.0,
+          "qtd_vendida": 0.0,
+          "valor_estoque": 7875.28,
+          "acao": "Monitorar / Ação preventiva"
+        },
+        {
+          "prioridade": "🟡 Atenção",
+          "produto": "PACKHAMS 90 TRAFUL",
+          "responsavel": "DORA",
+          "dias_estoque": 4,
+          "dias_sem_venda": 8,
+          "saldo_cx": 56.0,
+          "qtd_vendida": 0.0,
+          "valor_estoque": 7875.28,
+          "acao": "Monitorar / Ação preventiva"
+        },
+        {
+          "prioridade": "🟡 Atenção",
+          "produto": "PACKHAMS 120 BONA TERRA",
+          "responsavel": "DORA",
+          "dias_estoque": 4,
+          "dias_sem_venda": 8,
+          "saldo_cx": 56.0,
+          "qtd_vendida": 0.0,
+          "valor_estoque": 7851.76,
+          "acao": "Monitorar / Ação preventiva"
+        },
+        {
+          "prioridade": "🟡 Atenção",
+          "produto": "GALA 165 HIRAGAMIS CX BRANCA",
+          "responsavel": "DORA",
+          "dias_estoque": 11,
+          "dias_sem_venda": 8,
+          "saldo_cx": 56.0,
+          "qtd_vendida": 0.0,
+          "valor_estoque": 7495.04,
+          "acao": "Monitorar / Ação preventiva"
+        },
+        {
+          "prioridade": "🟡 Atenção",
+          "produto": "MAMAO HAVAI NORTE T18 Y",
+          "responsavel": "REGINALDO",
+          "dias_estoque": 1,
+          "dias_sem_venda": 8,
+          "saldo_cx": 70.0,
+          "qtd_vendida": 0.0,
+          "valor_estoque": 4025.0,
+          "acao": "Monitorar / Ação preventiva"
+        }
+      ]
+    }
+  },
+  "history": []
+}
