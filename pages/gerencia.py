@@ -1049,42 +1049,9 @@ def _render_fechamentos_semanais():
     # resumo_matriz.py, pra nunca ficar diferente daqui pra lá)
     resumo_matriz.render_matriz_produto_vendedor(prods)
 
-    # Comparativo entre semanas (se houver mais de 1)
-    if len(historico) >= 2:
-        st.divider()
-        st.subheader('Comparativo de Semanas')
-        st.caption('Variação (Δ%) sempre em relação à semana anterior na lista (mais antiga primeiro).')
-
-        historico_asc = sorted(historico, key=lambda kv: _sort_key_semana_slug(kv[0]))  # mais antiga primeiro p/ calcular Δ
-        comp_rows = []
-        vend_anterior = None
-        fat_anterior = None
-        for s, d in historico_asc:
-            dp    = d.get('produtos', [])
-            dm    = sum(r.get('estoque_total', 0) for r in dp)
-            dv    = sum(l['vendido'] for r in dp for l in r.get('linhas', []))
-            da    = dv / dm if dm else 0
-            dtg   = d.get('totais_rs', {}).get('total_geral', {})
-            fat   = dtg.get('fat') if dtg else None
-
-            comp_v = comparativo.calcular(dv, vend_anterior)
-            comp_f = comparativo.calcular(fat, fat_anterior) if fat is not None else None
-
-            comp_rows.append({
-                'Semana':        _label_fech(s),
-                'Período':       d.get('periodo', '-'),
-                'Meta (cx)':    f'{_num_vc(dm, 0)}',
-                'Vendido (cx)': f'{_num_vc(dv, 0)}',
-                'Δ Vendido':    comparativo.formatar_variacao(comp_v, casas=1),
-                '% Atingido':   f'{da*100:.1f}%',
-                'Fat R$':       f"R$ {_num_vc(fat, 2)}" if fat is not None else '—',
-                'Δ Fat':        comparativo.formatar_variacao(comp_f, casas=1) if comp_f else 'n/d',
-                'MC %':         f"{dtg.get('resultado_real', 0):.2f}%" if dtg else '—',
-            })
-            vend_anterior = dv
-            fat_anterior = fat
-
-        st.dataframe(pd.DataFrame(list(reversed(comp_rows))), use_container_width=True, hide_index=True)
+    # Comparativo de Semanas removido daqui a pedido explícito da Ingrid
+    # (28/08/2026) -- tela mais enxuta, encerrando na matriz Produto ×
+    # Vendedor acima.
 
 
 def _render_ontrack_clientes():
