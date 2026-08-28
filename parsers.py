@@ -12,6 +12,9 @@ import pdfplumber
 
 NUM_RE  = re.compile(r'^-?[\d.]+,\d+$')
 QTY3_RE = re.compile(r'^-?\d[\d.]*,\d{3}$')  # números com 3 casas decimais (quantidades)
+# Casa uma quantidade (3 casas decimais) colada no FINAL de um token maior,
+# ex.: "REGINALDO31,000" ou "CXREGINALDO1,000" — ver _extrair_qtde() abaixo.
+QTY3_TAIL_RE = re.compile(r'(-?\d[\d.]*,\d{3})$')
 DATE_RE = re.compile(r'^\d{2}/\d{2}/\d{4}$')
 VENDOR_LINE_RE = re.compile(r'^Vendedor:\s*(\d+)\s+(.+)$')
 
@@ -141,16 +144,36 @@ def parse_vendas(file) -> list[dict]:
                 if not codematch:
                     continue
                 codigo = codematch.group(1)
-                nums = [t for t in toks if NUM_RE.match(t)]
-                # Filtra só os tokens com 3 casas decimais (formato quantidade: 5,000)
-                # O último desses é sempre o Total das Saídas Qtd (Saídas por Vendas
-                # + Outras Saídas). Usando o último em vez do índice fixo 6 porque o
-                # pdfplumber funde colunas adjacentes em algumas linhas, deslocando os índices.
-                qty_nums = [n for n in nums if QTY3_RE.match(n)]
-                if not qty_nums:
-                    continue
-                # Preferência: 3º qty (Total das Saídas); fallback: último disponível
-                qtde = to_float(qty_nums[2] if len(qty_nums) >= 3 else qty_nums[-1])
+                # Às vezes a quantidade vendida sai colada sem espaço no nome do
+                # vendedor responsável (mesmo bug de caracteres embaralhados citado
+                # no docstring, ex.: "REGINALDO31,000" ou "CXREGINALDO1,000") — nesse
+                # caso o token inteiro não bate com QTY3_RE e a quantidade real
+                # desaparecia silenciosamente. Recuperamos ela procurando um número
+                # de 3 casas decimais colado no FINAL de qualquer token da linha.
+                glued_qty = None
+                qty_nums = []
+                for t in toks:
+                    if QTY3_RE.match(t):
+                        qty_nums.append(t)
+                        continue
+                    m = QTY3_TAIL_RE.search(t)
+                    if m and glued_qty is None:
+                        glued_qty = m.group(1)
+                if glued_qty is not None:
+                    # Token colado = exatamente o ponto de junção com o nome do
+                    # vendedor responsável descrito no docstring, i.e. a coluna de
+                    # Saídas por Vendas/Total — usamos direto, sem passar pela
+                    # heurística de índice abaixo (feita para linhas saudáveis).
+                    qtde = to_float(glued_qty)
+                else:
+                    if not qty_nums:
+                        continue
+                    # Filtra só os tokens com 3 casas decimais (formato quantidade: 5,000)
+                    # O último desses é sempre o Total das Saídas Qtd (Saídas por Vendas
+                    # + Outras Saídas). Usando o último em vez do índice fixo 6 porque o
+                    # pdfplumber funde colunas adjacentes em algumas linhas, deslocando os índices.
+                    # Preferência: 3º qty (Total das Saídas); fallback: último disponível
+                    qtde = to_float(qty_nums[2] if len(qty_nums) >= 3 else qty_nums[-1])
                 rows_out.append({
                     'vendedor': current_vendor,
                     'codigo': codigo,
