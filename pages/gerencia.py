@@ -1,6 +1,5 @@
 """Página de Gerência OTHIL — acesso restrito por senha."""
 import json
-import math
 import os
 import re
 import datetime
@@ -864,37 +863,10 @@ def _render_ontrack_publicado():
 
     st.divider()
 
-    # KPIs gerais -- meta geral = soma do 'estoque_total' real de cada
-    # produto, nunca a soma das metas individuais dos vendedores (essa soma
-    # é inflada pelo arredondamento pra cima de cada meta individual).
-    total_meta = sum(r.get('estoque_total', 0) for r in resultados)
-    total_vend = sum(l['vendido'] for r in resultados for l in r.get('linhas', []))
-    total_atg  = total_vend / total_meta if total_meta else 0
-    proj_cx    = math.ceil(total_vend / dia * 7) if dia > 0 else total_vend
-    em, lb, _  = _on_track_status_ger(total_atg, dia)
-
-    k1, k2, k3, k4, k5 = st.columns(5)
-    k1.metric('Meta (cx)',     f'{_num_vc(total_meta, 0)}')
-    k2.metric('Vendido (cx)',  f'{_num_vc(total_vend, 0)}')
-    k3.metric('% Atingido',    f'{total_atg*100:.1f}%')
-    k4.metric('Projeção (cx)', f'{_num_vc(proj_cx, 0)}')
-    k5.metric('Status',        f'{em} {lb}')
-
-    tg = totais_rs.get('total_geral', {})
-    if tg:
-        st.subheader('Faturamento Geral (R$)')
-        r1, r2, r3 = st.columns(3)
-        r1.metric('Faturamento', f"R$ {_num_vc(tg.get('fat', 0), 2)}")
-        r2.metric('MC R$',       f"R$ {_num_vc(tg.get('mc_rs', 0), 2)}")
-        r3.metric('MC %',        f"{tg.get('resultado_real', 0):.2f}%")
-
-    # Comparativo vs semana anterior salva -- removido em 26/08/2026 a pedido
-    # explícito da Ingrid ("ainda está com o comparativo, que já falei que
-    # não é necessário"): ela confirmou que isso também se aplica a esta
-    # tela (On Track Atual / Publicado), não só ao bloco já removido dentro
-    # da aba Metas Gerais.
-
-    st.divider()
+    # KPIs gerais / Faturamento Geral removidos daqui a pedido explícito da
+    # Ingrid (28/08/2026) -- ela quis a tela mais enxuta, indo direto pro
+    # detalhamento Por Produto / Por Vendedor abaixo, sem repetir o resumo
+    # geral aqui.
 
     # Por produto -- mesmo padrão visual/estrutural do "Por Vendedor" logo
     # abaixo (tabela via st.dataframe, não mais uma lista de accordions).
