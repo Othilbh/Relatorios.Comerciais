@@ -1968,14 +1968,31 @@ def _render_metas_gerais():
             _qbr_pct_real = mg.quebra_pct_faturamento(_qbr_realizado_rs, rv.get('faturamento'))
             if _qbr_pct_real is not None:
                 _qbr_txt = f"{_qbr_pct_real:.2f}% do fat."
+                _qbr_txt_em_rs = True
             elif rq.get('total_cx') is not None:
                 _qbr_txt = f"{_num_vc(rq.get('total_cx'), 0)} cx"
+                _qbr_txt_em_rs = False
             else:
                 _qbr_txt = '—'
-            if _qbr_meta_rs:
+                _qbr_txt_em_rs = _usa_rs_qbr  # sem valor nenhum -- tanto faz, não há unidade pra casar
+            # O Teto mostrado precisa estar na MESMA unidade do valor acima
+            # (_qbr_txt_em_rs), senão compara cx com R$ sem relação nenhuma
+            # entre si (bug real: com custo real ainda não extraído do PDF de
+            # quebra -- ou faturamento ainda não publicado pra calcular o %
+            # -- o valor cai pra cx mas o Teto continuava priorizando R$
+            # sempre que ele estivesse definido, mostrando ex. "831 cx" ao
+            # lado de "Teto: R$ 80.000,00"). Usa o que efetivamente formou
+            # _qbr_txt acima (_qbr_txt_em_rs), não _usa_rs_qbr sozinho --
+            # _usa_rs_qbr fica True mesmo quando o % não deu pra calcular
+            # por falta de faturamento, e nesse caso _qbr_txt já caiu pra cx.
+            if _qbr_txt_em_rs and _qbr_meta_rs:
                 _qbr_det = f"Teto: R$ {_num_vc(_qbr_meta_rs, 2)}"
             elif meta_atual.get('quebra_max_cx'):
                 _qbr_det = f"Teto: {_num_vc(meta_atual['quebra_max_cx'], 0)} cx"
+            elif _qbr_meta_rs:
+                _qbr_det = (f"Teto em R$ definido ({_num_vc(_qbr_meta_rs, 2)}), mas ainda falta "
+                            f"custo real de quebra e/ou faturamento publicado pra comparar -- "
+                            f"defina também um Teto de Quebra (CX) pra ter um indicador aqui.")
             else:
                 _qbr_det = 'Teto de quebra não definido'
             _badge_indicador_simples(_ot_qbr['status'], '📦 Quebra vs Faturamento', _qbr_txt, _qbr_det)
@@ -2077,18 +2094,24 @@ def _render_metas_gerais():
         if evol_rows:
             import pandas as _pd
             df_evol = _pd.DataFrame(evol_rows).set_index('Período')
+            # sort=False em todos: por padrão o st.bar_chart ordena o eixo
+            # categórico em ordem alfabética (comportamento do Altair/Vega-Lite
+            # pra colunas de texto), o que embaralhava os meses (Abril, Agosto,
+            # Fevereiro, Janeiro...) mesmo com df_evol já montado na ordem
+            # cronológica certa (via hist_refs acima). sort=False desliga essa
+            # ordenação automática e preserva a ordem das linhas do DataFrame.
             ev1, ev2, ev3 = st.columns(3)
             with ev1:
                 st.caption('Faturamento (R$)')
-                st.bar_chart(df_evol[['Faturamento']], color='#2D6A4F')
+                st.bar_chart(df_evol[['Faturamento']], color='#2D6A4F', sort=False)
             with ev2:
                 st.caption('Volume (CX)')
-                st.bar_chart(df_evol[['Volume (CX)']], color='#7C6FAD')
+                st.bar_chart(df_evol[['Volume (CX)']], color='#7C6FAD', sort=False)
             with ev3:
                 st.caption('Margem (%)')
-                st.bar_chart(df_evol[['Margem (%)']], color='#2A6F97')
+                st.bar_chart(df_evol[['Margem (%)']], color='#2A6F97', sort=False)
             st.caption('Quebra (R$ — ou cx, quando o custo real ainda não foi extraído do PDF)')
-            st.bar_chart(df_evol[['Quebra (R$)']], color='#BC4749')
+            st.bar_chart(df_evol[['Quebra (R$)']], color='#BC4749', sort=False)
 
         # ── OnTrack Semanal — quebra da meta MENSAL fixa (Faturamento) ──────
         # Só faz sentido pra 'mensal' (não dá pra quebrar um trimestre/ano em
