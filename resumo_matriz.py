@@ -9,9 +9,11 @@ aqui fica centralizado.
 `resultados` é a lista no formato de calc.compute_metas() / salvo em
 'produtos' pelo fechamento: [{'produto', 'estoque_total', 'prioridade',
 'linhas': [{'vendedor', 'meta', 'vendido', 'atingido', ...}, ...],
-'media_rs_cx', 'media_rs_cx_soma_ponderada', 'media_rs_cx_peso'}, ...]
-('media_rs_cx*' pode não existir em fechamentos salvos antes desse campo
-existir -- sempre acessado via .get() com fallback, nunca inventado.)
+'media_rs_cx', 'media_rs_cx_soma_ponderada', 'media_rs_cx_peso',
+'media_custo_cx', 'media_custo_cx_soma_ponderada', 'media_custo_cx_peso'},
+...] ('media_rs_cx*'/'media_custo_cx*' podem não existir em fechamentos
+salvos antes desses campos existirem -- sempre acessados via .get() com
+fallback, nunca inventados.)
 
 Renderizado como um bloco HTML único (pedido explícito da Ingrid,
 28/08/2026: "preciso que dê para abrir num todo" -- antes cada grupo de
@@ -21,12 +23,15 @@ MESMA estrutura visual do PDF Resumo Geral (pdfgen._build_resumo_geral,
 28/08/2026: Ingrid mandou print do PDF e confirmou "Assim é no PDF, e
 assim preciso que fique"): uma linha de totais gerais no topo, e um mini
 bloco por prioridade -- título colorido + tabela própria com cabeçalho
-colorido (Produto/Qtde/vendedores/TOTAL[Vend,%,R$ Méd/cx]) e linha de
-SUBTOTAL -- seguido da tabela TOTAL GERAL (verde OTHIL). Mesmas cores/
-fórmulas do PDF (pdfgen._PRIO_BG_RG / _PRIO_TITLE_COLOR_RG / _totais /
-_produto_totais / _subtotal_row). Os NÚMEROS e a lógica de cálculo em si
-não mudaram nada aqui -- só a apresentação, agora tudo num bloco só (sem
-exigir abrir/rolar cada grupo separadamente)."""
+colorido (Produto/Qtde/vendedores/TOTAL[Vend,%,Venda Méd/cx,Custo Méd/cx])
+e linha de SUBTOTAL -- seguido da tabela TOTAL GERAL (verde OTHIL). Mesmas
+cores/fórmulas do PDF (pdfgen._PRIO_BG_RG / _PRIO_TITLE_COLOR_RG / _totais
+/ _produto_totais / _subtotal_row). A coluna 'Custo Méd/cx' foi adicionada
+depois (28/08/2026, pedido explícito da Ingrid: "Preciso que tenha a média
+de custo e a média de venda R$"), usando o mesmo padrão de média ponderada
+de 'media_rs_cx' (calc.compute_metas -- ver 'media_custo_cx'). Os NÚMEROS
+e a lógica de cálculo em si não mudaram nada aqui -- só a apresentação,
+agora tudo num bloco só (sem exigir abrir/rolar cada grupo separadamente)."""
 import html as _html
 
 import streamlit as st
@@ -86,13 +91,21 @@ def _fmt_pct(v) -> str:
 
 
 def _media_rs_cx_grupo(group: list):
-    """Média ponderada de R$/cx do grupo -- soma dos R$ ponderados ÷ soma
-    dos pesos (nunca a média simples das médias de cada produto, que
+    """Média ponderada de Venda R$/cx do grupo -- soma dos R$ ponderados ÷
+    soma dos pesos (nunca a média simples das médias de cada produto, que
     distorceria quando os produtos têm volumes bem diferentes). None
     quando nenhum produto do grupo tem essa informação (PDF de Estoque
     Físico não enviado, ou fechamento salvo antes desse campo existir)."""
     fat = sum(r.get('media_rs_cx_soma_ponderada', 0.0) or 0.0 for r in group)
     peso = sum(r.get('media_rs_cx_peso', 0.0) or 0.0 for r in group)
+    return (fat / peso) if peso else None
+
+
+def _media_custo_cx_grupo(group: list):
+    """Mesma lógica de _media_rs_cx_grupo, mas para o custo unitário médio
+    ponderado do grupo (calc.compute_metas: 'media_custo_cx*')."""
+    fat = sum(r.get('media_custo_cx_soma_ponderada', 0.0) or 0.0 for r in group)
+    peso = sum(r.get('media_custo_cx_peso', 0.0) or 0.0 for r in group)
     return (fat / peso) if peso else None
 
 
@@ -105,10 +118,11 @@ def render_matriz_produto_vendedor(resultados: list, titulo: str = 'Resumo Geral
     Cada célula de vendedor mostra SÓ o vendido (pedido explícito da
     Ingrid: célula com vendido/meta/% junto ficava poluída). A meta de
     cada linha/subtotal fica na coluna 'Qtde', e a coluna 'TOTAL' traz
-    Vendido/%/R$ Méd por caixa -- SEM combinar vendido/meta no mesmo campo
-    (ex.: "275/618"), também por pedido explícito da Ingrid. 'Qtde' sempre
-    usa a meta REAL do produto ('estoque_total'), nunca a soma das metas
-    individuais dos vendedores (ver correção de meta geral)."""
+    Vendido/%/Venda Méd por caixa/Custo Méd por caixa -- SEM combinar
+    vendido/meta no mesmo campo (ex.: "275/618"), também por pedido
+    explícito da Ingrid. 'Qtde' sempre usa a meta REAL do produto
+    ('estoque_total'), nunca a soma das metas individuais dos vendedores
+    (ver correção de meta geral)."""
     if not resultados:
         st.info('Sem dados para montar o Resumo Geral.')
         return
@@ -144,9 +158,9 @@ def render_matriz_produto_vendedor(resultados: list, titulo: str = 'Resumo Geral
               + _th('Qtde', rowspan=2))
         for v in vendedores:
             r1 += _th(v, rowspan=2)
-        r1 += _th('TOTAL', colspan=3) + '</tr>'
+        r1 += _th('TOTAL', colspan=4) + '</tr>'
         r2 = (f'<tr style="background:{bg}; color:white;">'
-              + _th('Vend') + _th('%') + _th('R$ Méd/cx') + '</tr>')
+              + _th('Vend') + _th('%') + _th('Venda Méd/cx') + _th('Custo Méd/cx') + '</tr>')
         return r1 + r2
 
     def _linhas_grupo(group):
@@ -161,10 +175,12 @@ def render_matriz_produto_vendedor(resultados: list, titulo: str = 'Resumo Geral
                 l = linhas_por_vend.get(v)
                 cells.append(_td(f"{l['vendido']:.1f}") if l else _td('-'))
             pct_txt = _fmt_pct(p_vend / p_meta) if p_meta else '—'
-            media = r.get('media_rs_cx')
+            media_venda = r.get('media_rs_cx')
+            media_custo = r.get('media_custo_cx')
             cells.append(_td(f"{p_vend:.1f}"))
             cells.append(_td(pct_txt))
-            cells.append(_td(_fmt_money(media) if media is not None else '—'))
+            cells.append(_td(_fmt_money(media_venda) if media_venda is not None else '—'))
+            cells.append(_td(_fmt_money(media_custo) if media_custo is not None else '—'))
             rows_html.append(f'<tr style="background:{zebra};">' + ''.join(cells) + '</tr>')
         return rows_html
 
@@ -178,8 +194,10 @@ def render_matriz_produto_vendedor(resultados: list, titulo: str = 'Resumo Geral
         gv = sum(l['vendido'] for r in group for l in r.get('linhas', []))
         cells.append(_td(f"{gv:.1f}", bold=True, color=color))
         cells.append(_td(_fmt_pct(gv / gm) if gm else '—', bold=True, color=color))
-        media_g = _media_rs_cx_grupo(group)
-        cells.append(_td(_fmt_money(media_g) if media_g is not None else '—', bold=True, color=color))
+        media_venda_g = _media_rs_cx_grupo(group)
+        cells.append(_td(_fmt_money(media_venda_g) if media_venda_g is not None else '—', bold=True, color=color))
+        media_custo_g = _media_custo_cx_grupo(group)
+        cells.append(_td(_fmt_money(media_custo_g) if media_custo_g is not None else '—', bold=True, color=color))
         return f'<tr style="background:{bg};">' + ''.join(cells) + '</tr>'
 
     blocks_html = []
