@@ -28,17 +28,6 @@ CLIENTE_RE = re.compile(r'^Cliente:\s*([\w*]+)\s*-\s*(.+?)\s{2,}Cidade:')
 TOT_CLIENTE_RE = re.compile(r'^\s*Totais do Cliente - (.+):\s+(\S.*)$')
 TOT_VENDEDOR_RE = re.compile(r'^\s*Totais do Vendedor - (.+):\s+(\S.*)$')
 TOTAL_GERAL_RE = re.compile(r'^\s*Total Geral:\s+(\S.*)$')
-# Sem '\b' antes de "CX": quando o nome do vendedor/complemento é longo o
-# bastante para preencher a coluna até encostar em "CX" (ex.: "RONISTONIS"
-# -- "...RONISTONISCX       2,000..."), não sobra espaço nenhum entre o
-# texto e "CX", e um '\b' ali exigiria uma fronteira \w->\W que não existe
-# entre "S" e "C" (ambos caracteres de palavra). Com o '\b' a linha inteira
-# não era reconhecida como linha de produto: vazava pra "pending_lines" e
-# contaminava o produto seguinte (que "herdava" o código errado, e o
-# produto de verdade -- cujo texto tinha vazado -- desaparecia do
-# cálculo). "CX" só marca a coluna de unidade nesse relatório, então não
-# há necessidade de exigir fronteira de palavra antes dele.
-CX_RE = re.compile(r'CX\s+(?=[\d\-,.])')
 EMISSAO_RE = re.compile(r'Emissão:\s*(\d{2}/\d{2}/\d{4})')
 PERIODO_RE = re.compile(r'Período\s*:\s*(\d{2}/\d{2}/\d{4}[^N]*?\d{2}/\d{2}/\d{4})')
 
@@ -58,6 +47,29 @@ _KNOWN_COMPLEMENTOS = sorted([
     'ADILSON', 'AFANAIS', 'CLAUDIA', 'FARLEY', 'JULIANA AUGUSTA', 'JULIANA',
     'LUCA VENDEDOR', 'LUCA', 'LUCIANO', 'REGINALDO', 'RONISTONIS', 'RONI', 'DORA',
 ], key=len, reverse=True)
+
+# Sem '\b' antes de "CX": quando o nome do vendedor/complemento é longo o
+# bastante para preencher a coluna até encostar em "CX" (ex.: "RONISTONIS"
+# -- "...RONISTONISCX       2,000..."), não sobra espaço nenhum entre o
+# texto e "CX", e um '\b' ali exigiria uma fronteira \w->\W que não existe
+# entre "S" e "C" (ambos caracteres de palavra). Com o '\b' a linha inteira
+# não era reconhecida como linha de produto: vazava pra "pending_lines" e
+# contaminava o produto seguinte (que "herdava" o código errado, e o
+# produto de verdade -- cujo texto tinha vazado -- desaparecia do
+# cálculo). "CX" só marca a coluna de unidade nesse relatório, então não
+# há necessidade de exigir fronteira de palavra antes dele.
+#
+# O nome do vendedor responsável também pode aparecer DEPOIS de "CX", colado
+# direto na quantidade -- às vezes sem espaço nenhum em nenhum dos dois lados
+# (ex.: "CX REGINALDO31,000", ou até "CXREGINALDO1,000" totalmente colado).
+# É o mesmo bug de caracteres embaralhados perto da junção com o nome do
+# vendedor responsável citado no topo do arquivo. Sem tolerar esse nome
+# opcional entre "CX" e o número, a linha inteira não batia com CX_RE e a
+# venda inteira era perdida (não sobrava nem fallback: o pdftotext é tentado
+# primeiro e só cai pra pdfplumber se a lista de linhas vier vazia, o que não
+# acontece aqui porque outros produtos da mesma página continuam batendo).
+_COMPLEMENTO_ALT = '|'.join(re.escape(n) for n in _KNOWN_COMPLEMENTOS)
+CX_RE = re.compile(r'CX\s*(?:(?:' + _COMPLEMENTO_ALT + r')\s*)?(?=[\d\-,.])')
 
 
 class ValidationError(Exception):
