@@ -129,13 +129,49 @@ def semana_ano_anterior(slug: str) -> str:
 
 def dia_semana_atual(data: datetime.date = None) -> int:
     """Dia de venda (1..7) dentro da semana sexta-a-sexta que contém
-    `data` (hoje, por padrão) -- pula domingo, que não tem venda."""
+    `data` (hoje, por padrão) -- pula domingo, que não tem venda.
+
+    AMBÍGUO numa sexta-feira: `slug_semana` sempre trata uma sexta como a
+    abertura de uma semana NOVA (dia 1), mesmo que a intenção seja ver o
+    fechamento da semana que está terminando naquele mesmo dia (dia 7).
+    Por isso, sempre que já existir uma semana especificamente selecionada
+    na tela (ex.: um item de histórico/publicação), prefira
+    `dia_semana_no_periodo(slug, ...)` -- que calcula o dia em relação a
+    ESSA semana, não à que o calendário de hoje sugeriria por conta
+    própria. Use esta função (sem slug) só quando não há nenhuma semana
+    selecionada e "a semana atual" precisa ser inferida do zero."""
     if data is None:
         data = datetime.date.today()
     inicio, _ = intervalo_semana(slug_semana(data))
     dia = 0
     d = inicio
     while d <= data:
+        if d.weekday() != 6:  # domingo
+            dia += 1
+        d += datetime.timedelta(days=1)
+    return max(1, min(dia, 7))
+
+
+def dia_semana_no_periodo(slug: str, hoje: datetime.date = None) -> int:
+    """Dia de venda (1..7) já decorrido dentro da semana comercial `slug`
+    especificamente, até hoje -- ou a semana inteira (7) se `slug` já
+    tiver fechado antes de hoje. Corrige a ambiguidade de
+    `dia_semana_atual()` numa sexta-feira: se `slug` for a semana que
+    ABRIU há 7 dias e FECHA hoje (sexta), o resultado é dia 7 (a semana
+    ainda não encerrou, está no seu último dia) -- não dia 1, que seria
+    tratar hoje como abertura de uma semana nova (a ambiguidade
+    reportada pela Ingrid em 28/08/2026: "hj é sexta, dia 1 de 7" na
+    semana 21/08 a 28/08, que na verdade estava no dia 7, seu último
+    dia, ainda não fechada)."""
+    if hoje is None:
+        hoje = datetime.date.today()
+    inicio, fim = intervalo_semana(slug)
+    ref = min(hoje, fim)
+    if ref < inicio:
+        return 1
+    dia = 0
+    d = inicio
+    while d <= ref:
         if d.weekday() != 6:  # domingo
             dia += 1
         d += datetime.timedelta(days=1)
