@@ -120,7 +120,17 @@ def _salvar_fechamento(resultados: list, totais_rs: dict, periodo_txt: str, slug
     leitura já existente na página de Gerência) E na camada central de
     persistência (data_store — sobrevive a restart do Streamlit Cloud e
     mantém histórico versionado: fechar a mesma semana de novo não apaga
-    o fechamento anterior, ele fica disponível em 'histórico de versões')."""
+    o fechamento anterior, ele fica disponível em 'histórico de versões').
+
+    Retorna o registro devolvido por ds.save_record (mesmo padrão usado em
+    metas_gerais.py/6_Rentabilidade_Margens_OTHIL.py/etc.) para o chamador
+    poder checar 'valores' e o campo '_erro_persistencia_remota' antes de
+    mostrar sucesso -- ds.save_record NÃO levanta exceção quando a gravação
+    remota (GitHub) falha, ela é sinalizada só nesse campo do retorno. Sem
+    checar esse campo, o botão "Fechar Semana" sempre mostrava "✅ salvo"
+    mesmo quando a gravação remota falhava silenciosamente, e o fechamento
+    sumia da Gerência no primeiro restart do Streamlit Cloud (disco local é
+    efêmero) -- exatamente o "não está ficando salvo" relatado pela Ingrid."""
     os.makedirs(_FECHAMENTOS_DIR, exist_ok=True)
     payload = {
         'slug': slug,
@@ -133,18 +143,11 @@ def _salvar_fechamento(resultados: list, totais_rs: dict, periodo_txt: str, slug
     with open(path, 'w', encoding='utf-8') as f:
         json.dump(payload, f, ensure_ascii=False, indent=2)
 
-    try:
-        ds.save_record(
-            modulo=MODULO, tipo_periodo='semanal', periodo_ref=slug,
-            valores={'periodo': periodo_txt, 'produtos': resultados, 'totais_rs': totais_rs},
-            usuario=usuario,
-        )
-    except Exception as e:
-        st.warning(
-            f'O fechamento foi salvo localmente, mas houve um problema ao salvar '
-            f'de forma permanente (histórico pode não sobreviver a um restart do '
-            f'app): {e}'
-        )
+    return ds.save_record(
+        modulo=MODULO, tipo_periodo='semanal', periodo_ref=slug,
+        valores={'periodo': periodo_txt, 'produtos': resultados, 'totais_rs': totais_rs},
+        usuario=usuario,
+    )
 
 
 def _listar_fechamentos():
@@ -603,9 +606,18 @@ def _render_fechamento_semanal():
             else f'💾 Fechar {label_atual} (retroativo) e Salvar no Histórico'
         if st.button(label_botao, type='primary', key='btn_fechar'):
             try:
-                _salvar_fechamento(resultados, totais_rs, periodo_texto, slug_atual,
-                                    usuario=st.session_state.get('usuario_nome', 'Ingrid'))
-                st.success(f'✅ {label_atual} salvo no histórico da Gerência.')
+                _registro_fech = _salvar_fechamento(
+                    resultados, totais_rs, periodo_texto, slug_atual,
+                    usuario=st.session_state.get('usuario_nome', 'Ingrid'))
+                _erro_fech = _registro_fech.get('_erro_persistencia_remota') if _registro_fech else None
+                if _erro_fech:
+                    st.warning(
+                        f'{label_atual} foi salvo apenas localmente -- houve um problema ao '
+                        f'salvar de forma permanente (pode não sobreviver a um restart do '
+                        f'app e não aparecer na Gerência): {_erro_fech}'
+                    )
+                else:
+                    st.success(f'✅ {label_atual} salvo no histórico da Gerência.')
                 st.rerun()
             except Exception as e:
                 st.error(f'Erro ao salvar: {e}')
@@ -1226,15 +1238,31 @@ with tab_cfg:
                         hist_path = os.path.join(_ONTRACK_META_DIR, f'{slug_sem}.json')
                         with open(hist_path, 'w', encoding='utf-8') as f:
                             json.dump(snapshot, f, ensure_ascii=False, indent=2)
-                        # Persistência real e versionada (sobrevive a restart do app)
+                        # Persistência real e versionada (sobrevive a restart do app).
+                        # ds.save_record NÃO levanta exceção quando a gravação remota
+                        # (GitHub) falha -- ela sinaliza isso só no campo
+                        # '_erro_persistencia_remota' do retorno (mesmo padrão de
+                        # metas_gerais.py/6_Rentabilidade_Margens_OTHIL.py/etc.). O
+                        # except abaixo cobre só erros inesperados de verdade; sem
+                        # checar o retorno, esta tela sempre mostrava "✅ publicado"
+                        # mesmo quando a gravação remota falhava silenciosamente.
                         try:
-                            ds.save_record(
+                            _reg_ot = ds.save_record(
                                 modulo=MODULO_ONTRACK, tipo_periodo='semanal', periodo_ref=slug_sem,
                                 valores=snapshot, usuario=st.session_state.get('usuario_nome'),
                             )
                         except Exception as e2:
+                            _reg_ot = None
                             st.warning(f'Publicado localmente, mas houve um problema ao salvar de forma permanente: {e2}')
-                        st.success('✅ On Track publicado — disponível na aba Gerência.')
+                        else:
+                            _erro_ot = _reg_ot.get('_erro_persistencia_remota') if _reg_ot else None
+                            if _erro_ot:
+                                st.warning(
+                                    f'Publicado apenas localmente -- houve um problema ao salvar de '
+                                    f'forma permanente (pode não sobreviver a um restart do app): {_erro_ot}'
+                                )
+                            else:
+                                st.success('✅ On Track publicado — disponível na aba Gerência.')
                     except Exception as e:
                         st.error(f'Erro ao publicar: {e}')
 
