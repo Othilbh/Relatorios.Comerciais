@@ -1806,109 +1806,58 @@ def _render_prevperdas_secao(tipo, titulo):
 
 # ── Metas Gerais ────────────────────────────────────────────────────────────
 
-def _render_indicador_mg(titulo, unidade_fmt, meta, realizado, ot, completude_msg=None):
-    # Indicador em st.metric NATIVO (antes: cartão HTML/CSS de fundo pastel
-    # montado à mão). Mesmo conteúdo de sempre -- realizado em destaque,
-    # meta/% atingido/projeção/completude como detalhe --, agora no visual
-    # padrão do Streamlit, igual a todos os outros indicadores do app. O
-    # sinal de status, que antes era a cor de fundo do cartão, continua
-    # presente em três lugares: emoji no rótulo, cor do delta (mapeada do
-    # status em _GER_STATUS_CORES) e legenda colorida logo abaixo.
-    st.metric(
-        label=f"{ot['emoji']} {titulo}",
-        value=unidade_fmt(realizado) if realizado is not None else '—',
-        delta=(f"{ot['pct_atingido'] * 100:.0f}% da meta"
-               if ot.get('pct_atingido') is not None else None),
-        delta_color=_GER_STATUS_CORES[ot['status']]['delta_color'],
+def _barra_horizontal_meta(titulo, realizado, meta, status, unidade_fmt, subtitulo=None):
+    """Barra horizontal de progresso (realizado vs meta), preenchendo da
+    esquerda pra direita conforme o % atingido -- pedido explícito da
+    Ingrid, 28/08/2026: "um gráfico na horizontal em que vai enchendo à
+    medida que vamos faturando de acordo com a meta". Cor igual ao status
+    on-track (mesmo mapa único _GER_STATUS_CORES usado no resto da tela --
+    nunca uma segunda paleta). O preenchimento visual nunca passa de 100%
+    da largura (fisicamente não cabe no container), mas o texto do %
+    sempre mostra o valor real mesmo acima de 100% -- nunca esconde o
+    número (mesma filosofia de mg.quebra_semanal_meta: passar de 100% não
+    é limitado nem escondido)."""
+    cor = _GER_STATUS_CORES[status]['cor']
+    pct = (realizado / meta * 100) if (meta and realizado is not None) else None
+    largura = min(pct, 100) if pct is not None else 0.0
+    pct_txt = f'{pct:.0f}%' if pct is not None else '—'
+    val_txt = unidade_fmt(realizado) if realizado is not None else '—'
+    meta_txt = unidade_fmt(meta) if meta else '—'
+    st.markdown(
+        f'<div style="margin-bottom:0.2rem;">'
+        f'<div style="display:flex; justify-content:space-between; font-size:0.95rem; '
+        f'margin-bottom:4px;"><span style="font-weight:600;">{titulo}</span>'
+        f'<span>{val_txt} <span style="color:#888;">/ {meta_txt}</span></span></div>'
+        f'<div style="background:#EDEDED; border-radius:8px; height:30px; '
+        f'overflow:hidden; position:relative;">'
+        f'<div style="background:{cor}; width:{largura:.1f}%; height:100%; '
+        f'border-radius:8px;"></div>'
+        f'<div style="position:absolute; top:0; left:0; width:100%; height:100%; '
+        f'display:flex; align-items:center; justify-content:center; font-weight:700; '
+        f'font-size:0.9rem; color:#1a1a1a;">{pct_txt}</div></div></div>',
+        unsafe_allow_html=True,
     )
-    st.caption(f"Meta: {unidade_fmt(meta) if meta else '—'}")
-    if meta:
-        _ger_legenda_status(ot)
-    if ot.get('projecao_fechamento') is not None:
-        st.caption(f'Projeção de fechamento: {unidade_fmt(ot["projecao_fechamento"])}')
-    if completude_msg:
-        st.caption(completude_msg)
+    if subtitulo:
+        st.caption(subtitulo)
 
 
-def _render_indicador_quebra(meta_cx, realizado_cx, meta_rs, realizado_rs, faturamento_meta,
-                              tipo_periodo, periodo_ref, completude_msg=None):
-    """Card de Quebra -- com custo real disponível (extraído da coluna
-    "Custo Saída" do relatório de Quebra em PDF, desde que a Ingrid já
-    tenha subido um PDF processado com essa extração), funciona como os
-    outros indicadores: REALIZADO em R$ é o número principal, Teto em R$/%
-    é o detalhe. Sem isso (PDF antigo, sem a coluna extraída, ou Teto em
-    R$ ainda não definido), cai pro modo anterior: Teto em R$/% em
-    destaque (o único R$ que existe) e cx como detalhe -- nunca inventa um
-    "realizado em R$" que não temos."""
-    usa_rs = bool(meta_rs) and realizado_rs is not None
-    if usa_rs:
-        ot = mg.status_quebra(meta_rs, realizado_rs, tipo_periodo, periodo_ref)
-    else:
-        ot = mg.status_quebra(meta_cx, realizado_cx, tipo_periodo, periodo_ref)
-
-    # Mesmas informações de sempre, só reorganizadas para st.metric nativo +
-    # legendas (ver comentário em _render_indicador_mg acima): o que era a
-    # "linha principal" do cartão vira o value do metric, o "% do teto" vira
-    # o delta, e teto/cx/projeção/aviso viram st.caption.
-    if usa_rs:
-        titulo = 'Quebra'
-        linha_principal = f'R$ {_num_vc(realizado_rs, 2)}'
-        pct_fat = mg.quebra_pct_faturamento(meta_rs, faturamento_meta)
-        delta_txt = (f'{ot["pct_atingido"] * 100:.0f}% do teto'
-                      if ot.get('pct_atingido') is not None else None)
-        mostra_status = True
-        detalhes = [
-            f'Teto: R$ {_num_vc(meta_rs, 2)}'
-            + (f' ({_num_vc(pct_fat, 2)}% da Meta de Faturamento)' if pct_fat is not None else '')
-        ]
-        if realizado_cx is not None:
-            detalhes.append(
-                f'{_num_vc(realizado_cx, 0)} cx'
-                + (f'  |  Teto: {_num_vc(meta_cx, 0)} cx' if meta_cx else '')
-            )
-        if ot.get('projecao_fechamento') is not None:
-            detalhes.append(f'Projeção de fechamento: R$ {_num_vc(ot["projecao_fechamento"], 2)}')
-    else:
-        titulo = 'Quebra (Teto)'
-        if meta_rs:
-            pct_fat = mg.quebra_pct_faturamento(meta_rs, faturamento_meta)
-            linha_principal = f'R$ {_num_vc(meta_rs, 2)}' + (
-                f' ({_num_vc(pct_fat, 2)}% da Meta de Faturamento)' if pct_fat is not None else ''
-            )
-        else:
-            linha_principal = '—'
-        delta_txt = (f'{ot["pct_atingido"] * 100:.0f}% do teto em cx'
-                      if ot.get('pct_atingido') is not None else None)
-        mostra_status = bool(meta_cx)
-        detalhes = [
-            ('Realizado: ' + _num_vc(realizado_cx, 0) + ' cx' if realizado_cx is not None else 'Realizado: —')
-            + (f'  |  Teto: {_num_vc(meta_cx, 0)} cx' if meta_cx else '')
-        ]
-        if ot.get('projecao_fechamento') is not None:
-            detalhes.append(f'Projeção de fechamento (cx): {_num_vc(ot["projecao_fechamento"], 0)}')
-
-    aviso_txt = None
-    if not meta_rs:
-        aviso_txt = ('Defina o Teto de Quebra em R$ no formulário "🎯 Definir/editar meta" '
-                      'pra ver valor/% aqui.')
-    elif not usa_rs:
-        aviso_txt = ('Realizado em R$ ainda não disponível pra este período -- o PDF de Quebra '
-                      'precisa ser reprocessado (reenviado) pra extrair o custo.')
-
-    st.metric(
-        label=f"{ot['emoji']} {titulo}",
-        value=linha_principal,
-        delta=delta_txt,
-        delta_color=_GER_STATUS_CORES[ot['status']]['delta_color'],
+def _badge_indicador_simples(status, titulo, valor_txt, detalhe=None):
+    """Indicador simplificado (badge colorido, 1 número em destaque) --
+    pedido explícito da Ingrid, 28/08/2026: "algum indicador simplificado
+    que acompanhe o track de margem" / "algum indicador que vá indicando a
+    relação quebra vs faturamento". Mesmas cores de status do resto da
+    tela (_GER_STATUS_CORES bg/fg), sem os detalhes extras (projeção,
+    histórico etc.) que os cards anteriores tinham -- só o essencial."""
+    cores = _GER_STATUS_CORES[status]
+    st.markdown(
+        f'<div style="background:{cores["bg"]}; color:{cores["fg"]}; border-radius:8px; '
+        f'padding:10px 14px; margin-bottom:0.2rem;">'
+        f'<div style="font-size:0.8rem; font-weight:600; opacity:0.85;">{titulo}</div>'
+        f'<div style="font-size:1.35rem; font-weight:700;">{valor_txt}</div></div>',
+        unsafe_allow_html=True,
     )
-    for _linha_det in detalhes:
-        st.caption(_linha_det)
-    if mostra_status:
-        _ger_legenda_status(ot)
-    if aviso_txt:
-        st.caption(aviso_txt)
-    if completude_msg:
-        st.caption(completude_msg)
+    if detalhe:
+        st.caption(detalhe)
 
 
 def _render_metas_gerais():
@@ -1963,38 +1912,73 @@ def _render_metas_gerais():
             'completo': None,
         }
 
+        # 3 indicadores simplificados -- substituem os 4 cards detalhados
+        # anteriores (Faturamento/Volume/Margem/Quebra, cada um com
+        # meta/realizado/%/status/projeção), a pedido explícito da Ingrid
+        # (28/08/2026): "Track da meta geral: um gráfico na horizontal que
+        # vai enchendo + indicador simplificado de margem + indicador de
+        # quebra vs faturamento. Apenas isso nos dá o que precisamos... e
+        # gera um baita engajamento." Os CÁLCULOS continuam os mesmos de
+        # sempre (mg.realizado_vendas / on_track.calcular / mg.status_quebra
+        # / mg.quebra_pct_faturamento) -- só a apresentação foi trocada por
+        # algo mais visual e direto. Volume (CX) deixou de ter indicador
+        # dedicado aqui (continua no gráfico de Evolução logo abaixo e no
+        # ranking da aba Vendedor).
         st.subheader('Indicadores da Empresa')
-        ic1, ic2, ic3, ic4 = st.columns(4)
-        with ic1:
-            # NÃO usar `or 0` no realizado: rv.get(...) retorna None quando
-            # ainda não há dado publicado (diferente de "publicado e deu
-            # zero"), e on_track.calcular já trata None corretamente
-            # (status ⚪ Sem meta/dado). Convertendo para 0 aqui, o cálculo
-            # interpretava como "0% atingido" e mostrava 🔴 Fora do Track
-            # incorretamente assim que o período começava, mesmo sem nenhum
-            # dado real publicado ainda.
-            ot_fat = on_track.calcular(meta_atual.get('faturamento') or 0, rv.get('faturamento'),
-                                        tipo_mg, ref_mg, pct_tempo_decorrido=pct_tempo_mg)
-            _render_indicador_mg('Faturamento', lambda x: f'R$ {_num_vc(x, 0)}',
-                                  meta_atual.get('faturamento'), rv.get('faturamento'), ot_fat,
-                                  _completude_msgs.get(rv['completude']))
-        with ic2:
-            ot_vol = on_track.calcular(meta_atual.get('volume') or 0, rv.get('volume'),
-                                        tipo_mg, ref_mg, pct_tempo_decorrido=pct_tempo_mg)
-            _render_indicador_mg('Volume (CX)', lambda x: f'{_num_vc(x, 0)} cx',
-                                  meta_atual.get('volume'), rv.get('volume'), ot_vol,
-                                  _completude_msgs.get(rv['completude']))
-        with ic3:
+
+        # NÃO usar `or 0` no realizado: rv.get(...) retorna None quando
+        # ainda não há dado publicado (diferente de "publicado e deu
+        # zero"), e on_track.calcular já trata None corretamente (status
+        # ⚪ Sem meta/dado). Convertendo para 0 aqui, o cálculo interpretava
+        # como "0% atingido" e mostrava 🔴 Fora do Track incorretamente
+        # assim que o período começava, mesmo sem nenhum dado publicado.
+        ot_fat = on_track.calcular(meta_atual.get('faturamento') or 0, rv.get('faturamento'),
+                                    tipo_mg, ref_mg, pct_tempo_decorrido=pct_tempo_mg)
+        _barra_horizontal_meta(
+            '💰 Faturamento', rv.get('faturamento'), meta_atual.get('faturamento'),
+            ot_fat['status'], lambda x: f'R$ {_num_vc(x, 0)}',
+            subtitulo=_completude_msgs.get(rv['completude']),
+        )
+
+        st.markdown('<div style="height:0.6rem;"></div>', unsafe_allow_html=True)
+        _col_marg, _col_qbr = st.columns(2)
+        with _col_marg:
             ot_marg = on_track.calcular(meta_atual.get('margem_pct') or 0, rv.get('margem_pct'),
                                          tipo_mg, ref_mg, pct_tempo_decorrido=pct_tempo_mg)
-            _render_indicador_mg('Margem (%)', lambda x: f'{x:.2f}%',
-                                  meta_atual.get('margem_pct'), rv.get('margem_pct'), ot_marg,
-                                  _completude_msgs.get(rv['completude']))
-        with ic4:
-            _render_indicador_quebra(meta_atual.get('quebra_max_cx'), rq.get('total_cx'),
-                                      meta_atual.get('quebra_max_rs'), rq.get('total_custo'),
-                                      meta_atual.get('faturamento'), tipo_mg, ref_mg,
-                                      _completude_msgs.get(rq['completude']))
+            _marg_realizado = rv.get('margem_pct')
+            _marg_txt = f"{_marg_realizado:.1f}%" if _marg_realizado is not None else '—'
+            _marg_det = (f"Meta: {meta_atual['margem_pct']:.1f}%" if meta_atual.get('margem_pct')
+                         else 'Meta de margem não definida')
+            _badge_indicador_simples(ot_marg['status'], '📊 Margem', _marg_txt, _marg_det)
+        with _col_qbr:
+            # Mesma prioridade R$ > cx da versão anterior do card de Quebra:
+            # usa custo real (R$) quando já extraído do PDF e o Teto em R$
+            # já foi definido; senão cai pra cx.
+            _qbr_meta_rs = meta_atual.get('quebra_max_rs')
+            _qbr_realizado_rs = rq.get('total_custo')
+            _usa_rs_qbr = bool(_qbr_meta_rs) and _qbr_realizado_rs is not None
+            if _usa_rs_qbr:
+                _ot_qbr = mg.status_quebra(_qbr_meta_rs, _qbr_realizado_rs, tipo_mg, ref_mg)
+            else:
+                _ot_qbr = mg.status_quebra(meta_atual.get('quebra_max_cx'), rq.get('total_cx'),
+                                            tipo_mg, ref_mg)
+            # A "relação quebra vs faturamento" pedida pela Ingrid -- REALIZADO
+            # sobre REALIZADO (não meta sobre meta): quanto da quebra de
+            # verdade já representa do faturamento de verdade até agora.
+            _qbr_pct_real = mg.quebra_pct_faturamento(_qbr_realizado_rs, rv.get('faturamento'))
+            if _qbr_pct_real is not None:
+                _qbr_txt = f"{_qbr_pct_real:.2f}% do fat."
+            elif rq.get('total_cx') is not None:
+                _qbr_txt = f"{_num_vc(rq.get('total_cx'), 0)} cx"
+            else:
+                _qbr_txt = '—'
+            if _qbr_meta_rs:
+                _qbr_det = f"Teto: R$ {_num_vc(_qbr_meta_rs, 2)}"
+            elif meta_atual.get('quebra_max_cx'):
+                _qbr_det = f"Teto: {_num_vc(meta_atual['quebra_max_cx'], 0)} cx"
+            else:
+                _qbr_det = 'Teto de quebra não definido'
+            _badge_indicador_simples(_ot_qbr['status'], '📦 Quebra vs Faturamento', _qbr_txt, _qbr_det)
 
         st.divider()
 
@@ -2085,7 +2069,7 @@ def _render_metas_gerais():
                 'Faturamento': rv_h.get('faturamento') or 0,
                 'Volume (CX)': rv_h.get('volume') or 0,
                 'Margem (%)': rv_h.get('margem_pct') or 0,
-                # Mesma prioridade R$ > cx do card de Quebra (_render_indicador_quebra):
+                # Mesma prioridade R$ > cx do indicador de Quebra acima:
                 # custo real quando já extraído do PDF, senão cx como fallback.
                 'Quebra (R$)': (rq_h.get('total_custo') if rq_h.get('total_custo') is not None
                                  else (rq_h.get('total_cx') or 0)),
