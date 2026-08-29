@@ -2004,6 +2004,13 @@ def _render_metas_gerais():
                             f"defina também um Teto de Quebra (CX) pra ter um indicador aqui.")
             else:
                 _qbr_det = 'Teto de quebra não definido'
+            # Mesma distinção "sem dado" vs "falha ao consultar" já aplicada
+            # no Faturamento (ver _completude_msgs['erro_leitura']) -- sem
+            # isso, uma falha de leitura no GitHub ficava idêntica a "nunca
+            # publicou quebra nenhuma" aqui também.
+            if _qbr_txt == '—' and rq.get('erro_leitura'):
+                _qbr_det = (f'🔴 Não deu pra confirmar -- consulta ao GitHub falhou. '
+                            f'Detalhe técnico: {rq["erro_leitura"]}')
             _badge_indicador_simples(_ot_qbr['status'], '📦 Quebra vs Faturamento', _qbr_txt, _qbr_det)
 
         st.divider()
@@ -2072,6 +2079,77 @@ def _render_metas_gerais():
         # Comparativo vs período anterior removido a pedido explícito da
         # Ingrid em 26/08/2026 ("remover completamente"), pra deixar a tela
         # mais compacta.
+
+        # ── Publicar Realizado do Período (PDF) ──────────────────────────────
+        # Pedido explícito da Ingrid, 29/08/2026: "não quero que seja a soma a
+        # partir do módulo vendedor cliente, quero que tenha espaço pra eu
+        # adicionar os PDFs e ele calcular -- o mesmo para a quebra". Publica
+        # DIRETO aqui (mg.MOD_MG_VENDAS / mg.MOD_MG_QUEBRA), independente do
+        # que estiver ou não publicado em Vendedor-Cliente/Quebra -- só
+        # reaproveita os mesmos parsers que aquelas páginas já usam
+        # (parsers_vendedor.parse_totais_vendedor / parser_quebra.parse_quebra).
+        # Só faz sentido por mês (cada PDF é de um período fechado
+        # específico), por isso só fica ativo com Tipo de período = Mensal --
+        # mesmo padrão já usado no OnTrack Semanal logo abaixo.
+        with st.expander(f'📤 Publicar Realizado — {periodo_mod.rotulo(tipo_mg, ref_mg)}'):
+            if tipo_mg != 'mensal':
+                st.caption('Publicação é sempre por mês -- mude "Tipo de período" acima pra '
+                           '**Mensal** e selecione o mês do PDF pra publicar.')
+            else:
+                st.caption('Sobe o PDF do relatório e o app calcula sozinho -- não depende do '
+                           'que foi (ou não) publicado nas páginas Vendedor-Cliente / Quebra.')
+                col_pub_v, col_pub_q = st.columns(2)
+                with col_pub_v:
+                    st.markdown('**💰 Faturamento / Volume / Margem**')
+                    pdf_vendas_mg = st.file_uploader(
+                        'PDF Lucratividade por Vendedor', type='pdf', key='mg_pdf_vendas')
+                    if pdf_vendas_mg is not None and st.button(
+                            '📊 Processar e publicar Vendas', key='mg_btn_pub_vendas'):
+                        with st.spinner('Lendo PDF...'):
+                            try:
+                                _reg_v = mg.publicar_vendas_pdf(
+                                    ref_mg, pdf_vendas_mg,
+                                    usuario=st.session_state.get('usuario_nome'))
+                                _erro_v = _reg_v.get('_erro_persistencia_remota') if _reg_v else None
+                                _tg = (_reg_v.get('valores') or {}).get('total_geral') or {}
+                                if _erro_v:
+                                    st.warning(f'Processado, mas houve um problema ao salvar de '
+                                               f'forma permanente: {_erro_v}')
+                                else:
+                                    st.success(
+                                        f"✅ Publicado: R$ {_num_vc(_tg.get('fat', 0), 2)} de "
+                                        f"faturamento, {_num_vc(_tg.get('vol', 0), 0)} cx, "
+                                        f"{_tg.get('resultado_real', 0):.2f}% de margem."
+                                    )
+                                st.rerun()
+                            except Exception as _e_pub_v:
+                                st.error(f'Erro ao processar o PDF: {_e_pub_v}')
+                with col_pub_q:
+                    st.markdown('**📦 Quebra**')
+                    pdf_quebra_mg = st.file_uploader(
+                        'PDF Resumo do Estoque (Quebra)', type='pdf', key='mg_pdf_quebra')
+                    if pdf_quebra_mg is not None and st.button(
+                            '📊 Processar e publicar Quebra', key='mg_btn_pub_quebra'):
+                        with st.spinner('Lendo PDF...'):
+                            try:
+                                _reg_q = mg.publicar_quebra_pdf(
+                                    ref_mg, pdf_quebra_mg,
+                                    usuario=st.session_state.get('usuario_nome'))
+                                _erro_q = _reg_q.get('_erro_persistencia_remota') if _reg_q else None
+                                _vq = (_reg_q.get('valores') or {}) if _reg_q else {}
+                                if _erro_q:
+                                    st.warning(f'Processado, mas houve um problema ao salvar de '
+                                               f'forma permanente: {_erro_q}')
+                                else:
+                                    _custo_txt = (f", R$ {_num_vc(_vq.get('total_custo'), 2)}"
+                                                  if _vq.get('total_custo') is not None else '')
+                                    st.success(
+                                        f"✅ Publicado: {_num_vc(_vq.get('total_cx', 0), 0)} cx "
+                                        f"quebradas{_custo_txt}."
+                                    )
+                                st.rerun()
+                            except Exception as _e_pub_q:
+                                st.error(f'Erro ao processar o PDF: {_e_pub_q}')
 
         # ── Evolução ──────────────────────────────────────────────────────────
         # Faturamento, Volume e Margem já existiam (Quebra tinha sido removida
