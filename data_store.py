@@ -236,9 +236,12 @@ def _write_file(rel_path: str, obj: dict, mensagem: str):
 
 @st.cache_data(ttl=30, show_spinner=False)
 def _load_current_cached(modulo: str, tipo_periodo: str, periodo_ref: str):
+    """Devolve (registro, erro) -- ver load_current_com_erro() abaixo pro
+    significado de cada um. Guardado como tupla numa cache só (em vez de
+    duas caches separadas) pra não duplicar a chamada à API do GitHub."""
     rel_path = _path_for(modulo, tipo_periodo, periodo_ref)
-    obj, _erro = _read_file(rel_path)
-    return obj.get('current') if obj else None
+    obj, erro = _read_file(rel_path)
+    return (obj.get('current') if obj else None), erro
 
 
 def _invalidate_cache():
@@ -329,7 +332,26 @@ def save_record(modulo: str, tipo_periodo: str, periodo_ref: str, valores: dict,
 
 def load_current(modulo: str, tipo_periodo: str, periodo_ref: str):
     """Retorna o registro (versão) mais recente, ou None se não houver dado
-    salvo para esse módulo/período."""
+    salvo para esse módulo/período. Não distingue "nunca foi publicado" de
+    "falha ao consultar o GitHub agora" -- quem precisa dessa distinção
+    (pra não mostrar "sem dado" quando na real é uma falha de leitura) usa
+    load_current_com_erro() abaixo."""
+    reg, _erro = _load_current_cached(modulo, tipo_periodo, periodo_ref)
+    return reg
+
+
+def load_current_com_erro(modulo: str, tipo_periodo: str, periodo_ref: str):
+    """Como load_current(), mas devolve (registro, erro).
+
+    erro vem preenchido (string) quando a consulta ao GitHub falhou de
+    forma AMBÍGUA (rede, token inválido/sem permissão, rate limit, erro
+    5xx do lado do GitHub) -- nesse caso NÃO dá pra saber se o dado existe
+    ou não, e quem chama não deve tratar isso como "nunca foi publicado"
+    (mesma distinção que _github_get já faz internamente, só que até aqui
+    ela se perdia -- load_current descartava o erro em silêncio e todo
+    "sem dado" na tela podia na real ser uma falha de leitura escondida).
+    erro é None quando a consulta foi conclusiva (achou o registro, ou
+    confirmou -- 404 -- que ele realmente não existe)."""
     return _load_current_cached(modulo, tipo_periodo, periodo_ref)
 
 
