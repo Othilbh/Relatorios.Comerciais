@@ -49,8 +49,17 @@ MODULO_META_VENDEDORES = 'metas_gerais_config_vendedores'
 MODULO_PCTS_SEMANAIS = 'metas_gerais_pcts_semanais'
 PCTS_SEMANAIS_PADRAO = [30.0, 28.0, 25.0, 25.0]
 
-MOD_VENDEDOR_CLIENTE = 'vendedor_cliente'
-MOD_QUEBRA = 'quebra'
+# Realizado da Meta Geral -- PUBLICADO DIRETO AQUI (PDF), independente dos
+# módulos Vendedor-Cliente/Quebra usados por outras páginas (pedido
+# explícito da Ingrid, 29/08/2026: "não quero que seja a soma a partir do
+# módulo vendedor cliente, quero que tenha espaço pra eu adicionar os PDFs
+# e ele calcular -- o mesmo para a quebra"). As funções publicar_*_pdf()
+# abaixo reaproveitam os MESMOS parsers que Vendedor-Cliente/Quebra já
+# usam (parsers_vendedor.parse_totais_vendedor / parser_quebra.parse_quebra)
+# -- só a persistência é um módulo à parte, pra publicar aqui nunca
+# depender nem sobrescrever o que foi (ou não) publicado naquelas páginas.
+MOD_MG_VENDAS = 'metas_gerais_vendas'
+MOD_MG_QUEBRA = 'metas_gerais_quebra'
 
 
 # ---------------------------------------------------------------------------
@@ -151,14 +160,15 @@ def salvar_pcts_semanais(mes_ref: str, percentuais: list, usuario: str = None) -
 # ---------------------------------------------------------------------------
 
 def _vendido_acumulado_ate(mes_ref: str, data_limite: date) -> dict:
-    """totais_dict (por vendedor: fat/vol/custo) do Vendedor-Cliente daquele
-    mês, na versão mais recente cujo timestamp seja <= data_limite -- ou
-    seja, 'o que já estava vendido' até aquele momento, reconstruído a
-    partir dos uploads reais já feitos (cada upload durante o mês gera uma
-    versão nova via data_store). Não inventa nem interpola nenhum número;
-    se não houver nenhuma versão até essa data, devolve {} (sem dado ainda
-    naquele momento)."""
-    versoes = ds.load_all_versions(MOD_VENDEDOR_CLIENTE, 'mensal', mes_ref)
+    """vendedores (por vendedor: fat/vol/custo) do Realizado de Vendas
+    publicado direto na Meta Geral (MOD_MG_VENDAS) pra esse mês, na versão
+    mais recente cujo timestamp seja <= data_limite -- ou seja, 'o que já
+    estava vendido' até aquele momento, reconstruído a partir dos PDFs
+    realmente publicados aqui (cada publicação via publicar_vendas_pdf()
+    gera uma versão nova via data_store). Não inventa nem interpola nenhum
+    número; se não houver nenhuma versão até essa data, devolve {} (sem
+    dado ainda naquele momento)."""
+    versoes = ds.load_all_versions(MOD_MG_VENDAS, 'mensal', mes_ref)
     melhor = None
     for v in versoes:
         ts = (v.get('atualizado_em') or v.get('criado_em') or '')[:10]
@@ -172,7 +182,7 @@ def _vendido_acumulado_ate(mes_ref: str, data_limite: date) -> dict:
             melhor = (data_v, v)
     if melhor is None:
         return {}
-    return (melhor[1].get('valores') or {}).get('totais_dict', {}) or {}
+    return (melhor[1].get('valores') or {}).get('vendedores', {}) or {}
 
 
 def _blocos_semanais_do_mes(mes_ref: str, n_semanas: int = 4) -> list:
@@ -300,12 +310,66 @@ def _meses_do_periodo(tipo_periodo: str, periodo_ref: str) -> list:
     return meses
 
 
+def publicar_vendas_pdf(mes_ref: str, pdf_file, usuario: str = None) -> dict:
+    """Lê o PDF 'Lucratividade por Vendedor' e publica como o Realizado
+    (Faturamento/Volume/Margem) da Meta Geral pro mês `mes_ref` --
+    INDEPENDENTE do módulo Vendedor-Cliente (ver comentário de MOD_MG_VENDAS
+    acima). Reaproveita o mesmo parser que a página Vendedor-Cliente já usa
+    pros totais (parsers_vendedor.parse_totais_vendedor); só não precisa
+    dos PDFs por cliente nem do histórico JSON que aquela página também
+    pede, porque a Meta Geral só precisa do total agregado da empresa, não
+    do detalhe por cliente."""
+    from parsers_vendedor import parse_totais_vendedor
+    res = parse_totais_vendedor(pdf_file)
+    vendedores = res.get('vendedores') or {}
+    total_geral = res.get('total_geral')
+    if not total_geral:
+        # PDF sem a linha "Total Geral:" reconhecida (ou ilegível nessa
+        # linha) -- soma os vendedores manualmente em vez de falhar, mesma
+        # agregação que o resto do app já faz a partir de totais por
+        # vendedor (ver _agg() em parsers_vendedor.py).
+        vol_s   = sum(v.get('vol', 0) or 0 for v in vendedores.values())
+        fat_s   = sum(v.get('fat', 0) or 0 for v in vendedores.values())
+        custo_s = sum(v.get('custo', 0) or 0 for v in vendedores.values())
+        mc_rs_s  = fat_s - custo_s
+        mc_pct_s = (mc_rs_s / custo_s * 100) if custo_s else 0.0
+        total_geral = {
+            'vol': round(vol_s), 'fat': round(fat_s, 2), 'custo': round(custo_s, 2),
+            'mc_rs': round(mc_rs_s, 2), 'mc_pct': round(mc_pct_s, 2),
+            'resultado_real': round(mc_pct_s + 15, 2),
+        }
+    return ds.save_record(
+        modulo=MOD_MG_VENDAS, tipo_periodo='mensal', periodo_ref=mes_ref,
+        valores={
+            'total_geral': total_geral,
+            'vendedores': vendedores,
+            'periodo_pdf': res.get('periodo'),
+            'data_emissao_pdf': res.get('data_emissao'),
+        },
+        usuario=usuario,
+    )
+
+
+def publicar_quebra_pdf(mes_ref: str, pdf_file, usuario: str = None) -> dict:
+    """Lê o PDF 'Resumo do Estoque (Quebra)' e publica como o Realizado de
+    Quebra da Meta Geral pro mês `mes_ref` -- INDEPENDENTE do módulo Quebra
+    usado por pages/4_Quebra_OTHIL.py. Reaproveita o mesmo parser que
+    aquela página já usa (parser_quebra.parse_quebra)."""
+    from parser_quebra import parse_quebra
+    dados = parse_quebra(pdf_file)
+    return ds.save_record(
+        modulo=MOD_MG_QUEBRA, tipo_periodo='mensal', periodo_ref=mes_ref,
+        valores=dados, usuario=usuario,
+    )
+
+
 def realizado_vendas(tipo_periodo: str, periodo_ref: str) -> dict:
     """{faturamento, volume, margem_pct, vendedores: {nome: {fat,vol,custo,mc_rs,mc_pct}},
     completude: 'completo'|'parcial'|'sem_dado'|'erro_leitura', erro_leitura, origem}.
 
-    Meta Geral é independente de Metas Semanais — cobre apenas mensal,
-    trimestral, semestral e anual, agregando por mês via Vendedor-Cliente."""
+    Meta Geral é independente de Metas Semanais E de Vendedor-Cliente —
+    cobre apenas mensal, trimestral, semestral e anual, agregando por mês
+    a partir do que foi publicado direto aqui via publicar_vendas_pdf()."""
     meses = _meses_do_periodo(tipo_periodo, periodo_ref)
     fat = vol = custo = 0.0
     vend_agg = {}
@@ -314,29 +378,26 @@ def realizado_vendas(tipo_periodo: str, periodo_ref: str) -> dict:
     # encontrado entre os meses do período -- ver load_current_com_erro().
     # Antes disso usávamos ds.load_current() puro, que descarta erro em
     # silêncio: uma falha transitória de leitura virava "Sem dado publicado
-    # ainda" na tela, indistinguível de realmente não ter publicado nada
-    # (sintoma real da Ingrid em 29/08/2026: Vendedor-Cliente de Agosto/2026
-    # publicado e confirmado presente no repositório, mas o indicador
-    # continuava mostrando "sem dado" mesmo depois de recarregar a página).
+    # ainda" na tela, indistinguível de realmente não ter publicado nada.
     erro_leitura = None
     for mes in meses:
-        reg, erro = ds.load_current_com_erro(MOD_VENDEDOR_CLIENTE, 'mensal', mes)
+        reg, erro = ds.load_current_com_erro(MOD_MG_VENDAS, 'mensal', mes)
         if erro and erro_leitura is None:
             erro_leitura = erro
         if not reg:
             continue
-        totais_dict = reg['valores'].get('totais_dict', {}) or {}
-        if not totais_dict:
+        tg = reg['valores'].get('total_geral') or {}
+        if not tg:
             continue
         meses_com_dado.append(mes)
-        for nome, v in totais_dict.items():
+        fat   += tg.get('fat', 0) or 0
+        vol   += tg.get('vol', 0) or 0
+        custo += tg.get('custo', 0) or 0
+        for nome, v in (reg['valores'].get('vendedores') or {}).items():
             a = vend_agg.setdefault(nome, {'fat': 0.0, 'vol': 0.0, 'custo': 0.0})
             a['fat']   += v.get('fat', 0) or 0
             a['vol']   += v.get('vol', 0) or 0
             a['custo'] += v.get('custo', 0) or 0
-            fat   += v.get('fat', 0) or 0
-            vol   += v.get('vol', 0) or 0
-            custo += v.get('custo', 0) or 0
     for a in vend_agg.values():
         a['mc_rs']  = a['fat'] - a['custo']
         a['mc_pct'] = (a['mc_rs'] / a['custo'] * 100) if a['custo'] else 0.0
@@ -367,87 +428,39 @@ def realizado_vendas(tipo_periodo: str, periodo_ref: str) -> dict:
         'erro_leitura': erro_leitura,
         'meses_com_dado': meses_com_dado,
         'meses_total': meses,
-        'origem': 'Vendedor-Cliente (agregado por mês)',
+        'origem': 'PDF Lucratividade por Vendedor (publicado direto na Meta Geral)',
     }
 
 
-def _semanas_do_mes(mes_ref: str) -> list:
-    """Lista (sem repetição, em ordem) das semanas ISO ('YYYY-Www') que
-    tocam o mês `mes_ref` ('YYYY-MM'). Uma semana ISO pode começar num mês
-    e terminar no seguinte -- nesse caso ela conta para os dois meses (não
-    há como fatiar uma semana ao meio sem dado diário, que este app não
-    guarda; é a mesma aproximação usada em periodo_ano_anterior)."""
-    ini, fim = periodo.intervalo_datas('mensal', mes_ref)
-    semanas = []
-    d = ini
-    while d <= fim:
-        s = periodo.periodo_ref('semanal', d)
-        if s not in semanas:
-            semanas.append(s)
-        d += timedelta(days=1)
-    return semanas
-
-
-def _quebra_mes(mes_ref: str):
-    """{'cx': total_cx, 'custo': total_custo} de um mês, ou None se não
-    houver nenhum dado. 'custo' pode ser None mesmo com 'cx' preenchido --
-    PDFs de quebra salvos ANTES desta função existir não têm a coluna de
-    custo extraída (parser_quebra só passou a ler isso depois); nesses
-    casos não inventamos um valor, só não somamos custo pra esse mês (ver
-    realizado_quebra, que sinaliza quando isso acontece).
-
-    O módulo de Quebra (pages/4_Quebra_OTHIL.py) permite publicar tanto em
-    modo Semanal quanto Mensal (a Ingrid escolhe a aba na hora do upload).
-    Na prática, o uso real tem sido sempre pela aba Semanal -- então exigir
-    um registro 'mensal' aqui (como este módulo fazia antes) deixava o
-    indicador de Quebra sempre "Sem dado" no painel de Meta Geral,
-    mesmo com quebra publicada normalmente todo período. Por isso: usa o
-    registro mensal direto se existir (compatível com quem publica em modo
-    Mensal); senão, soma as semanas ISO que tocam o mês."""
-    reg = ds.load_current(MOD_QUEBRA, 'mensal', mes_ref)
-    if reg and reg['valores'].get('total_cx') is not None:
-        v = reg['valores']
-        return {'cx': v.get('total_cx', 0) or 0, 'custo': v.get('total_custo')}
-
-    cx = 0.0
-    custo = 0.0
-    alguma_semana_com_dado = False
-    algum_custo_lido = False
-    for semana in _semanas_do_mes(mes_ref):
-        reg_sem = ds.load_current(MOD_QUEBRA, 'semanal', semana)
-        if reg_sem and reg_sem['valores'].get('total_cx') is not None:
-            alguma_semana_com_dado = True
-            cx += reg_sem['valores'].get('total_cx', 0) or 0
-            custo_sem = reg_sem['valores'].get('total_custo')
-            if custo_sem is not None:
-                algum_custo_lido = True
-                custo += custo_sem
-    if not alguma_semana_com_dado:
-        return None
-    return {'cx': cx, 'custo': custo if algum_custo_lido else None}
-
-
 def realizado_quebra(tipo_periodo: str, periodo_ref: str) -> dict:
-    """{total_cx, total_custo, completude, meses_com_dado?, meses_total?}.
+    """{total_cx, total_custo, completude, erro_leitura, meses_com_dado?, meses_total?}.
 
     total_custo é None se nenhum mês do período tinha a coluna de custo
-    extraída ainda (dado publicado antes dessa funcionalidade existir) --
-    nunca inventa um valor parcial silenciosamente."""
+    extraída ainda -- nunca inventa um valor parcial silenciosamente.
+    Fonte: Realizado de Quebra publicado direto na Meta Geral (PDF), via
+    publicar_quebra_pdf() -- independente da página de Quebra."""
     meses = _meses_do_periodo(tipo_periodo, periodo_ref)
     total_cx = 0.0
     total_custo = 0.0
     algum_custo_lido = False
     meses_com_dado = []
+    erro_leitura = None
     for mes in meses:
-        m = _quebra_mes(mes)
-        if m is not None:
-            meses_com_dado.append(mes)
-            total_cx += m['cx']
-            if m['custo'] is not None:
-                algum_custo_lido = True
-                total_custo += m['custo']
+        reg, erro = ds.load_current_com_erro(MOD_MG_QUEBRA, 'mensal', mes)
+        if erro and erro_leitura is None:
+            erro_leitura = erro
+        if not reg:
+            continue
+        v = reg['valores']
+        if v.get('total_cx') is None:
+            continue
+        meses_com_dado.append(mes)
+        total_cx += v.get('total_cx', 0) or 0
+        if v.get('total_custo') is not None:
+            algum_custo_lido = True
+            total_custo += v.get('total_custo')
     if not meses_com_dado:
-        completude = 'sem_dado'
+        completude = 'erro_leitura' if erro_leitura else 'sem_dado'
     elif len(meses_com_dado) < len(meses):
         completude = 'parcial'
     else:
@@ -455,6 +468,7 @@ def realizado_quebra(tipo_periodo: str, periodo_ref: str) -> dict:
     return {'total_cx': total_cx if meses_com_dado else None,
             'total_custo': total_custo if (meses_com_dado and algum_custo_lido) else None,
             'completude': completude,
+            'erro_leitura': erro_leitura,
             'meses_com_dado': meses_com_dado, 'meses_total': meses}
 
 
