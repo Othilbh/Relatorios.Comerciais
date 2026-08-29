@@ -1909,6 +1909,15 @@ def _render_metas_gerais():
         _completude_msgs = {
             'sem_dado': f'⚪ Sem dado publicado ainda para {periodo_mod.rotulo(tipo_mg, ref_mg)} (fonte: {rv.get("origem","-")}).',
             'parcial':  f'🟡 Dado parcial: {len(rv.get("meses_com_dado", []))}/{len(rv.get("meses_total", []))} mês(es) do período têm publicação.',
+            # Distinto de 'sem_dado': aqui o Vendedor-Cliente PODE já estar
+            # publicado, só não deu pra confirmar agora porque a consulta ao
+            # GitHub falhou (rede/token/rate-limit) -- ver
+            # ds.load_current_com_erro(). Antes esse caso ficava idêntico a
+            # "sem dado publicado", escondendo uma falha real de leitura.
+            'erro_leitura': (f'🔴 Não deu pra confirmar o dado de {periodo_mod.rotulo(tipo_mg, ref_mg)} agora '
+                              f'-- a consulta ao GitHub falhou (pode já estar publicado, mas não foi possível '
+                              f'verificar). Tente recarregar a página em alguns instantes. '
+                              f'Detalhe técnico: {rv.get("erro_leitura", "-")}'),
             'completo': None,
         }
 
