@@ -92,14 +92,14 @@
     }
   ],
   "vendedor_pcts": {
-    "Farley": 17,
-    "Dora": 17,
+    "Farley": 15,
+    "Dora": 15,
     "Afanais": 25,
     "Roni": 25,
     "Reginaldo": 22,
-    "Luciano": 7,
-    "Juliana": 7,
-    "Luca": 7
+    "Luciano": 0,
+    "Juliana": 15,
+    "Luca": 17
   },
   "periodo": "29/08 a 04/09"
 }
