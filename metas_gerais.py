@@ -302,7 +302,7 @@ def _meses_do_periodo(tipo_periodo: str, periodo_ref: str) -> list:
 
 def realizado_vendas(tipo_periodo: str, periodo_ref: str) -> dict:
     """{faturamento, volume, margem_pct, vendedores: {nome: {fat,vol,custo,mc_rs,mc_pct}},
-    completude: 'completo'|'parcial'|'sem_dado', origem}.
+    completude: 'completo'|'parcial'|'sem_dado'|'erro_leitura', erro_leitura, origem}.
 
     Meta Geral é independente de Metas Semanais — cobre apenas mensal,
     trimestral, semestral e anual, agregando por mês via Vendedor-Cliente."""
@@ -310,8 +310,19 @@ def realizado_vendas(tipo_periodo: str, periodo_ref: str) -> dict:
     fat = vol = custo = 0.0
     vend_agg = {}
     meses_com_dado = []
+    # Guarda o 1º erro de leitura AMBÍGUO (rede/token/rate-limit no GitHub)
+    # encontrado entre os meses do período -- ver load_current_com_erro().
+    # Antes disso usávamos ds.load_current() puro, que descarta erro em
+    # silêncio: uma falha transitória de leitura virava "Sem dado publicado
+    # ainda" na tela, indistinguível de realmente não ter publicado nada
+    # (sintoma real da Ingrid em 29/08/2026: Vendedor-Cliente de Agosto/2026
+    # publicado e confirmado presente no repositório, mas o indicador
+    # continuava mostrando "sem dado" mesmo depois de recarregar a página).
+    erro_leitura = None
     for mes in meses:
-        reg = ds.load_current(MOD_VENDEDOR_CLIENTE, 'mensal', mes)
+        reg, erro = ds.load_current_com_erro(MOD_VENDEDOR_CLIENTE, 'mensal', mes)
+        if erro and erro_leitura is None:
+            erro_leitura = erro
         if not reg:
             continue
         totais_dict = reg['valores'].get('totais_dict', {}) or {}
@@ -331,7 +342,10 @@ def realizado_vendas(tipo_periodo: str, periodo_ref: str) -> dict:
         a['mc_pct'] = (a['mc_rs'] / a['custo'] * 100) if a['custo'] else 0.0
 
     if not meses_com_dado:
-        completude = 'sem_dado'
+        # Só chama de "sem dado" quando a leitura foi CONCLUSIVA (confirmou
+        # que não existe). Se houve erro de leitura ambíguo, não sabemos --
+        # não inventa a ausência do dado.
+        completude = 'erro_leitura' if erro_leitura else 'sem_dado'
     elif len(meses_com_dado) < len(meses):
         completude = 'parcial'
     else:
@@ -350,6 +364,7 @@ def realizado_vendas(tipo_periodo: str, periodo_ref: str) -> dict:
         'margem_pct': margem_pct,
         'vendedores': vend_agg,
         'completude': completude,
+        'erro_leitura': erro_leitura,
         'meses_com_dado': meses_com_dado,
         'meses_total': meses,
         'origem': 'Vendedor-Cliente (agregado por mês)',
