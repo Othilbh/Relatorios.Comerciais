@@ -959,21 +959,14 @@ def _render_ontrack_publicado():
     # que o calendário de hoje sugeriria por conta própria -- útil quando a
     # tela está mostrando uma semana diferente da atual (histórico), já que
     # calc.dia_semana_atual() sozinho sempre se refere à semana de hoje.
-    _dia_default = (calc.dia_semana_no_periodo(slug_ot) if slug_ot
-                     else calc.dia_semana_atual())
-    # Chave inclui a semana selecionada -- sem isso, o slider ficaria
-    # "preso" no valor da última semana visitada ao trocar de período
-    # (mesmo bug de fundo: mistura o estado de duas semanas diferentes).
-    dia = st.slider(
-        'Dia da semana (para status On Track)', 1, 6,
-        value=_dia_default,
-        format='Dia %d de 6', key=f'ger_ot_dia_{slug_ot or "legado"}',
-        help='Semana comercial sábado a sexta (sem domingo, que não tem '
-             'venda): Sábado=1  Segunda=2  Terça=3  Quarta=4  Quinta=5  '
-             'Sexta (fecha a semana)=6 -- mesma convenção da aba Metas '
-             'Semanais. Calculado em relação à semana selecionada acima, '
-             'não à data de hoje sozinha.',
-    )
+    #
+    # O slider manual ("Dia da semana para status On Track") foi removido
+    # daqui a pedido explícito da Ingrid (31/08/2026) -- ela quis a tela
+    # mais enxuta, sem esse controle. O cálculo automático (dia_default)
+    # já é confiável agora que a semana comercial sábado-a-sexta está
+    # corrigida, então usa ele direto, sem exigir ajuste manual.
+    dia = (calc.dia_semana_no_periodo(slug_ot) if slug_ot
+           else calc.dia_semana_atual())
 
     st.divider()
 
