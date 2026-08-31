@@ -106,7 +106,8 @@ def save_config(cfg, show_feedback=True):
 # Fechamento helpers
 # ---------------------------------------------------------------------------
 # _slug_semana / _intervalo_semana / _label_semana / _semana_anterior /
-# _semana_ano_anterior / _dia_semana_atual (semana comercial sexta-a-sexta)
+# _semana_ano_anterior / _dia_semana_atual (semana comercial -- sábado a
+# sexta desde 31/08/2026; ver calc.py pra definição/histórico completos)
 # foram MOVIDAS pra calc.py em 26/08/2026 -- fonte única compartilhada com
 # pages/gerencia.py (tela "On Track Atual", que exibe snapshots publicados
 # daqui e precisava da MESMA definição de semana, não uma segunda lógica
@@ -274,11 +275,11 @@ _STATUS_COR = {
 }
 
 
-def _on_track_status(atingido: float, dia: int, total_dias: int = 7):
+def _on_track_status(atingido: float, dia: int, total_dias: int = 6):
     """Retorna (emoji, label, hex_color) usando a lógica CENTRAL de On Track
     (on_track.py — a mesma usada por todos os módulos do app), com o tempo
     decorrido calculado em dias de venda da semana comercial (1..total_dias,
-    sexta a sexta, sem domingo -- ver `_dia_semana_atual`), que é a
+    sábado a sexta, sem domingo -- ver `_dia_semana_atual`), que é a
     convenção já usada aqui (em vez de dias corridos do calendário).
     `atingido` já vem como fração (vendido/meta) calculada pelo chamador."""
     pct_tempo = (dia / total_dias) if total_dias else 0.0
@@ -307,12 +308,12 @@ def _render_on_track():
     with col_dia:
         dia_semana = st.slider(
             'Dia da semana atual',
-            min_value=1, max_value=7,
+            min_value=1, max_value=6,
             value=_dia_semana_atual(),
-            format='Dia %d de 7',
-            help='Semana comercial sexta a sexta (sem domingo, que não tem '
-                 'venda): Sexta=1  Sábado=2  Segunda=3  Terça=4  Quarta=5  '
-                 'Quinta=6  Sexta (fecha a semana)=7',
+            format='Dia %d de 6',
+            help='Semana comercial sábado a sexta (sem domingo, que não tem '
+                 'venda): Sábado=1  Segunda=2  Terça=3  Quarta=4  Quinta=5  '
+                 'Sexta (fecha a semana)=6',
             key='ont_dia',
         )
     with col_sort:
@@ -335,7 +336,7 @@ def _render_on_track():
     total_vend   = sum(l['vendido'] for r in resultados for l in r['linhas'])
     total_falta  = soma_falta([l for r in resultados for l in r['linhas']])
     ating_geral  = total_vend / total_meta if total_meta else 0
-    proj_cx      = math.ceil(total_vend / dia_semana * 7) if dia_semana > 0 else 0
+    proj_cx      = math.ceil(total_vend / dia_semana * 6) if dia_semana > 0 else 0
     delta_proj   = proj_cx - total_meta
 
     on_em, on_lb, _ = _on_track_status(ating_geral, dia_semana)
@@ -348,7 +349,7 @@ def _render_on_track():
     c0, c1, c2, c3, c4, c5 = st.columns(6)
     c0.metric(
         'Status Geral', f'{on_em} {on_lb}',
-        delta=f'dia {dia_semana}/7', delta_color='off',
+        delta=f'dia {dia_semana}/6', delta_color='off',
     )
     c1.metric('Meta total (cx)',  _fmt_num(total_meta, 0))
     c2.metric('Vendido (cx)',     _fmt_num(total_vend, 0))
@@ -390,7 +391,7 @@ def _render_on_track():
         meta_v = ag['meta']
         vend_v = ag['vendido']
         atg_v  = vend_v / meta_v if meta_v else 0
-        proj_v = math.ceil(vend_v / dia_semana * 7) if dia_semana > 0 else 0
+        proj_v = math.ceil(vend_v / dia_semana * 6) if dia_semana > 0 else 0
         em, lb, _ = _on_track_status(atg_v, dia_semana)
         rs = vend_rs.get(v, {})
         rows.append({
@@ -481,7 +482,7 @@ def _render_on_track():
 # Render: Fechamento Semanal
 # ---------------------------------------------------------------------------
 
-def _render_resumo_geral_inline(resultados: list, totais_rs: dict, dia: int = 7):
+def _render_resumo_geral_inline(resultados: list, totais_rs: dict, dia: int = 6):
     """Exibe o Resumo Geral (On Track + matriz produto × vendedor) inline."""
     if not resultados:
         return
@@ -492,7 +493,7 @@ def _render_resumo_geral_inline(resultados: list, totais_rs: dict, dia: int = 7)
     total_meta  = sum(r.get('estoque_total', 0) for r in resultados)
     total_vend  = sum(l['vendido'] for r in resultados for l in r['linhas'])
     ating_geral = total_vend / total_meta if total_meta else 0
-    proj_cx     = math.ceil(total_vend / dia * 7) if dia > 0 else 0
+    proj_cx     = math.ceil(total_vend / dia * 6) if dia > 0 else 0
     on_em, on_lb, _ = _on_track_status(ating_geral, dia)
 
     # Status geral como st.metric nativo (ver comentário equivalente em
@@ -531,7 +532,7 @@ def _render_resumo_geral_inline(resultados: list, totais_rs: dict, dia: int = 7)
         meta_v = ag['meta']
         vend_v = ag['vendido']
         atg_v  = vend_v / meta_v if meta_v else 0
-        proj_v = math.ceil(vend_v / dia * 7) if dia > 0 else 0
+        proj_v = math.ceil(vend_v / dia * 6) if dia > 0 else 0
         em, lb, _ = _on_track_status(atg_v, dia)
         rs = vend_rs.get(v, {})
         vrows.append({
@@ -576,20 +577,19 @@ def _render_fechamento_semanal():
 
         st.subheader(f'Fechar: {label_atual}' + (' (retroativo)' if retroativo else ''))
         st.caption(
-            'Semana comercial: sexta a sexta (8 dias corridos, sem contar domingo, '
-            'que não tem venda) — a sexta é o dia de fechar a semana atual e já '
-            'abrir a próxima. Se hoje for sexta e você quiser fechar a semana que '
-            'está terminando (em vez de já abrir a nova), escolha ontem (quinta) '
-            'como data de referência acima.'
+            'Semana comercial: sábado a sexta (7 dias corridos, sem contar domingo, '
+            'que não tem venda) — a sexta fecha a semana atual (e é o dia em que os '
+            'produtos da semana seguinte já podem ser configurados), mas as vendas '
+            'da semana nova só passam a contar a partir do sábado seguinte.'
         )
         st.caption(f'Período configurado: **{periodo_texto or "(não informado)"}**')
 
         # Dia da semana (para o On Track inline) -- se for retroativo, assume
-        # semana inteira decorrida (dia 7) por padrão, já que já passou.
+        # semana inteira decorrida (dia 6) por padrão, já que já passou.
         dia_fech = st.slider(
-            'Dia da semana (para projeção)', 1, 7,
-            value=7 if retroativo else _dia_semana_atual(),
-            format='Dia %d de 7',
+            'Dia da semana (para projeção)', 1, 6,
+            value=6 if retroativo else _dia_semana_atual(),
+            format='Dia %d de 6',
             key='fech_dia',
         )
 
