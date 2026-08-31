@@ -265,6 +265,9 @@ _HTML_TEMPLATE = (
   th, td { padding: 5px 8px; border-bottom: 1px solid #E5E5E5; text-align: left; }
   th { background: var(--header-bg); color: var(--header-fg); font-weight: bold;
        position: sticky; top: 0; white-space: nowrap; }
+  th.sortable { cursor: pointer; user-select: none; }
+  th.sortable:hover { opacity: 0.85; }
+  th.sortable .arrow { display: inline-block; width: 10px; font-size: 9px; opacity: 0.85; }
   td { white-space: nowrap; }
   td.wrap { white-space: normal; max-width: 180px; }
   td.num, th.num { text-align: right; }
@@ -356,9 +359,13 @@ _HTML_TEMPLATE = (
       <div class="table-scroll">
         <table id="tabelaRanking">
           <thead><tr>
-            <th>Vendedor</th><th class="num">Clientes</th><th class="num">Caixas</th>
-            <th class="num">Faturamento R$</th><th class="num">MC R$ real</th>
-            <th class="num">MC % real</th><th>Status</th>
+            <th class="sortable" data-key="vendedor" data-type="str">Vendedor</th>
+            <th class="num sortable" data-key="clientes" data-type="num">Clientes</th>
+            <th class="num sortable" data-key="caixas" data-type="num">Caixas</th>
+            <th class="num sortable" data-key="faturamento" data-type="num">Faturamento R$</th>
+            <th class="num sortable" data-key="mc_rs" data-type="num">MC R$ real</th>
+            <th class="num sortable" data-key="mc_pct_real" data-type="num">MC % real</th>
+            <th>Status</th>
           </tr></thead>
           <tbody></tbody>
         </table>
@@ -374,8 +381,10 @@ _HTML_TEMPLATE = (
         <div class="table-scroll" style="margin-top:10px;max-height:180px;">
           <table id="tabelaCategorias">
             <thead><tr>
-              <th>Categoria</th><th class="num">Faturamento R$</th>
-              <th class="num">MC R$ real</th><th class="num">MC % real</th>
+              <th class="sortable" data-key="categoria" data-type="str">Categoria</th>
+              <th class="num sortable" data-key="faturamento" data-type="num">Faturamento R$</th>
+              <th class="num sortable" data-key="mc_rs" data-type="num">MC R$ real</th>
+              <th class="num sortable" data-key="mc_pct_real" data-type="num">MC % real</th>
             </tr></thead>
             <tbody></tbody>
           </table>
@@ -388,8 +397,10 @@ _HTML_TEMPLATE = (
         <div class="table-scroll" style="margin-top:10px;max-height:320px;">
           <table id="tabelaClientes">
             <thead><tr>
-              <th>Cliente</th><th class="num">Faturamento R$</th>
-              <th class="num">MC R$ real</th><th class="num">MC % real</th>
+              <th class="sortable" data-key="cliente" data-type="str">Cliente</th>
+              <th class="num sortable" data-key="faturamento" data-type="num">Faturamento R$</th>
+              <th class="num sortable" data-key="mc_rs" data-type="num">MC R$ real</th>
+              <th class="num sortable" data-key="mc_pct_real" data-type="num">MC % real</th>
             </tr></thead>
             <tbody></tbody>
           </table>
@@ -437,6 +448,48 @@ function resColor(pct) {
   return              {bg:'__VERMELHO_BG__', fg:'__VERMELHO_FG__'};
 }
 
+// Ordenação por clique no cabeçalho (pedido Ingrid, 31/08/2026: "opção de
+// ordenar por margem de MC" na aba Margem Real) -- genérico pra qualquer
+// tabela marcada com th.sortable[data-key]: clica ordena por aquela coluna
+// (asc: primeiro clique / desc: segundo clique no mesmo cabeçalho), com uma
+// seta indicando a coluna/direção atual. Ordena o array de dados em si (não
+// só o DOM), então reflete o valor real -- e como cada tabela recebe sua
+// própria renderFn (só recria as linhas, não o gráfico), o gráfico ao lado
+// continua mostrando a ordem original dos dados, sem duplicar.
+const _sortState = {};
+function attachSort(tableId, arr, renderFn) {
+  const table = document.getElementById(tableId);
+  if (!table) return;
+  const ths = table.querySelectorAll('thead th.sortable');
+  ths.forEach(th => {
+    const arrow = document.createElement('span');
+    arrow.className = 'arrow';
+    th.appendChild(document.createTextNode(' '));
+    th.appendChild(arrow);
+    th.addEventListener('click', () => {
+      const key = th.dataset.key;
+      const tipo = th.dataset.type;
+      const atual = _sortState[tableId];
+      const dir = (atual && atual.key === key && atual.dir === 'asc') ? 'desc' : 'asc';
+      arr.sort((a, b) => {
+        let va = a[key], vb = b[key];
+        if (tipo === 'num') {
+          va = Number(va) || 0; vb = Number(vb) || 0;
+        } else {
+          va = String(va || '').toLowerCase(); vb = String(vb || '').toLowerCase();
+        }
+        if (va < vb) return dir === 'asc' ? -1 : 1;
+        if (va > vb) return dir === 'asc' ? 1 : -1;
+        return 0;
+      });
+      _sortState[tableId] = {key, dir};
+      ths.forEach(t => { t.querySelector('.arrow').textContent = ''; });
+      arrow.textContent = dir === 'asc' ? '▲' : '▼';
+      renderFn();
+    });
+  });
+}
+
 function montarKpis() {
   const k = DADOS.kpis;
   const cards = [
@@ -463,7 +516,7 @@ function montarSemCadastro() {
   ).join('');
 }
 
-function montarRanking() {
+function renderTabelaRanking() {
   const tbody = document.querySelector('#tabelaRanking tbody');
   tbody.innerHTML = DADOS.ranking.map(r => {
     const cRes = resColor(r.mc_pct_real);
@@ -478,6 +531,10 @@ function montarRanking() {
       '<td><span class="badge" style="background:' + r.bg + ';color:' + r.fg + ';">' + r.status + '</span></td>' +
       '</tr>';
   }).join('');
+}
+
+function montarRanking() {
+  renderTabelaRanking();
 
   try {
     new Chart(document.getElementById('chartVendedores'), {
@@ -492,6 +549,8 @@ function montarRanking() {
         scales: { y: { beginAtZero:true, ticks:{ callback: v=>'R$ '+v.toLocaleString('pt-BR') } } } },
     });
   } catch(e) { console.error('Erro grafico vendedores:', e); }
+
+  attachSort('tabelaRanking', DADOS.ranking, renderTabelaRanking);
 }
 
 function montarCategorias() {
@@ -513,6 +572,11 @@ function montarCategorias() {
     });
   } catch(e) { console.error('Erro grafico categorias:', e); }
 
+  renderTabelaCategorias();
+  attachSort('tabelaCategorias', DADOS.categorias, renderTabelaCategorias);
+}
+
+function renderTabelaCategorias() {
   const tbody = document.querySelector('#tabelaCategorias tbody');
   tbody.innerHTML = DADOS.categorias.map(c => {
     const cRes = resColor(c.mc_pct_real);
@@ -546,6 +610,11 @@ function montarClientes() {
   } catch(e) { console.error('Erro grafico clientes:', e); }
 
   document.getElementById('qtdClientes').textContent = DADOS.todos_clientes.length;
+  renderTabelaClientes();
+  attachSort('tabelaClientes', DADOS.todos_clientes, renderTabelaClientes);
+}
+
+function renderTabelaClientes() {
   const tbody = document.querySelector('#tabelaClientes tbody');
   tbody.innerHTML = DADOS.todos_clientes.map(c => {
     const cRes = resColor(c.mc_pct_real);
