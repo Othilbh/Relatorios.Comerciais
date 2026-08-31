@@ -62,20 +62,29 @@ def round_up(x: float) -> int:
 
 
 # ---------------------------------------------------------------------------
-# Semana comercial de Metas Semanais: SEXTA A SEXTA (pedido explícito da
-# Ingrid, 18/08/2026: "Hj na meta semanal, nossa semana vai de segunda a
-# sexta, preciso que passe a ser de sexta a sexta... na sexta encerra a
-# semana e na sexta mesmo, já será definido as metas da proxima semana").
+# Semana comercial de Metas Semanais: SÁBADO A SEXTA (redefinido a pedido
+# explícito da Ingrid, 31/08/2026: "Precisaremos voltar atrás naquela
+# questão da semana terminar e iniciar na sexta feira. A semana terminará
+# na sexta. Na sexta mesmo eu coloco os produtos da nova semana, mas só
+# começará a contar as vendas de sábado. Então a semana será de sexta a
+# sábado" -- ou seja: a sexta continua sendo o dia em que ela fecha a
+# semana e já configura os produtos da semana seguinte, mas as VENDAS da
+# semana nova só passam a contar a partir do sábado seguinte).
+#
+# Definição ANTERIOR (sexta a sexta, 18/08/2026 a 30/08/2026): a mesma
+# sexta-feira era ao mesmo tempo o dia 7 (fechamento) de uma semana E o
+# dia 1 (abertura) da próxima -- essa ambiguidade exigia um band-aid
+# (`dia_semana_no_periodo`, ver abaixo) sempre que a tela precisava saber
+# a que semana uma sexta-feira específica pertencia. Na definição NOVA, a
+# sexta-feira pertence só à semana que abriu no sábado anterior (como seu
+# último dia de venda) -- nunca à semana seguinte, que só começa a contar
+# no sábado. Isso elimina a ambiguidade na raiz, em vez de contorná-la.
+#
 # FONTE ÚNICA dessa definição -- tanto pages/metas_semanais.py quanto a
 # tela "On Track Atual" de pages/gerencia.py (que exibe snapshots
 # publicados de Metas Semanais) importam daqui, pra nunca haver uma
 # segunda lógica de semana divergente (reafirmado pela Ingrid em
-# 26/08/2026: "não criar uma segunda lógica de semana" -- antes desta
-# consolidação, gerencia.py._render_ontrack_publicado ainda calculava o
-# tempo decorrido com a convenção ANTIGA segunda-sexta [1..5], mesmo
-# depois da semana comercial já ter virado sexta-sexta em
-# metas_semanais.py -- essa era exatamente a inconsistência que ela
-# pediu pra corrigir "definitivamente").
+# 26/08/2026: "não criar uma segunda lógica de semana").
 #
 # ISSO É ESPECÍFICO DE METAS SEMANAIS -- não usa nem altera periodo.py
 # (que continua semana ISO segunda-domingo, usado por Quebra, Vendedor-
@@ -84,23 +93,24 @@ def round_up(x: float) -> int:
 # ---------------------------------------------------------------------------
 
 def slug_semana(data: datetime.date) -> str:
-    """periodo_ref da semana COMERCIAL de Metas Semanais: sexta a sexta (8
-    dias corridos, contando as duas sextas -- a que abre e a que
-    fecha/já abre a semana seguinte). O identificador é a data (ISO,
-    "AAAA-MM-DD") da sexta-feira de ABERTURA da semana. Se `data` cair
-    numa sexta-feira, ela é tratada como a sexta de abertura da semana
-    que começa NAQUELA data."""
-    dias_desde_sexta = (data.weekday() - 4) % 7  # segunda=0 ... sexta=4 -> 0
-    sexta_abertura = data - datetime.timedelta(days=dias_desde_sexta)
-    return sexta_abertura.isoformat()
+    """periodo_ref da semana COMERCIAL de Metas Semanais: sábado a sexta (7
+    dias corridos). O identificador é a data (ISO, "AAAA-MM-DD") do
+    sábado em que as VENDAS da semana começam a contar (mesmo que os
+    produtos já tenham sido configurados na sexta anterior, ao fechar a
+    semana passada). Se `data` cair num sábado, ela é tratada como o
+    sábado de abertura da semana que começa NAQUELA data -- e uma
+    sexta-feira pertence sempre à semana que abriu no sábado anterior
+    (seu dia de fechamento), nunca à que abre no sábado seguinte."""
+    dias_desde_sabado = (data.weekday() - 5) % 7  # segunda=0 ... sábado=5 -> 0
+    sabado_abertura = data - datetime.timedelta(days=dias_desde_sabado)
+    return sabado_abertura.isoformat()
 
 
 def intervalo_semana(slug: str):
-    """(sexta_abertura, sexta_fechamento) da semana `slug` -- 8 dias
-    corridos, incluindo as duas sextas (confirmado com a Ingrid: "8 dias
-    corridos, porém 07 [dias de venda] pq no domingo não tem venda")."""
+    """(sabado_abertura, sexta_fechamento) da semana `slug` -- 7 dias
+    corridos (sábado a sexta, ambos incluídos)."""
     inicio = datetime.date.fromisoformat(slug)
-    fim = inicio + datetime.timedelta(days=7)
+    fim = inicio + datetime.timedelta(days=6)
     return inicio, fim
 
 
@@ -128,18 +138,16 @@ def semana_ano_anterior(slug: str) -> str:
 
 
 def dia_semana_atual(data: datetime.date = None) -> int:
-    """Dia de venda (1..7) dentro da semana sexta-a-sexta que contém
+    """Dia de venda (1..6) dentro da semana sábado-a-sexta que contém
     `data` (hoje, por padrão) -- pula domingo, que não tem venda.
 
-    AMBÍGUO numa sexta-feira: `slug_semana` sempre trata uma sexta como a
-    abertura de uma semana NOVA (dia 1), mesmo que a intenção seja ver o
-    fechamento da semana que está terminando naquele mesmo dia (dia 7).
-    Por isso, sempre que já existir uma semana especificamente selecionada
-    na tela (ex.: um item de histórico/publicação), prefira
-    `dia_semana_no_periodo(slug, ...)` -- que calcula o dia em relação a
-    ESSA semana, não à que o calendário de hoje sugeriria por conta
-    própria. Use esta função (sem slug) só quando não há nenhuma semana
-    selecionada e "a semana atual" precisa ser inferida do zero."""
+    Desde a redefinição de 31/08/2026 (sábado a sexta) não existe mais a
+    ambiguidade que a definição anterior (sexta a sexta) tinha numa
+    sexta-feira -- cada dia do calendário pertence a exatamente uma
+    semana comercial. `dia_semana_no_periodo(slug, ...)` abaixo continua
+    disponível para quando já existe uma semana especificamente
+    selecionada na tela (histórico/publicação) diferente da semana
+    corrente do calendário."""
     if data is None:
         data = datetime.date.today()
     inicio, _ = intervalo_semana(slug_semana(data))
@@ -149,20 +157,17 @@ def dia_semana_atual(data: datetime.date = None) -> int:
         if d.weekday() != 6:  # domingo
             dia += 1
         d += datetime.timedelta(days=1)
-    return max(1, min(dia, 7))
+    return max(1, min(dia, 6))
 
 
 def dia_semana_no_periodo(slug: str, hoje: datetime.date = None) -> int:
-    """Dia de venda (1..7) já decorrido dentro da semana comercial `slug`
-    especificamente, até hoje -- ou a semana inteira (7) se `slug` já
-    tiver fechado antes de hoje. Corrige a ambiguidade de
-    `dia_semana_atual()` numa sexta-feira: se `slug` for a semana que
-    ABRIU há 7 dias e FECHA hoje (sexta), o resultado é dia 7 (a semana
-    ainda não encerrou, está no seu último dia) -- não dia 1, que seria
-    tratar hoje como abertura de uma semana nova (a ambiguidade
-    reportada pela Ingrid em 28/08/2026: "hj é sexta, dia 1 de 7" na
-    semana 21/08 a 28/08, que na verdade estava no dia 7, seu último
-    dia, ainda não fechada)."""
+    """Dia de venda (1..6) já decorrido dentro da semana comercial `slug`
+    especificamente, até hoje -- ou a semana inteira (6) se `slug` já
+    tiver fechado antes de hoje. Sob a definição sábado-a-sexta (a partir
+    de 31/08/2026) não há mais a ambiguidade de sexta-feira que motivou a
+    criação desta função -- mas ela continua útil quando a tela já tem
+    uma semana selecionada (histórico, publicação) diferente da semana
+    corrente do calendário, calculando o dia em relação a ESSA semana."""
     if hoje is None:
         hoje = datetime.date.today()
     inicio, fim = intervalo_semana(slug)
@@ -175,7 +180,7 @@ def dia_semana_no_periodo(slug: str, hoje: datetime.date = None) -> int:
         if d.weekday() != 6:  # domingo
             dia += 1
         d += datetime.timedelta(days=1)
-    return max(1, min(dia, 7))
+    return max(1, min(dia, 6))
 
 
 def codigo_matches(codigo_norm: str, entry: str) -> bool:
