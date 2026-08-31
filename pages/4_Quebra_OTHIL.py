@@ -230,50 +230,61 @@ def _render_tab(tipo: str, label_tipo: str):
                 except Exception as e:
                     st.error(f'Erro ao processar PDF: {e}')
 
-    # Nunca mostra o histórico/dashboard de Quebra aqui -- só na Gerência.
-    acesso.parar_se_upload()
+    # Perfil de upload (27/08/2026, pedido da Ingrid): nunca vê o
+    # histórico/dashboard de Quebra aqui -- só na Gerência. SEMPRE
+    # bloqueado, independente de já ter processado um PDF ou não nesta
+    # sessão.
+    #
+    # Usa deve_esconder_apos_upload() em vez de parar_se_upload() aqui --
+    # mesmo bug real encontrado em 29/08/2026 (e corrigido do mesmo jeito
+    # em 1_Relatorio_Diario_OTHIL.py): esta página tem 3 abas
+    # (Semanal/Mensal/Comparativo), e _render_tab() é compartilhada pelas
+    # duas primeiras. parar_se_upload() usa st.stop(), que mata o script
+    # INTEIRO -- ao rodar a aba Semanal (que vem antes das outras no
+    # código), o st.stop() impedia as abas Mensal e Comparativo de sequer
+    # aparecerem (nem o uploader delas).
+    if not acesso.deve_esconder_apos_upload():
+        st.divider()
 
-    st.divider()
+        # Histórico
+        historico = _listar(tipo)
+        if not historico:
+            st.info('Nenhum relatório salvo ainda. Envie um PDF acima.')
+            return
 
-    # Histórico
-    historico = _listar(tipo)
-    if not historico:
-        st.info('Nenhum relatório salvo ainda. Envie um PDF acima.')
-        return
+        slugs  = [s for s, _ in historico]
+        labels = [
+            f"{_label_slug(s, tipo)}  —  {m.get('periodo', '-')}"
+            for s, m in historico
+        ]
 
-    slugs  = [s for s, _ in historico]
-    labels = [
-        f"{_label_slug(s, tipo)}  —  {m.get('periodo', '-')}"
-        for s, m in historico
-    ]
+        idx_key = f'qbr_{tipo}_idx'
+        if idx_key not in st.session_state:
+            st.session_state[idx_key] = 0
 
-    idx_key = f'qbr_{tipo}_idx'
-    if idx_key not in st.session_state:
-        st.session_state[idx_key] = 0
+        col_prev, col_sel, col_next = st.columns([1, 6, 1], vertical_alignment='bottom')
+        with col_prev:
+            if st.button('◀', key=f'qbr_prev_{tipo}', help='Período anterior'):
+                st.session_state[idx_key] = min(st.session_state[idx_key] + 1, len(slugs) - 1)
+        with col_next:
+            if st.button('▶', key=f'qbr_next_{tipo}', help='Próximo período'):
+                st.session_state[idx_key] = max(st.session_state[idx_key] - 1, 0)
+        with col_sel:
+            escolha = st.selectbox(
+                f'{len(historico)} período(s) salvo(s):',
+                labels,
+                index=min(st.session_state[idx_key], len(labels) - 1),
+                key=f'qbr_sel_{tipo}',
+            )
+            st.session_state[idx_key] = labels.index(escolha)
 
-    col_prev, col_sel, col_next = st.columns([1, 6, 1], vertical_alignment='bottom')
-    with col_prev:
-        if st.button('◀', key=f'qbr_prev_{tipo}', help='Período anterior'):
-            st.session_state[idx_key] = min(st.session_state[idx_key] + 1, len(slugs) - 1)
-    with col_next:
-        if st.button('▶', key=f'qbr_next_{tipo}', help='Próximo período'):
-            st.session_state[idx_key] = max(st.session_state[idx_key] - 1, 0)
-    with col_sel:
-        escolha = st.selectbox(
-            f'{len(historico)} período(s) salvo(s):',
-            labels,
-            index=min(st.session_state[idx_key], len(labels) - 1),
-            key=f'qbr_sel_{tipo}',
-        )
-        st.session_state[idx_key] = labels.index(escolha)
+        idx = st.session_state[idx_key]
+        slug_sel = slugs[idx]
+        dados_sel = historico[idx][1]
+        dados_ant = historico[idx + 1][1] if idx + 1 < len(historico) else None
+        label_ant = _label_slug(slugs[idx + 1], tipo) if idx + 1 < len(historico) else None
 
-    idx = st.session_state[idx_key]
-    slug_sel = slugs[idx]
-    dados_sel = historico[idx][1]
-    dados_ant = historico[idx + 1][1] if idx + 1 < len(historico) else None
-    label_ant = _label_slug(slugs[idx + 1], tipo) if idx + 1 < len(historico) else None
-
-    _render_dashboard(dados_sel, tipo, slug_sel, dados_ant=dados_ant, label_ant=label_ant)
+        _render_dashboard(dados_sel, tipo, slug_sel, dados_ant=dados_ant, label_ant=label_ant)
 
 
 # ── Comparativo ───────────────────────────────────────────────────────────────
