@@ -726,10 +726,10 @@ def _listar_recorrencias_ger():
 _FECHAMENTOS_DIR = os.path.join(_GERENCIA_DIR, 'fechamentos')
 
 
-def _on_track_status_ger(atingido: float, dia: int, total_dias: int = 7):
+def _on_track_status_ger(atingido: float, dia: int, total_dias: int = 6):
     """(emoji, label, hex_color) — via lógica central de On Track
     (on_track.py), tempo decorrido em dias de venda da semana comercial
-    sexta a sexta (1..7, sem domingo -- ver calc.dia_semana_atual), MESMA
+    sábado a sexta (1..6, sem domingo -- ver calc.dia_semana_atual), MESMA
     convenção usada em Metas Semanais (calc.py é a fonte única). Corrige
     inconsistência: esta função usava a convenção ANTIGA segunda-sexta
     (1..5, dia/5) mesmo depois da semana comercial de Metas Semanais já
@@ -839,26 +839,23 @@ def _render_ontrack_publicado():
     st.caption(f"Período: **{periodo}**  |  Publicado em: **{pub_em}**")
 
     # Dia calculado em relação à semana SELECIONADA acima (slug_ot), não à
-    # que o calendário de hoje sugeriria por conta própria -- numa
-    # sexta-feira, o dia de hoje é ao mesmo tempo o fechamento da semana
-    # selecionada (se for ela) e a abertura da próxima; calc.dia_semana_atual()
-    # sozinho sempre assume a segunda leitura (dia 1), o que ficava errado
-    # quando a semana selecionada era na verdade a que estava terminando
-    # (pedido da Ingrid, 28/08/2026).
+    # que o calendário de hoje sugeriria por conta própria -- útil quando a
+    # tela está mostrando uma semana diferente da atual (histórico), já que
+    # calc.dia_semana_atual() sozinho sempre se refere à semana de hoje.
     _dia_default = (calc.dia_semana_no_periodo(slug_ot) if slug_ot
                      else calc.dia_semana_atual())
     # Chave inclui a semana selecionada -- sem isso, o slider ficaria
     # "preso" no valor da última semana visitada ao trocar de período
     # (mesmo bug de fundo: mistura o estado de duas semanas diferentes).
     dia = st.slider(
-        'Dia da semana (para status On Track)', 1, 7,
+        'Dia da semana (para status On Track)', 1, 6,
         value=_dia_default,
-        format='Dia %d de 7', key=f'ger_ot_dia_{slug_ot or "legado"}',
-        help='Semana comercial sexta a sexta (sem domingo, que não tem '
-             'venda): Sexta=1  Sábado=2  Segunda=3  Terça=4  Quarta=5  '
-             'Quinta=6  Sexta (fecha a semana)=7 -- mesma convenção da '
-             'aba Metas Semanais. Calculado em relação à semana '
-             'selecionada acima, não à data de hoje sozinha.',
+        format='Dia %d de 6', key=f'ger_ot_dia_{slug_ot or "legado"}',
+        help='Semana comercial sábado a sexta (sem domingo, que não tem '
+             'venda): Sábado=1  Segunda=2  Terça=3  Quarta=4  Quinta=5  '
+             'Sexta (fecha a semana)=6 -- mesma convenção da aba Metas '
+             'Semanais. Calculado em relação à semana selecionada acima, '
+             'não à data de hoje sozinha.',
     )
 
     st.divider()
