@@ -962,19 +962,28 @@ def _listar_fechamentos():
 
 
 def _label_fech(slug: str) -> str:
-    try:
-        return periodo_mod.rotulo('semanal', slug)
-    except Exception:
-        pass
-    # Formato novo (Metas Semanais passou a usar semana comercial sexta a
-    # sexta, local a essa página — ver pages/metas_semanais.py): o slug é a
-    # data ISO ("AAAA-MM-DD") da sexta de abertura, não mais "AAAA-Www".
-    try:
-        inicio = datetime.date.fromisoformat(slug)
-        fim = inicio + datetime.timedelta(days=7)
-        return f"Semana {inicio.strftime('%d/%m')} a {fim.strftime('%d/%m')}"
-    except Exception:
-        return slug
+    """Rótulo em português do fechamento `slug`.
+
+    BUG REAL encontrado em 31/08/2026 (reportado pela Ingrid: rótulo
+    'Semana 28/08 a 04/09' sem sentido pra um fechamento cujo período era
+    21/08 a 28/08): esta função reimplementava sua PRÓPRIA conta de data
+    de fim (+7 dias corridos, sem pular domingo) em vez de usar
+    calc.label_semana() -- exatamente o tipo de "segunda lógica de
+    semana divergente" que a Ingrid pediu pra nunca existir (26/08/2026).
+    Além de duplicada, essa conta local nunca foi atualizada quando a
+    semana comercial virou sábado-a-sexta (31/08/2026, ver calc.py), então
+    seguia calculando como se ainda fosse a definição antiga.
+
+    FONTE ÚNICA agora: calc.label_semana(), a mesma usada em Metas
+    Semanais e nas demais seções desta página. Formato antigo "AAAA-Www"
+    (slugs arquivados de antes da migração pra semana comercial em
+    18/08/2026) continua caindo em periodo_mod.rotulo()."""
+    if '-W' in slug:
+        try:
+            return periodo_mod.rotulo('semanal', slug)
+        except Exception:
+            return slug
+    return calc.label_semana(slug)
 
 
 def _sort_key_semana_slug(slug: str) -> str:
