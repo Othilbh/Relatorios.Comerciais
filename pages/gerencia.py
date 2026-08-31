@@ -1036,11 +1036,56 @@ def _render_fechamentos_semanais():
         )
         st.session_state[idx_key] = labels.index(escolha)
 
-    idx   = st.session_state[idx_key]
-    dados = historico[idx][1]
+    idx        = st.session_state[idx_key]
+    slug_atual = slugs[idx]
+    dados      = historico[idx][1]
 
     gerado = dados.get('gerado_em', '')[:16].replace('T', ' ')
     st.caption(f"Período: {dados.get('periodo', '-')}  |  Salvo em: {gerado}")
+
+    # Corrigir semana errada (31/08/2026, pedido da Ingrid): um fechamento
+    # feito ANTES da migração pra semana comercial sábado-a-sexta podia ter
+    # sido salvo sob a semana errada por causa da própria ambiguidade da
+    # sexta que motivou essa migração (fechar "hoje" numa sexta lia aquela
+    # sexta como abertura da semana NOVA, não fechamento da que estava
+    # terminando -- ver calc.py). A Ingrid não quer recalcular/refechar do
+    # zero pra corrigir isso -- só re-salva os MESMOS dados já calculados
+    # sob o periodo_ref certo. O fechamento antigo (sob a semana errada)
+    # não é apagado (não existe uma função de apagar em data_store.py, e
+    # não é o caso de criar uma só pra isso) -- fica órfão no histórico,
+    # sem efeito prático, exatamente como já foi explicado pra ela.
+    with st.expander('🔧 Corrigir a semana deste fechamento'):
+        st.caption(
+            f'Semana atual deste fechamento: **{_label_fech(slug_atual)}**. '
+            'Escolha uma data dentro da semana comercial CORRETA (qualquer '
+            'dia entre a abertura e o fechamento dela) e confirme abaixo -- '
+            'os dados calculados (metas, vendido, matriz produto × '
+            'vendedor) continuam exatamente os mesmos, só a semana em que '
+            'ficam arquivados muda.'
+        )
+        nova_data_fech = st.date_input(
+            'Data dentro da semana correta', value=datetime.date.today(),
+            format='DD/MM/YYYY', key=f'ger_fech_corrigir_data_{slug_atual}',
+        )
+        novo_slug_fech = calc.slug_semana(nova_data_fech)
+        if novo_slug_fech == slug_atual:
+            st.caption('Essa data cai na mesma semana já usada -- nada a corrigir.')
+        else:
+            st.caption(f'Nova semana: **{calc.label_semana(novo_slug_fech)}**')
+            if st.button('✅ Corrigir e salvar sob essa semana', key=f'ger_fech_corrigir_btn_{slug_atual}'):
+                try:
+                    _reg_corr = ds.save_record(
+                        modulo=MOD_FECHAMENTO, tipo_periodo='semanal', periodo_ref=novo_slug_fech,
+                        valores=dados, usuario=st.session_state.get('usuario_nome'),
+                    )
+                    _erro_corr = _reg_corr.get('_erro_persistencia_remota') if _reg_corr else None
+                    if _erro_corr:
+                        st.warning(f'Salvo, mas houve um problema ao persistir de forma permanente: {_erro_corr}')
+                    else:
+                        st.success(f'✅ Salvo como {calc.label_semana(novo_slug_fech)}. O fechamento antigo (sob a semana errada) continua no histórico, sem uso.')
+                    st.rerun()
+                except Exception as e:
+                    st.error(f'Erro ao corrigir: {e}')
 
     prods = dados.get('produtos', [])
 
