@@ -224,7 +224,22 @@ def _write_file(rel_path: str, obj: dict, mensagem: str):
     _local_put(rel_path, obj)  # grava local sempre (cache/dev)
     if is_remoto():
         _, sha, _erro = _github_get(rel_path)
-        return _github_put(rel_path, obj, sha, mensagem)
+        ok, err = _github_put(rel_path, obj, sha, mensagem)
+        if not ok and err and err.startswith('GitHub respondeu 409'):
+            # 409 = o sha que mandamos ficou desatualizado entre o GET e o
+            # PUT acima -- outra gravação no MESMO arquivo aconteceu bem
+            # no meio (ex.: duplo clique num botão de salvar, duas abas
+            # abertas, dois cliques em sequência rápida enquanto a pessoa
+            # não tinha certeza se o primeiro tinha funcionado -- caso
+            # real da Ingrid em 31/08/2026, usando "Corrigir a semana"
+            # duas vezes seguidas). Busca o sha ATUAL de novo e tenta
+            # gravar mais uma vez antes de desistir -- sem isso, a
+            # gravação ficava só no cache local (efêmero no Streamlit
+            # Cloud), sem persistir de verdade, até a pessoa notar o aviso
+            # e clicar de novo manualmente.
+            _, sha2, _erro2 = _github_get(rel_path)
+            ok, err = _github_put(rel_path, obj, sha2, mensagem)
+        return ok, err
     return True, None
 
 
