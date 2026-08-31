@@ -709,12 +709,20 @@ def _render_tab(tipo, label_tipo):
     # bloqueado aqui, independente de já ter lido um PDF ou não nesta
     # sessão (por isso fica fora do "if resultado_{key}..." acima, e não
     # só dentro dele).
-    acesso.parar_se_upload()
-
-    # ── Histórico ────────────────────────────────────────────────────────────
-    st.divider()
-    st.header(f'4. Histórico {label_tipo}')
-    _navegar_e_exibir_historico(tipo, label_tipo)
+    #
+    # Usa deve_esconder_apos_upload() em vez de parar_se_upload() aqui --
+    # bug real encontrado em 29/08/2026: esta função é chamada de dentro
+    # de _render_tab(), compartilhada pelas abas Semanal e Mensal desta
+    # MESMA página (que tem 3 abas: Diário/Semanal/Mensal). parar_se_upload()
+    # usa st.stop(), que mata o script INTEIRO -- ao rodar a aba Semanal
+    # (que vem antes da Mensal no código), o st.stop() impedia a aba Mensal
+    # de sequer aparecer (nem o uploader dela). Sintoma reportado pela
+    # Ingrid: "no dashboard semanal e mensal, não está com a opção de
+    # colocar upload do PDF" -- as abas ficavam totalmente em branco.
+    if not acesso.deve_esconder_apos_upload():
+        st.divider()
+        st.header(f'4. Histórico {label_tipo}')
+        _navegar_e_exibir_historico(tipo, label_tipo)
 
 
 # ── Página principal ─────────────────────────────────────────────────────────
@@ -865,13 +873,20 @@ with tab_d:
     # Perfil de upload (26/08/2026, pedido da Ingrid): nunca vê o preview do
     # dashboard nem o histórico abaixo -- SEMPRE bloqueado aqui, independente
     # de já ter lido um PDF ou não nesta sessão.
-    acesso.parar_se_upload()
-
-    # Histórico diário -- sempre visível (não depende de ter subido um PDF
-    # nesta sessão), com a mesma navegação por data usada em Semanal/Mensal.
-    st.divider()
-    st.header('4. Histórico Diário')
-    _navegar_e_exibir_historico('diario', 'Diário')
+    #
+    # Usa deve_esconder_apos_upload() em vez de parar_se_upload() aqui pelo
+    # MESMO motivo do comentário equivalente em _render_tab() abaixo: esta
+    # é a aba Diário, a PRIMEIRA das 3 abas desta página -- um st.stop()
+    # aqui matava o script antes mesmo de chegar nas abas Semanal e Mensal,
+    # deixando as duas completamente em branco (bug real reportado pela
+    # Ingrid em 29/08/2026).
+    if not acesso.deve_esconder_apos_upload():
+        # Histórico diário -- sempre visível (não depende de ter subido um
+        # PDF nesta sessão), com a mesma navegação por data usada em
+        # Semanal/Mensal.
+        st.divider()
+        st.header('4. Histórico Diário')
+        _navegar_e_exibir_historico('diario', 'Diário')
 
 # ── ABA SEMANAL ──────────────────────────────────────────────────────────────
 with tab_s:
