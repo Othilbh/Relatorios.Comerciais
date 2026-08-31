@@ -6,9 +6,9 @@
     "periodo_ref": "2026-08-22",
     "data_referencia": "2026-08-31",
     "criado_em": "2026-08-31T14:38:07+00:00",
-    "atualizado_em": "2026-08-31T15:32:36+00:00",
+    "atualizado_em": "2026-08-31T16:04:11+00:00",
     "usuario": "Ingrid",
-    "versao": 8,
+    "versao": 9,
     "valores": {
       "publicado_em": "2026-08-28T17:31:02",
       "periodo": "21/08 a 28/08",
@@ -11455,6 +11455,1641 @@
       "atualizado_em": "2026-08-31T15:32:32+00:00",
       "usuario": "Ingrid",
       "versao": 7,
+      "valores": {
+        "publicado_em": "2026-08-28T17:31:02",
+        "periodo": "21/08 a 28/08",
+        "resultados": [
+          {
+            "produto": "WILLIANS 110 DOLE PONTO AZUL",
+            "estoque_total": 61.0,
+            "linhas": [
+              {
+                "vendedor": "Farley",
+                "pct": 17,
+                "meta": 11,
+                "vendido": 2.0,
+                "falta": 9.0,
+                "atingido": 0.18181818181818182
+              },
+              {
+                "vendedor": "Dora",
+                "pct": 17,
+                "meta": 11,
+                "vendido": 10.0,
+                "falta": 1.0,
+                "atingido": 0.9090909090909091
+              },
+              {
+                "vendedor": "Afanais",
+                "pct": 25,
+                "meta": 16,
+                "vendido": 5.0,
+                "falta": 11.0,
+                "atingido": 0.3125
+              },
+              {
+                "vendedor": "Roni",
+                "pct": 25,
+                "meta": 16,
+                "vendido": 24.0,
+                "falta": 0.0,
+                "atingido": 1.5
+              },
+              {
+                "vendedor": "Reginaldo",
+                "pct": 22,
+                "meta": 14,
+                "vendido": 12.0,
+                "falta": 2.0,
+                "atingido": 0.8571428571428571
+              },
+              {
+                "vendedor": "Luciano",
+                "pct": 7,
+                "meta": 5,
+                "vendido": 1.0,
+                "falta": 4.0,
+                "atingido": 0.2
+              },
+              {
+                "vendedor": "Juliana",
+                "pct": 7,
+                "meta": 5,
+                "vendido": 5.0,
+                "falta": 0.0,
+                "atingido": 1.0
+              },
+              {
+                "vendedor": "Luca",
+                "pct": 7,
+                "meta": 5,
+                "vendido": 75.0,
+                "falta": 0.0,
+                "atingido": 15.0
+              }
+            ],
+            "media_rs_cx": 157.63,
+            "media_rs_cx_soma_ponderada": 21437.68,
+            "media_rs_cx_peso": 136.0,
+            "media_custo_cx": 168.3,
+            "media_custo_cx_soma_ponderada": 22888.800000000003,
+            "media_custo_cx_peso": 136.0,
+            "prioridade": "🚨 Grande Urgência"
+          },
+          {
+            "produto": "PACKHAMS PROFESOR",
+            "estoque_total": 272.0,
+            "linhas": [
+              {
+                "vendedor": "Farley",
+                "pct": 17,
+                "meta": 47,
+                "vendido": 1.0,
+                "falta": 46.0,
+                "atingido": 0.02127659574468085
+              },
+              {
+                "vendedor": "Dora",
+                "pct": 17,
+                "meta": 47,
+                "vendido": 135.0,
+                "falta": 0.0,
+                "atingido": 2.872340425531915
+              },
+              {
+                "vendedor": "Afanais",
+                "pct": 25,
+                "meta": 68,
+                "vendido": 16.0,
+                "falta": 52.0,
+                "atingido": 0.23529411764705882
+              },
+              {
+                "vendedor": "Roni",
+                "pct": 25,
+                "meta": 68,
+                "vendido": 76.0,
+                "falta": 0.0,
+                "atingido": 1.1176470588235294
+              },
+              {
+                "vendedor": "Reginaldo",
+                "pct": 22,
+                "meta": 60,
+                "vendido": 0.0,
+                "falta": 60.0,
+                "atingido": 0.0
+              },
+              {
+                "vendedor": "Luciano",
+                "pct": 7,
+                "meta": 20,
+                "vendido": 0.0,
+                "falta": 20.0,
+                "atingido": 0.0
+              },
+              {
+                "vendedor": "Juliana",
+                "pct": 7,
+                "meta": 20,
+                "vendido": 10.0,
+                "falta": 10.0,
+                "atingido": 0.5
+              },
+              {
+                "vendedor": "Luca",
+                "pct": 7,
+                "meta": 20,
+                "vendido": 0.0,
+                "falta": 20.0,
+                "atingido": 0.0
+              }
+            ],
+            "media_rs_cx": 119.6883064516129,
+            "media_rs_cx_soma_ponderada": 29682.7,
+            "media_rs_cx_peso": 248.0,
+            "media_custo_cx": 125.61483870967741,
+            "media_custo_cx_soma_ponderada": 31152.48,
+            "media_custo_cx_peso": 248.0,
+            "prioridade": "🚨 Grande Urgência"
+          },
+          {
+            "produto": "PACKMANS LOS PIONEIROS",
+            "estoque_total": 280.0,
+            "linhas": [
+              {
+                "vendedor": "Farley",
+                "pct": 17,
+                "meta": 48,
+                "vendido": 2.0,
+                "falta": 46.0,
+                "atingido": 0.041666666666666664
+              },
+              {
+                "vendedor": "Dora",
+                "pct": 17,
+                "meta": 48,
+                "vendido": 0.0,
+                "falta": 48.0,
+                "atingido": 0.0
+              },
+              {
+                "vendedor": "Afanais",
+                "pct": 25,
+                "meta": 70,
+                "vendido": 6.0,
+                "falta": 64.0,
+                "atingido": 0.08571428571428572
+              },
+              {
+                "vendedor": "Roni",
+                "pct": 25,
+                "meta": 70,
+                "vendido": 8.0,
+                "falta": 62.0,
+                "atingido": 0.11428571428571428
+              },
+              {
+                "vendedor": "Reginaldo",
+                "pct": 22,
+                "meta": 62,
+                "vendido": 1.0,
+                "falta": 61.0,
+                "atingido": 0.016129032258064516
+              },
+              {
+                "vendedor": "Luciano",
+                "pct": 7,
+                "meta": 20,
+                "vendido": 0.0,
+                "falta": 20.0,
+                "atingido": 0.0
+              },
+              {
+                "vendedor": "Juliana",
+                "pct": 7,
+                "meta": 20,
+                "vendido": 1.0,
+                "falta": 19.0,
+                "atingido": 0.05
+              },
+              {
+                "vendedor": "Luca",
+                "pct": 7,
+                "meta": 20,
+                "vendido": 0.0,
+                "falta": 20.0,
+                "atingido": 0.0
+              }
+            ],
+            "media_rs_cx": 135.55888888888887,
+            "media_rs_cx_soma_ponderada": 2440.06,
+            "media_rs_cx_peso": 18.0,
+            "media_custo_cx": 134.07000000000002,
+            "media_custo_cx_soma_ponderada": 2413.26,
+            "media_custo_cx_peso": 18.0,
+            "prioridade": "🚨 Grande Urgência"
+          },
+          {
+            "produto": "PACKMANS 1/2 MONO AZUL",
+            "estoque_total": 23.0,
+            "linhas": [
+              {
+                "vendedor": "Farley",
+                "pct": 17,
+                "meta": 4,
+                "vendido": 19.0,
+                "falta": 0.0,
+                "atingido": 4.75
+              },
+              {
+                "vendedor": "Dora",
+                "pct": 17,
+                "meta": 4,
+                "vendido": 3.0,
+                "falta": 1.0,
+                "atingido": 0.75
+              },
+              {
+                "vendedor": "Afanais",
+                "pct": 25,
+                "meta": 6,
+                "vendido": 0.0,
+                "falta": 6.0,
+                "atingido": 0.0
+              },
+              {
+                "vendedor": "Roni",
+                "pct": 25,
+                "meta": 6,
+                "vendido": 6.0,
+                "falta": 0.0,
+                "atingido": 1.0
+              },
+              {
+                "vendedor": "Reginaldo",
+                "pct": 22,
+                "meta": 6,
+                "vendido": 0.0,
+                "falta": 6.0,
+                "atingido": 0.0
+              },
+              {
+                "vendedor": "Luciano",
+                "pct": 7,
+                "meta": 2,
+                "vendido": 0.0,
+                "falta": 2.0,
+                "atingido": 0.0
+              },
+              {
+                "vendedor": "Juliana",
+                "pct": 7,
+                "meta": 2,
+                "vendido": 2.0,
+                "falta": 0.0,
+                "atingido": 1.0
+              },
+              {
+                "vendedor": "Luca",
+                "pct": 7,
+                "meta": 2,
+                "vendido": 0.0,
+                "falta": 2.0,
+                "atingido": 0.0
+              }
+            ],
+            "media_rs_cx": 61.77,
+            "media_rs_cx_soma_ponderada": 1914.8700000000001,
+            "media_rs_cx_peso": 31.0,
+            "media_custo_cx": 0.0,
+            "media_custo_cx_soma_ponderada": 0.0,
+            "media_custo_cx_peso": 31.0,
+            "prioridade": "🚨 Grande Urgência"
+          },
+          {
+            "produto": "MELAO DINO",
+            "estoque_total": 304.0,
+            "linhas": [
+              {
+                "vendedor": "Farley",
+                "pct": 17,
+                "meta": 52,
+                "vendido": 10.0,
+                "falta": 42.0,
+                "atingido": 0.19230769230769232
+              },
+              {
+                "vendedor": "Dora",
+                "pct": 17,
+                "meta": 52,
+                "vendido": 32.0,
+                "falta": 20.0,
+                "atingido": 0.6153846153846154
+              },
+              {
+                "vendedor": "Afanais",
+                "pct": 25,
+                "meta": 76,
+                "vendido": 34.0,
+                "falta": 42.0,
+                "atingido": 0.4473684210526316
+              },
+              {
+                "vendedor": "Roni",
+                "pct": 25,
+                "meta": 76,
+                "vendido": 95.0,
+                "falta": 0.0,
+                "atingido": 1.25
+              },
+              {
+                "vendedor": "Reginaldo",
+                "pct": 22,
+                "meta": 67,
+                "vendido": 42.0,
+                "falta": 25.0,
+                "atingido": 0.6268656716417911
+              },
+              {
+                "vendedor": "Luciano",
+                "pct": 7,
+                "meta": 22,
+                "vendido": 0.0,
+                "falta": 22.0,
+                "atingido": 0.0
+              },
+              {
+                "vendedor": "Juliana",
+                "pct": 7,
+                "meta": 22,
+                "vendido": 9.0,
+                "falta": 13.0,
+                "atingido": 0.4090909090909091
+              },
+              {
+                "vendedor": "Luca",
+                "pct": 7,
+                "meta": 22,
+                "vendido": 35.0,
+                "falta": 0.0,
+                "atingido": 1.5909090909090908
+              }
+            ],
+            "media_rs_cx": 53.585598455598465,
+            "media_rs_cx_soma_ponderada": 13878.670000000002,
+            "media_rs_cx_peso": 259.0,
+            "media_custo_cx": 57.761969111969115,
+            "media_custo_cx_soma_ponderada": 14960.35,
+            "media_custo_cx_peso": 259.0,
+            "prioridade": "🚨 Grande Urgência"
+          },
+          {
+            "produto": "ROMA",
+            "estoque_total": 300.0,
+            "linhas": [
+              {
+                "vendedor": "Farley",
+                "pct": 17,
+                "meta": 52,
+                "vendido": 5.0,
+                "falta": 47.0,
+                "atingido": 0.09615384615384616
+              },
+              {
+                "vendedor": "Dora",
+                "pct": 17,
+                "meta": 52,
+                "vendido": 10.0,
+                "falta": 42.0,
+                "atingido": 0.19230769230769232
+              },
+              {
+                "vendedor": "Afanais",
+                "pct": 25,
+                "meta": 75,
+                "vendido": 13.0,
+                "falta": 62.0,
+                "atingido": 0.17333333333333334
+              },
+              {
+                "vendedor": "Roni",
+                "pct": 25,
+                "meta": 75,
+                "vendido": 42.0,
+                "falta": 33.0,
+                "atingido": 0.56
+              },
+              {
+                "vendedor": "Reginaldo",
+                "pct": 22,
+                "meta": 66,
+                "vendido": 62.0,
+                "falta": 4.0,
+                "atingido": 0.9393939393939394
+              },
+              {
+                "vendedor": "Luciano",
+                "pct": 7,
+                "meta": 22,
+                "vendido": 0.0,
+                "falta": 22.0,
+                "atingido": 0.0
+              },
+              {
+                "vendedor": "Juliana",
+                "pct": 7,
+                "meta": 22,
+                "vendido": 3.0,
+                "falta": 19.0,
+                "atingido": 0.13636363636363635
+              },
+              {
+                "vendedor": "Luca",
+                "pct": 7,
+                "meta": 22,
+                "vendido": 121.0,
+                "falta": 0.0,
+                "atingido": 5.5
+              }
+            ],
+            "media_rs_cx": 89.88505836575875,
+            "media_rs_cx_soma_ponderada": 23100.46,
+            "media_rs_cx_peso": 257.0,
+            "media_custo_cx": 84.26988326848249,
+            "media_custo_cx_soma_ponderada": 21657.36,
+            "media_custo_cx_peso": 257.0,
+            "prioridade": "🚨 Grande Urgência"
+          },
+          {
+            "produto": "CUMB CRINSON CHERRY BELLA",
+            "estoque_total": 24.0,
+            "linhas": [
+              {
+                "vendedor": "Farley",
+                "pct": 17,
+                "meta": 5,
+                "vendido": 0.0,
+                "falta": 5.0,
+                "atingido": 0.0
+              },
+              {
+                "vendedor": "Dora",
+                "pct": 17,
+                "meta": 5,
+                "vendido": 0.0,
+                "falta": 5.0,
+                "atingido": 0.0
+              },
+              {
+                "vendedor": "Afanais",
+                "pct": 25,
+                "meta": 6,
+                "vendido": 18.0,
+                "falta": 0.0,
+                "atingido": 3.0
+              },
+              {
+                "vendedor": "Roni",
+                "pct": 25,
+                "meta": 6,
+                "vendido": 0.0,
+                "falta": 6.0,
+                "atingido": 0.0
+              },
+              {
+                "vendedor": "Reginaldo",
+                "pct": 22,
+                "meta": 6,
+                "vendido": 3.0,
+                "falta": 3.0,
+                "atingido": 0.5
+              },
+              {
+                "vendedor": "Luciano",
+                "pct": 7,
+                "meta": 2,
+                "vendido": 0.0,
+                "falta": 2.0,
+                "atingido": 0.0
+              },
+              {
+                "vendedor": "Juliana",
+                "pct": 7,
+                "meta": 2,
+                "vendido": 0.0,
+                "falta": 2.0,
+                "atingido": 0.0
+              },
+              {
+                "vendedor": "Luca",
+                "pct": 7,
+                "meta": 2,
+                "vendido": 0.0,
+                "falta": 2.0,
+                "atingido": 0.0
+              }
+            ],
+            "media_rs_cx": 55.71,
+            "media_rs_cx_soma_ponderada": 1169.91,
+            "media_rs_cx_peso": 21.0,
+            "media_custo_cx": 72.32,
+            "media_custo_cx_soma_ponderada": 1518.7199999999998,
+            "media_custo_cx_peso": 21.0,
+            "prioridade": "🚨 Grande Urgência"
+          },
+          {
+            "produto": "AMEIXA 50-55 TANY",
+            "estoque_total": 232.0,
+            "linhas": [
+              {
+                "vendedor": "Farley",
+                "pct": 17,
+                "meta": 40,
+                "vendido": 1.0,
+                "falta": 39.0,
+                "atingido": 0.025
+              },
+              {
+                "vendedor": "Dora",
+                "pct": 17,
+                "meta": 40,
+                "vendido": 33.0,
+                "falta": 7.0,
+                "atingido": 0.825
+              },
+              {
+                "vendedor": "Afanais",
+                "pct": 25,
+                "meta": 58,
+                "vendido": 26.0,
+                "falta": 32.0,
+                "atingido": 0.4482758620689655
+              },
+              {
+                "vendedor": "Roni",
+                "pct": 25,
+                "meta": 58,
+                "vendido": 119.0,
+                "falta": 0.0,
+                "atingido": 2.0517241379310347
+              },
+              {
+                "vendedor": "Reginaldo",
+                "pct": 22,
+                "meta": 52,
+                "vendido": 13.0,
+                "falta": 39.0,
+                "atingido": 0.25
+              },
+              {
+                "vendedor": "Luciano",
+                "pct": 7,
+                "meta": 17,
+                "vendido": 0.0,
+                "falta": 17.0,
+                "atingido": 0.0
+              },
+              {
+                "vendedor": "Juliana",
+                "pct": 7,
+                "meta": 17,
+                "vendido": 12.0,
+                "falta": 5.0,
+                "atingido": 0.7058823529411765
+              },
+              {
+                "vendedor": "Luca",
+                "pct": 7,
+                "meta": 17,
+                "vendido": 1.0,
+                "falta": 16.0,
+                "atingido": 0.058823529411764705
+              }
+            ],
+            "media_rs_cx": 116.83000000000001,
+            "media_rs_cx_soma_ponderada": 23950.15,
+            "media_rs_cx_peso": 205.0,
+            "media_custo_cx": 139.95,
+            "media_custo_cx_soma_ponderada": 28689.749999999996,
+            "media_custo_cx_peso": 205.0,
+            "prioridade": "🚨 Grande Urgência"
+          },
+          {
+            "produto": "NECTARINA ",
+            "estoque_total": 65.0,
+            "linhas": [
+              {
+                "vendedor": "Farley",
+                "pct": 17,
+                "meta": 12,
+                "vendido": 54.0,
+                "falta": 0.0,
+                "atingido": 4.5
+              },
+              {
+                "vendedor": "Dora",
+                "pct": 17,
+                "meta": 12,
+                "vendido": 0.0,
+                "falta": 12.0,
+                "atingido": 0.0
+              },
+              {
+                "vendedor": "Afanais",
+                "pct": 25,
+                "meta": 17,
+                "vendido": 3.0,
+                "falta": 14.0,
+                "atingido": 0.17647058823529413
+              },
+              {
+                "vendedor": "Roni",
+                "pct": 25,
+                "meta": 17,
+                "vendido": 5.0,
+                "falta": 12.0,
+                "atingido": 0.29411764705882354
+              },
+              {
+                "vendedor": "Reginaldo",
+                "pct": 22,
+                "meta": 15,
+                "vendido": 1.0,
+                "falta": 14.0,
+                "atingido": 0.06666666666666667
+              },
+              {
+                "vendedor": "Luciano",
+                "pct": 7,
+                "meta": 5,
+                "vendido": 0.0,
+                "falta": 5.0,
+                "atingido": 0.0
+              },
+              {
+                "vendedor": "Juliana",
+                "pct": 7,
+                "meta": 5,
+                "vendido": 0.0,
+                "falta": 5.0,
+                "atingido": 0.0
+              },
+              {
+                "vendedor": "Luca",
+                "pct": 7,
+                "meta": 5,
+                "vendido": 112.0,
+                "falta": 0.0,
+                "atingido": 22.4
+              }
+            ],
+            "media_rs_cx": 110.77947976878612,
+            "media_rs_cx_soma_ponderada": 19164.85,
+            "media_rs_cx_peso": 173.0,
+            "media_custo_cx": 47.643468208092486,
+            "media_custo_cx_soma_ponderada": 8242.32,
+            "media_custo_cx_peso": 173.0,
+            "prioridade": "🚨 Grande Urgência"
+          },
+          {
+            "produto": "CUMB THOMPSON GURUVA",
+            "estoque_total": 623.0,
+            "linhas": [
+              {
+                "vendedor": "Farley",
+                "pct": 17,
+                "meta": 106,
+                "vendido": 72.0,
+                "falta": 34.0,
+                "atingido": 0.6792452830188679
+              },
+              {
+                "vendedor": "Dora",
+                "pct": 17,
+                "meta": 106,
+                "vendido": 4.0,
+                "falta": 102.0,
+                "atingido": 0.03773584905660377
+              },
+              {
+                "vendedor": "Afanais",
+                "pct": 25,
+                "meta": 156,
+                "vendido": 18.0,
+                "falta": 138.0,
+                "atingido": 0.11538461538461539
+              },
+              {
+                "vendedor": "Roni",
+                "pct": 25,
+                "meta": 156,
+                "vendido": 0.0,
+                "falta": 156.0,
+                "atingido": 0.0
+              },
+              {
+                "vendedor": "Reginaldo",
+                "pct": 22,
+                "meta": 138,
+                "vendido": 1.0,
+                "falta": 137.0,
+                "atingido": 0.007246376811594203
+              },
+              {
+                "vendedor": "Luciano",
+                "pct": 7,
+                "meta": 44,
+                "vendido": 0.0,
+                "falta": 44.0,
+                "atingido": 0.0
+              },
+              {
+                "vendedor": "Juliana",
+                "pct": 7,
+                "meta": 44,
+                "vendido": 258.0,
+                "falta": 0.0,
+                "atingido": 5.863636363636363
+              },
+              {
+                "vendedor": "Luca",
+                "pct": 7,
+                "meta": 44,
+                "vendido": 21.0,
+                "falta": 23.0,
+                "atingido": 0.4772727272727273
+              }
+            ],
+            "media_rs_cx": 63.14,
+            "media_rs_cx_soma_ponderada": 23614.36,
+            "media_rs_cx_peso": 374.0,
+            "media_custo_cx": 70.6,
+            "media_custo_cx_soma_ponderada": 26404.399999999998,
+            "media_custo_cx_peso": 374.0,
+            "prioridade": "🚨 Grande Urgência"
+          },
+          {
+            "produto": "CUMB THOMPSON FRUTIBRAS",
+            "estoque_total": 0.0,
+            "linhas": [
+              {
+                "vendedor": "Farley",
+                "pct": 17,
+                "meta": 0,
+                "vendido": 2.0,
+                "falta": 0.0,
+                "atingido": 0.0
+              },
+              {
+                "vendedor": "Dora",
+                "pct": 17,
+                "meta": 0,
+                "vendido": 0.0,
+                "falta": 0.0,
+                "atingido": 0.0
+              },
+              {
+                "vendedor": "Afanais",
+                "pct": 25,
+                "meta": 0,
+                "vendido": 0.0,
+                "falta": 0.0,
+                "atingido": 0.0
+              },
+              {
+                "vendedor": "Roni",
+                "pct": 25,
+                "meta": 0,
+                "vendido": 155.0,
+                "falta": 0.0,
+                "atingido": 0.0
+              },
+              {
+                "vendedor": "Reginaldo",
+                "pct": 22,
+                "meta": 0,
+                "vendido": 0.0,
+                "falta": 0.0,
+                "atingido": 0.0
+              },
+              {
+                "vendedor": "Luciano",
+                "pct": 7,
+                "meta": 0,
+                "vendido": 0.0,
+                "falta": 0.0,
+                "atingido": 0.0
+              },
+              {
+                "vendedor": "Juliana",
+                "pct": 7,
+                "meta": 0,
+                "vendido": 3.0,
+                "falta": 0.0,
+                "atingido": 0.0
+              },
+              {
+                "vendedor": "Luca",
+                "pct": 7,
+                "meta": 0,
+                "vendido": 0.0,
+                "falta": 0.0,
+                "atingido": 0.0
+              }
+            ],
+            "media_rs_cx": 63.06,
+            "media_rs_cx_soma_ponderada": 10089.6,
+            "media_rs_cx_peso": 160.0,
+            "media_custo_cx": 80.38,
+            "media_custo_cx_soma_ponderada": 12860.8,
+            "media_custo_cx_peso": 160.0,
+            "prioridade": "🚨 Grande Urgência"
+          },
+          {
+            "produto": "BERGAMOTA",
+            "estoque_total": 500.0,
+            "linhas": [
+              {
+                "vendedor": "Farley",
+                "pct": 17,
+                "meta": 85,
+                "vendido": 31.0,
+                "falta": 54.0,
+                "atingido": 0.36470588235294116
+              },
+              {
+                "vendedor": "Dora",
+                "pct": 17,
+                "meta": 85,
+                "vendido": 32.0,
+                "falta": 53.0,
+                "atingido": 0.3764705882352941
+              },
+              {
+                "vendedor": "Afanais",
+                "pct": 25,
+                "meta": 125,
+                "vendido": 222.0,
+                "falta": 0.0,
+                "atingido": 1.776
+              },
+              {
+                "vendedor": "Roni",
+                "pct": 25,
+                "meta": 125,
+                "vendido": 369.0,
+                "falta": 0.0,
+                "atingido": 2.952
+              },
+              {
+                "vendedor": "Reginaldo",
+                "pct": 22,
+                "meta": 110,
+                "vendido": 52.0,
+                "falta": 58.0,
+                "atingido": 0.4727272727272727
+              },
+              {
+                "vendedor": "Luciano",
+                "pct": 7,
+                "meta": 35,
+                "vendido": 0.0,
+                "falta": 35.0,
+                "atingido": 0.0
+              },
+              {
+                "vendedor": "Juliana",
+                "pct": 7,
+                "meta": 35,
+                "vendido": 4.0,
+                "falta": 31.0,
+                "atingido": 0.11428571428571428
+              },
+              {
+                "vendedor": "Luca",
+                "pct": 7,
+                "meta": 35,
+                "vendido": 404.0,
+                "falta": 0.0,
+                "atingido": 11.542857142857143
+              }
+            ],
+            "media_rs_cx": 69.8654529147982,
+            "media_rs_cx_soma_ponderada": 77899.98,
+            "media_rs_cx_peso": 1115.0,
+            "media_custo_cx": 40.50504932735426,
+            "media_custo_cx_soma_ponderada": 45163.13,
+            "media_custo_cx_peso": 1115.0,
+            "prioridade": "🔥 Alta Prioridade"
+          },
+          {
+            "produto": "PIMETAO REI",
+            "estoque_total": 100.0,
+            "linhas": [
+              {
+                "vendedor": "Farley",
+                "pct": 17,
+                "meta": 17,
+                "vendido": 0.0,
+                "falta": 17.0,
+                "atingido": 0.0
+              },
+              {
+                "vendedor": "Dora",
+                "pct": 17,
+                "meta": 17,
+                "vendido": 1.0,
+                "falta": 16.0,
+                "atingido": 0.058823529411764705
+              },
+              {
+                "vendedor": "Afanais",
+                "pct": 25,
+                "meta": 25,
+                "vendido": 2.0,
+                "falta": 23.0,
+                "atingido": 0.08
+              },
+              {
+                "vendedor": "Roni",
+                "pct": 25,
+                "meta": 25,
+                "vendido": 2.0,
+                "falta": 23.0,
+                "atingido": 0.08
+              },
+              {
+                "vendedor": "Reginaldo",
+                "pct": 22,
+                "meta": 22,
+                "vendido": 55.0,
+                "falta": 0.0,
+                "atingido": 2.5
+              },
+              {
+                "vendedor": "Luciano",
+                "pct": 7,
+                "meta": 8,
+                "vendido": 0.0,
+                "falta": 8.0,
+                "atingido": 0.0
+              },
+              {
+                "vendedor": "Juliana",
+                "pct": 7,
+                "meta": 8,
+                "vendido": 0.0,
+                "falta": 8.0,
+                "atingido": 0.0
+              },
+              {
+                "vendedor": "Luca",
+                "pct": 7,
+                "meta": 8,
+                "vendido": 0.0,
+                "falta": 8.0,
+                "atingido": 0.0
+              }
+            ],
+            "media_rs_cx": 88.06603174603174,
+            "media_rs_cx_soma_ponderada": 5548.16,
+            "media_rs_cx_peso": 63.0,
+            "media_custo_cx": 171.01333333333335,
+            "media_custo_cx_soma_ponderada": 10773.84,
+            "media_custo_cx_peso": 63.0,
+            "prioridade": "🔥 Alta Prioridade"
+          },
+          {
+            "produto": "8KG THOMPSON AUTUM CAPELLARO",
+            "estoque_total": 150.0,
+            "linhas": [
+              {
+                "vendedor": "Farley",
+                "pct": 17,
+                "meta": 26,
+                "vendido": 1.0,
+                "falta": 25.0,
+                "atingido": 0.038461538461538464
+              },
+              {
+                "vendedor": "Dora",
+                "pct": 17,
+                "meta": 26,
+                "vendido": 3.0,
+                "falta": 23.0,
+                "atingido": 0.11538461538461539
+              },
+              {
+                "vendedor": "Afanais",
+                "pct": 25,
+                "meta": 38,
+                "vendido": 56.0,
+                "falta": 0.0,
+                "atingido": 1.4736842105263157
+              },
+              {
+                "vendedor": "Roni",
+                "pct": 25,
+                "meta": 38,
+                "vendido": 36.0,
+                "falta": 2.0,
+                "atingido": 0.9473684210526315
+              },
+              {
+                "vendedor": "Reginaldo",
+                "pct": 22,
+                "meta": 33,
+                "vendido": 1.0,
+                "falta": 32.0,
+                "atingido": 0.030303030303030304
+              },
+              {
+                "vendedor": "Luciano",
+                "pct": 7,
+                "meta": 11,
+                "vendido": 0.0,
+                "falta": 11.0,
+                "atingido": 0.0
+              },
+              {
+                "vendedor": "Juliana",
+                "pct": 7,
+                "meta": 11,
+                "vendido": 0.0,
+                "falta": 11.0,
+                "atingido": 0.0
+              },
+              {
+                "vendedor": "Luca",
+                "pct": 7,
+                "meta": 11,
+                "vendido": 0.0,
+                "falta": 11.0,
+                "atingido": 0.0
+              }
+            ],
+            "media_rs_cx": 155.43,
+            "media_rs_cx_soma_ponderada": 15076.710000000001,
+            "media_rs_cx_peso": 97.0,
+            "media_custo_cx": 162.65,
+            "media_custo_cx_soma_ponderada": 15777.050000000001,
+            "media_custo_cx_peso": 97.0,
+            "prioridade": "🔥 Alta Prioridade"
+          },
+          {
+            "produto": "CUMB VITORIA HONEY",
+            "estoque_total": 1256.0,
+            "linhas": [
+              {
+                "vendedor": "Farley",
+                "pct": 17,
+                "meta": 214,
+                "vendido": 21.0,
+                "falta": 193.0,
+                "atingido": 0.09813084112149532
+              },
+              {
+                "vendedor": "Dora",
+                "pct": 17,
+                "meta": 214,
+                "vendido": 45.0,
+                "falta": 169.0,
+                "atingido": 0.2102803738317757
+              },
+              {
+                "vendedor": "Afanais",
+                "pct": 25,
+                "meta": 314,
+                "vendido": 456.0,
+                "falta": 0.0,
+                "atingido": 1.4522292993630572
+              },
+              {
+                "vendedor": "Roni",
+                "pct": 25,
+                "meta": 314,
+                "vendido": 479.0,
+                "falta": 0.0,
+                "atingido": 1.5254777070063694
+              },
+              {
+                "vendedor": "Reginaldo",
+                "pct": 22,
+                "meta": 277,
+                "vendido": 3.0,
+                "falta": 274.0,
+                "atingido": 0.010830324909747292
+              },
+              {
+                "vendedor": "Luciano",
+                "pct": 7,
+                "meta": 88,
+                "vendido": 0.0,
+                "falta": 88.0,
+                "atingido": 0.0
+              },
+              {
+                "vendedor": "Juliana",
+                "pct": 7,
+                "meta": 88,
+                "vendido": 310.0,
+                "falta": 0.0,
+                "atingido": 3.522727272727273
+              },
+              {
+                "vendedor": "Luca",
+                "pct": 7,
+                "meta": 88,
+                "vendido": 2.0,
+                "falta": 86.0,
+                "atingido": 0.022727272727272728
+              }
+            ],
+            "media_rs_cx": null,
+            "media_rs_cx_soma_ponderada": 0.0,
+            "media_rs_cx_peso": 0.0,
+            "media_custo_cx": null,
+            "media_custo_cx_soma_ponderada": 0.0,
+            "media_custo_cx_peso": 0.0,
+            "prioridade": "🔥 Alta Prioridade"
+          },
+          {
+            "produto": "BENITAKA",
+            "estoque_total": 169.0,
+            "linhas": [
+              {
+                "vendedor": "Farley",
+                "pct": 17,
+                "meta": 29,
+                "vendido": 0.0,
+                "falta": 29.0,
+                "atingido": 0.0
+              },
+              {
+                "vendedor": "Dora",
+                "pct": 17,
+                "meta": 29,
+                "vendido": 20.0,
+                "falta": 9.0,
+                "atingido": 0.6896551724137931
+              },
+              {
+                "vendedor": "Afanais",
+                "pct": 25,
+                "meta": 43,
+                "vendido": 6.0,
+                "falta": 37.0,
+                "atingido": 0.13953488372093023
+              },
+              {
+                "vendedor": "Roni",
+                "pct": 25,
+                "meta": 43,
+                "vendido": 13.0,
+                "falta": 30.0,
+                "atingido": 0.3023255813953488
+              },
+              {
+                "vendedor": "Reginaldo",
+                "pct": 22,
+                "meta": 38,
+                "vendido": 4.0,
+                "falta": 34.0,
+                "atingido": 0.10526315789473684
+              },
+              {
+                "vendedor": "Luciano",
+                "pct": 7,
+                "meta": 12,
+                "vendido": 0.0,
+                "falta": 12.0,
+                "atingido": 0.0
+              },
+              {
+                "vendedor": "Juliana",
+                "pct": 7,
+                "meta": 12,
+                "vendido": 6.0,
+                "falta": 6.0,
+                "atingido": 0.5
+              },
+              {
+                "vendedor": "Luca",
+                "pct": 7,
+                "meta": 12,
+                "vendido": 0.0,
+                "falta": 12.0,
+                "atingido": 0.0
+              }
+            ],
+            "media_rs_cx": 94.59,
+            "media_rs_cx_soma_ponderada": 4634.91,
+            "media_rs_cx_peso": 49.0,
+            "media_custo_cx": 94.73,
+            "media_custo_cx_soma_ponderada": 4641.77,
+            "media_custo_cx_peso": 49.0,
+            "prioridade": "🔥 Alta Prioridade"
+          },
+          {
+            "produto": "NUBIA/JUBILLE SPECIALE",
+            "estoque_total": 698.0,
+            "linhas": [
+              {
+                "vendedor": "Farley",
+                "pct": 17,
+                "meta": 119,
+                "vendido": 1.0,
+                "falta": 118.0,
+                "atingido": 0.008403361344537815
+              },
+              {
+                "vendedor": "Dora",
+                "pct": 17,
+                "meta": 119,
+                "vendido": 18.0,
+                "falta": 101.0,
+                "atingido": 0.15126050420168066
+              },
+              {
+                "vendedor": "Afanais",
+                "pct": 25,
+                "meta": 175,
+                "vendido": 9.0,
+                "falta": 166.0,
+                "atingido": 0.05142857142857143
+              },
+              {
+                "vendedor": "Roni",
+                "pct": 25,
+                "meta": 175,
+                "vendido": 18.0,
+                "falta": 157.0,
+                "atingido": 0.10285714285714286
+              },
+              {
+                "vendedor": "Reginaldo",
+                "pct": 22,
+                "meta": 154,
+                "vendido": 3.0,
+                "falta": 151.0,
+                "atingido": 0.01948051948051948
+              },
+              {
+                "vendedor": "Luciano",
+                "pct": 7,
+                "meta": 49,
+                "vendido": 0.0,
+                "falta": 49.0,
+                "atingido": 0.0
+              },
+              {
+                "vendedor": "Juliana",
+                "pct": 7,
+                "meta": 49,
+                "vendido": 19.0,
+                "falta": 30.0,
+                "atingido": 0.3877551020408163
+              },
+              {
+                "vendedor": "Luca",
+                "pct": 7,
+                "meta": 49,
+                "vendido": 0.0,
+                "falta": 49.0,
+                "atingido": 0.0
+              }
+            ],
+            "media_rs_cx": 93.68,
+            "media_rs_cx_soma_ponderada": 6370.240000000001,
+            "media_rs_cx_peso": 68.0,
+            "media_custo_cx": 98.81,
+            "media_custo_cx_soma_ponderada": 6719.08,
+            "media_custo_cx_peso": 68.0,
+            "prioridade": "🔥 Alta Prioridade"
+          },
+          {
+            "produto": "MELAO PELE DE SAPO",
+            "estoque_total": 227.0,
+            "linhas": [
+              {
+                "vendedor": "Farley",
+                "pct": 17,
+                "meta": 39,
+                "vendido": 107.0,
+                "falta": 0.0,
+                "atingido": 2.7435897435897436
+              },
+              {
+                "vendedor": "Dora",
+                "pct": 17,
+                "meta": 39,
+                "vendido": 9.0,
+                "falta": 30.0,
+                "atingido": 0.23076923076923078
+              },
+              {
+                "vendedor": "Afanais",
+                "pct": 25,
+                "meta": 57,
+                "vendido": 26.0,
+                "falta": 31.0,
+                "atingido": 0.45614035087719296
+              },
+              {
+                "vendedor": "Roni",
+                "pct": 25,
+                "meta": 57,
+                "vendido": 9.0,
+                "falta": 48.0,
+                "atingido": 0.15789473684210525
+              },
+              {
+                "vendedor": "Reginaldo",
+                "pct": 22,
+                "meta": 50,
+                "vendido": 77.0,
+                "falta": 0.0,
+                "atingido": 1.54
+              },
+              {
+                "vendedor": "Luciano",
+                "pct": 7,
+                "meta": 16,
+                "vendido": 1.0,
+                "falta": 15.0,
+                "atingido": 0.0625
+              },
+              {
+                "vendedor": "Juliana",
+                "pct": 7,
+                "meta": 16,
+                "vendido": 1.0,
+                "falta": 15.0,
+                "atingido": 0.0625
+              },
+              {
+                "vendedor": "Luca",
+                "pct": 7,
+                "meta": 16,
+                "vendido": 70.0,
+                "falta": 0.0,
+                "atingido": 4.375
+              }
+            ],
+            "media_rs_cx": 56.323184713375795,
+            "media_rs_cx_soma_ponderada": 17685.48,
+            "media_rs_cx_peso": 314.0,
+            "media_custo_cx": 4.285031847133758,
+            "media_custo_cx_soma_ponderada": 1345.5,
+            "media_custo_cx_peso": 314.0,
+            "prioridade": "Normal"
+          },
+          {
+            "produto": "MELAO REI",
+            "estoque_total": 1400.0,
+            "linhas": [
+              {
+                "vendedor": "Farley",
+                "pct": 17,
+                "meta": 239,
+                "vendido": 176.0,
+                "falta": 63.0,
+                "atingido": 0.7364016736401674
+              },
+              {
+                "vendedor": "Dora",
+                "pct": 17,
+                "meta": 239,
+                "vendido": 79.0,
+                "falta": 160.0,
+                "atingido": 0.3305439330543933
+              },
+              {
+                "vendedor": "Afanais",
+                "pct": 25,
+                "meta": 350,
+                "vendido": 239.0,
+                "falta": 111.0,
+                "atingido": 0.6828571428571428
+              },
+              {
+                "vendedor": "Roni",
+                "pct": 25,
+                "meta": 350,
+                "vendido": 746.0,
+                "falta": 0.0,
+                "atingido": 2.1314285714285712
+              },
+              {
+                "vendedor": "Reginaldo",
+                "pct": 22,
+                "meta": 308,
+                "vendido": 407.0,
+                "falta": 0.0,
+                "atingido": 1.3214285714285714
+              },
+              {
+                "vendedor": "Luciano",
+                "pct": 7,
+                "meta": 99,
+                "vendido": 12.0,
+                "falta": 87.0,
+                "atingido": 0.12121212121212122
+              },
+              {
+                "vendedor": "Juliana",
+                "pct": 7,
+                "meta": 99,
+                "vendido": 68.0,
+                "falta": 31.0,
+                "atingido": 0.6868686868686869
+              },
+              {
+                "vendedor": "Luca",
+                "pct": 7,
+                "meta": 99,
+                "vendido": 272.0,
+                "falta": 0.0,
+                "atingido": 2.7474747474747474
+              }
+            ],
+            "media_rs_cx": 79.0808322147651,
+            "media_rs_cx_soma_ponderada": 58915.22,
+            "media_rs_cx_peso": 745.0,
+            "media_custo_cx": 83.235677852349,
+            "media_custo_cx_soma_ponderada": 62010.58,
+            "media_custo_cx_peso": 745.0,
+            "prioridade": "Normal"
+          },
+          {
+            "produto": "MIRTILO",
+            "estoque_total": 300.0,
+            "linhas": [
+              {
+                "vendedor": "Farley",
+                "pct": 17,
+                "meta": 52,
+                "vendido": 18.0,
+                "falta": 34.0,
+                "atingido": 0.34615384615384615
+              },
+              {
+                "vendedor": "Dora",
+                "pct": 17,
+                "meta": 52,
+                "vendido": 16.0,
+                "falta": 36.0,
+                "atingido": 0.3076923076923077
+              },
+              {
+                "vendedor": "Afanais",
+                "pct": 25,
+                "meta": 75,
+                "vendido": 43.0,
+                "falta": 32.0,
+                "atingido": 0.5733333333333334
+              },
+              {
+                "vendedor": "Roni",
+                "pct": 25,
+                "meta": 75,
+                "vendido": 131.0,
+                "falta": 0.0,
+                "atingido": 1.7466666666666666
+              },
+              {
+                "vendedor": "Reginaldo",
+                "pct": 22,
+                "meta": 66,
+                "vendido": 61.0,
+                "falta": 5.0,
+                "atingido": 0.9242424242424242
+              },
+              {
+                "vendedor": "Luciano",
+                "pct": 7,
+                "meta": 22,
+                "vendido": 1.0,
+                "falta": 21.0,
+                "atingido": 0.045454545454545456
+              },
+              {
+                "vendedor": "Juliana",
+                "pct": 7,
+                "meta": 22,
+                "vendido": 8.0,
+                "falta": 14.0,
+                "atingido": 0.36363636363636365
+              },
+              {
+                "vendedor": "Luca",
+                "pct": 7,
+                "meta": 22,
+                "vendido": 139.0,
+                "falta": 0.0,
+                "atingido": 6.318181818181818
+              }
+            ],
+            "media_rs_cx": 103.73852380952381,
+            "media_rs_cx_soma_ponderada": 43570.18,
+            "media_rs_cx_peso": 420.0,
+            "media_custo_cx": 105.59195238095239,
+            "media_custo_cx_soma_ponderada": 44348.62,
+            "media_custo_cx_peso": 420.0,
+            "prioridade": "Normal"
+          }
+        ],
+        "totais_rs": {
+          "data_emissao": "28/08/2026",
+          "periodo": "21/08/2026 00:00:00 até 28/08/2026",
+          "vendedores": {
+            "Reginaldo": {
+              "vol": 12,
+              "fat": 1920.0,
+              "custo": 160.0,
+              "mc_rs": 1760.0,
+              "mc_pct": 1100.0,
+              "resultado_real": 1115.0
+            },
+            "Roni": {
+              "vol": 24,
+              "fat": 3955.0,
+              "custo": 164.79,
+              "mc_rs": 3790.21,
+              "mc_pct": 2300.02,
+              "resultado_real": 2315.02
+            },
+            "Afanais": {
+              "vol": 56,
+              "fat": 8440.0,
+              "custo": 150.71,
+              "mc_rs": 8289.29,
+              "mc_pct": 5500.16,
+              "resultado_real": 5515.16
+            },
+            "Dora": {
+              "vol": 10,
+              "fat": 1465.0,
+              "custo": 146.5,
+              "mc_rs": 1318.5,
+              "mc_pct": 900.0,
+              "resultado_real": 915.0
+            },
+            "Farley": {
+              "vol": 18,
+              "fat": 2240.0,
+              "custo": 124.44,
+              "mc_rs": 2115.56,
+              "mc_pct": 1700.06,
+              "resultado_real": 1715.06
+            },
+            "Luciano": {
+              "vol": 1,
+              "fat": 168.0,
+              "custo": 168.0,
+              "mc_rs": 0.0,
+              "mc_pct": 0.0,
+              "resultado_real": 15.0
+            },
+            "Luca": {
+              "vol": 75,
+              "fat": 13145.0,
+              "custo": 175.27,
+              "mc_rs": 12969.73,
+              "mc_pct": 7399.86,
+              "resultado_real": 7414.86
+            },
+            "Juliana": {
+              "vol": 5,
+              "fat": 785.0,
+              "custo": 157.0,
+              "mc_rs": 628.0,
+              "mc_pct": 400.0,
+              "resultado_real": 415.0
+            }
+          },
+          "total_geral": {
+            "vol": 7288,
+            "fat": 550564.0,
+            "custo": 570436.13,
+            "mc_rs": -19872.13,
+            "mc_pct": -3.48,
+            "resultado_real": 11.52
+          }
+        }
+      }
+    },
+    {
+      "id": "e6889885-094e-47ac-8daf-d3d67d66edf9",
+      "modulo_origem": "metas_semanais_ontrack",
+      "tipo_periodo": "semanal",
+      "periodo_ref": "2026-08-22",
+      "data_referencia": "2026-08-31",
+      "criado_em": "2026-08-31T14:38:07+00:00",
+      "atualizado_em": "2026-08-31T15:32:36+00:00",
+      "usuario": "Ingrid",
+      "versao": 8,
       "valores": {
         "publicado_em": "2026-08-28T17:31:02",
         "periodo": "21/08 a 28/08",
