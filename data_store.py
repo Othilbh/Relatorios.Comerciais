@@ -145,6 +145,22 @@ def _github_put(rel_path: str, obj: dict, sha, mensagem: str):
     return False, f"GitHub respondeu {resp.status_code}: {resp.text[:200]}"
 
 
+def _github_delete(rel_path: str, sha: str, mensagem: str):
+    headers = _headers()
+    if not headers:
+        return False, "GITHUB_TOKEN não configurado nos Secrets."
+    repo, branch = _repo_branch()
+    url = f"https://api.github.com/repos/{repo}/contents/{DATA_ROOT}/{rel_path}"
+    payload = {"message": mensagem, "sha": sha, "branch": branch}
+    try:
+        resp = requests.delete(url, headers=headers, json=payload, timeout=15)
+    except requests.RequestException as e:
+        return False, f"Falha ao apagar no GitHub: {e}"
+    if resp.status_code in (200, 204):
+        return True, None
+    return False, f"GitHub respondeu {resp.status_code}: {resp.text[:200]}"
+
+
 def _github_list_dir(rel_dir: str):
     headers = _headers()
     if not headers:
@@ -343,6 +359,37 @@ def save_record(modulo: str, tipo_periodo: str, periodo_ref: str, valores: dict,
         novo = dict(novo)
         novo['_erro_persistencia_remota'] = err
     return novo
+
+
+def delete_record(modulo: str, tipo_periodo: str, periodo_ref: str) -> tuple:
+    """Apaga PERMANENTEMENTE o registro (modulo, tipo_periodo, periodo_ref)
+    -- do GitHub (se configurado) e do cache local, junto com todo o
+    histórico de versões dele. AÇÃO IRREVERSÍVEL -- diferente de
+    save_record() (que nunca apaga, só versiona), esta função existe
+    especificamente pra remover registros órfãos/duplicados (ex.: um
+    fechamento salvo sob o periodo_ref errado por causa da ambiguidade da
+    semana comercial -- ver "🔧 Corrigir a semana" em pages/gerencia.py).
+    Só deve ser chamada com confirmação explícita da pessoa usuária na UI,
+    nunca automaticamente. Devolve (ok: bool, erro: str|None)."""
+    rel_path = _path_for(modulo, tipo_periodo, periodo_ref)
+    full = _local_full_path(rel_path)
+    if os.path.exists(full):
+        try:
+            os.remove(full)
+        except Exception:
+            pass  # segue tentando apagar do GitHub mesmo se o local falhar
+    if not is_remoto():
+        _invalidate_cache()
+        return True, None
+    _, sha, erro_leitura = _github_get(rel_path)
+    if sha is None:
+        _invalidate_cache()
+        if erro_leitura:
+            return False, f"Não foi possível confirmar o registro no GitHub antes de apagar: {erro_leitura}"
+        return True, None  # já não existe remotamente -- nada a fazer
+    ok, err = _github_delete(rel_path, sha, f"{modulo}: apaga {tipo_periodo} {periodo_ref}")
+    _invalidate_cache()
+    return ok, err
 
 
 def load_current(modulo: str, tipo_periodo: str, periodo_ref: str):
