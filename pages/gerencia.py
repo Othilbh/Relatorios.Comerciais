@@ -838,6 +838,52 @@ def _render_ontrack_publicado():
 
     st.caption(f"Período: **{periodo}**  |  Publicado em: **{pub_em}**")
 
+    # Corrigir semana errada (31/08/2026, pedido da Ingrid) -- mesma
+    # ferramenta e mesmo motivo da que existe em "Fechamentos Semanais"
+    # (ver _render_fechamentos_semanais acima): uma publicação feita ANTES
+    # da migração pra semana comercial sábado-a-sexta pode ter sido salva
+    # sob a semana errada, pela mesma ambiguidade da sexta que motivou a
+    # migração (publicar "hoje" numa sexta lia aquela sexta como abertura
+    # da semana NOVA, não fechamento da que estava terminando -- ver
+    # calc.py). Não recalcula nada -- só re-salva o MESMO snapshot já
+    # publicado sob o periodo_ref certo. Só aparece quando há uma semana
+    # selecionada (slug_ot) -- não no fallback do arquivo único legado.
+    if slug_ot:
+        with st.expander('🔧 Corrigir a semana desta publicação'):
+            st.caption(
+                f'Semana atual desta publicação: **{_label_fech(slug_ot)}**. '
+                'Escolha uma data dentro da semana comercial CORRETA e '
+                'confirme abaixo -- o snapshot publicado (resultados, '
+                'totais) continua exatamente o mesmo, só a semana em que '
+                'fica arquivado muda.'
+            )
+            nova_data_ot = st.date_input(
+                'Data dentro da semana correta', value=datetime.date.today(),
+                format='DD/MM/YYYY', key=f'ger_ot_corrigir_data_{slug_ot}',
+            )
+            novo_slug_ot = calc.slug_semana(nova_data_ot)
+            if novo_slug_ot == slug_ot:
+                st.caption('Essa data cai na mesma semana já usada -- nada a corrigir.')
+            else:
+                st.caption(f'Nova semana: **{calc.label_semana(novo_slug_ot)}**')
+                if st.button('✅ Corrigir e salvar sob essa semana', key=f'ger_ot_corrigir_btn_{slug_ot}'):
+                    try:
+                        _reg_corr_ot = ds.save_record(
+                            modulo=MOD_ONTRACK_METAS, tipo_periodo='semanal', periodo_ref=novo_slug_ot,
+                            valores=snap, usuario=st.session_state.get('usuario_nome'),
+                        )
+                        _erro_corr_ot = _reg_corr_ot.get('_erro_persistencia_remota') if _reg_corr_ot else None
+                        if _erro_corr_ot:
+                            st.warning(f'Salvo, mas houve um problema ao persistir de forma permanente: {_erro_corr_ot}')
+                        else:
+                            st.success(
+                                f'✅ Salvo como {calc.label_semana(novo_slug_ot)}. A publicação antiga '
+                                '(sob a semana errada) continua no histórico, sem uso.'
+                            )
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f'Erro ao corrigir: {e}')
+
     # Dia calculado em relação à semana SELECIONADA acima (slug_ot), não à
     # que o calendário de hoje sugeriria por conta própria -- útil quando a
     # tela está mostrando uma semana diferente da atual (histórico), já que
