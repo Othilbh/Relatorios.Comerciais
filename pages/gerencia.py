@@ -884,17 +884,26 @@ def _render_ontrack_publicado():
                             valores=snap, usuario=st.session_state.get('usuario_nome'),
                         )
                         _erro_corr_ot = _reg_corr_ot.get('_erro_persistencia_remota') if _reg_corr_ot else None
-                        # Reseleciona automaticamente o registro CORRIGIDO --
-                        # sem isso, o índice do seletor ficava numa posição
-                        # numérica fixa que, dependendo de como as semanas
-                        # ordenam, podia continuar apontando pro registro
-                        # ANTIGO (mal rotulado) mesmo depois de salvar o novo
-                        # certinho -- reforçando a falsa impressão de que
-                        # nada tinha acontecido.
+                        # Reseleciona automaticamente o registro CORRIGIDO.
+                        # BUG REAL encontrado em 31/08/2026 (Ingrid: "dá
+                        # sucesso, porém não altera a data"): só ajustar
+                        # st.session_state[idx_key_ot] não bastava -- o
+                        # st.selectbox abaixo tem seu PRÓPRIO key
+                        # ('ger_ot_meta_sel'), que guarda o rótulo (texto)
+                        # já escolhido. Depois que um widget com key já
+                        # rodou uma vez, o Streamlit ignora o argumento
+                        # index= em reruns seguintes e mantém o valor que
+                        # já está em session_state[key] -- por isso a
+                        # semana continuava exibindo a mesma antiga. A
+                        # correção real é apagar esse key do session_state
+                        # também, pra o widget nascer de novo no próximo
+                        # rerun usando o index= (que aí sim reflete a
+                        # semana recém-corrigida).
                         _hist_novo_ot = _listar_ontrack_metas_hist()
                         _slugs_novo_ot = [s for s, _ in _hist_novo_ot]
                         if novo_slug_ot in _slugs_novo_ot:
                             st.session_state[idx_key_ot] = _slugs_novo_ot.index(novo_slug_ot)
+                            st.session_state.pop('ger_ot_meta_sel', None)
                         if _erro_corr_ot:
                             st.session_state['_ger_ot_corrigir_msg'] = (
                                 'warning',
@@ -1163,13 +1172,18 @@ def _render_fechamentos_semanais():
                     )
                     _erro_corr = _reg_corr.get('_erro_persistencia_remota') if _reg_corr else None
                     # Reseleciona automaticamente o registro CORRIGIDO --
-                    # mesmo motivo do comentário equivalente na correção de
-                    # On Track acima (o índice fixo podia continuar
-                    # apontando pro registro antigo mal rotulado).
+                    # mesmo bug e mesma correção do comentário equivalente
+                    # na correção de On Track acima ("dá sucesso, porém não
+                    # altera a data"): o st.selectbox tem seu PRÓPRIO key
+                    # ('ger_fech_sel'), que precisa ser apagado do
+                    # session_state também -- só ajustar idx_key não é
+                    # suficiente, porque o Streamlit ignora index= num
+                    # widget com key que já rodou antes.
                     _hist_novo_fech = _listar_fechamentos()
                     _slugs_novo_fech = [s for s, _ in _hist_novo_fech]
                     if novo_slug_fech in _slugs_novo_fech:
                         st.session_state[idx_key] = _slugs_novo_fech.index(novo_slug_fech)
+                        st.session_state.pop('ger_fech_sel', None)
                     if _erro_corr:
                         st.session_state['_ger_fech_corrigir_msg'] = (
                             'warning',
