@@ -1,0 +1,92 @@
+{
+  "current": {
+    "id": "78ccb66b-c4c3-479a-b665-3c5a94624daf",
+    "modulo_origem": "metas_gerais_vendas",
+    "tipo_periodo": "mensal",
+    "periodo_ref": "2026-08",
+    "data_referencia": "2026-08-31",
+    "criado_em": "2026-08-31T17:22:00+00:00",
+    "atualizado_em": "2026-08-31T17:22:00+00:00",
+    "usuario": "Ingrid",
+    "versao": 1,
+    "valores": {
+      "total_geral": {
+        "vol": 216327,
+        "fat": 15688145.4,
+        "custo": 15934604.5,
+        "mc_rs": -246459.1,
+        "mc_pct": -1.55,
+        "resultado_real": 13.45
+      },
+      "vendedores": {
+        "Reginaldo": {
+          "vol": 22477,
+          "fat": 1954498.95,
+          "custo": 1931080.04,
+          "mc_rs": 23418.91,
+          "mc_pct": 1.21,
+          "resultado_real": 16.21
+        },
+        "Roni": {
+          "vol": 53609,
+          "fat": 3641486.01,
+          "custo": 3784372.05,
+          "mc_rs": -142886.04,
+          "mc_pct": -3.78,
+          "resultado_real": 11.22
+        },
+        "Afanais": {
+          "vol": 82980,
+          "fat": 5798818.92,
+          "custo": 5907981.08,
+          "mc_rs": -109162.16,
+          "mc_pct": -1.85,
+          "resultado_real": 13.15
+        },
+        "Dora": {
+          "vol": 10985,
+          "fat": 806487.2,
+          "custo": 797791.92,
+          "mc_rs": 8695.28,
+          "mc_pct": 1.09,
+          "resultado_real": 16.09
+        },
+        "Farley": {
+          "vol": 18075,
+          "fat": 1174186.61,
+          "custo": 1203693.2,
+          "mc_rs": -29506.59,
+          "mc_pct": -2.45,
+          "resultado_real": 12.55
+        },
+        "Luciano": {
+          "vol": 187,
+          "fat": 18081.0,
+          "custo": 16573.49,
+          "mc_rs": 1507.51,
+          "mc_pct": 9.1,
+          "resultado_real": 24.1
+        },
+        "Luca": {
+          "vol": 18223,
+          "fat": 1660611.06,
+          "custo": 1649902.4,
+          "mc_rs": 10708.66,
+          "mc_pct": 0.65,
+          "resultado_real": 15.65
+        },
+        "Juliana": {
+          "vol": 9787,
+          "fat": 633731.25,
+          "custo": 642941.21,
+          "mc_rs": -9209.96,
+          "mc_pct": -1.43,
+          "resultado_real": 13.57
+        }
+      },
+      "periodo_pdf": "01/08/2026 00:00:00 até 31/08/2026",
+      "data_emissao_pdf": "31/08/2026"
+    }
+  },
+  "history": []
+}
