@@ -919,6 +919,42 @@ def _render_ontrack_publicado():
                     except Exception as e:
                         st.error(f'Erro ao corrigir: {e}')
 
+        # Apagar registro órfão/duplicado (31/08/2026, pedido da Ingrid):
+        # depois de corrigir a semana de um registro, o antigo (sob a
+        # semana errada) fica pra trás na lista -- e como save_record()
+        # nunca apaga nada (só versiona), essas sobras iam se acumulando
+        # sem nenhuma forma de sumir com elas. AÇÃO IRREVERSÍVEL -- por
+        # isso exige marcar a caixinha de confirmação antes do botão
+        # ficar disponível, e não é sugerida como automática em nenhum
+        # lugar do app.
+        with st.expander('🗑️ Apagar este registro (irreversível)'):
+            st.caption(
+                f'Apaga PERMANENTEMENTE a publicação "{_label_fech(slug_ot)}" '
+                f'(período: {periodo}) -- não dá pra desfazer. Use só pra '
+                'remover sobras/duplicatas, nunca a semana que você quer manter.'
+            )
+            confirma_del_ot = st.checkbox(
+                'Confirmo que quero apagar esse registro permanentemente',
+                key=f'ger_ot_del_conf_{slug_ot}',
+            )
+            if st.button('🗑️ Apagar definitivamente', key=f'ger_ot_del_btn_{slug_ot}',
+                          disabled=not confirma_del_ot):
+                try:
+                    ok_del, err_del = ds.delete_record(MOD_ONTRACK_METAS, 'semanal', slug_ot)
+                    st.session_state[idx_key_ot] = 0
+                    st.session_state.pop('ger_ot_meta_sel', None)
+                    if ok_del:
+                        st.session_state['_ger_ot_corrigir_msg'] = (
+                            'success', f'🗑️ Registro "{_label_fech(slug_ot)}" apagado.',
+                        )
+                    else:
+                        st.session_state['_ger_ot_corrigir_msg'] = (
+                            'warning', f'Não deu pra apagar: {err_del}',
+                        )
+                    st.rerun()
+                except Exception as e:
+                    st.error(f'Erro ao apagar: {e}')
+
     # Dia calculado em relação à semana SELECIONADA acima (slug_ot), não à
     # que o calendário de hoje sugeriria por conta própria -- útil quando a
     # tela está mostrando uma semana diferente da atual (histórico), já que
@@ -1198,6 +1234,39 @@ def _render_fechamentos_semanais():
                     st.rerun()
                 except Exception as e:
                     st.error(f'Erro ao corrigir: {e}')
+
+    # Apagar registro órfão/duplicado -- mesmo motivo e mesma ferramenta
+    # do comentário equivalente em _render_ontrack_publicado() acima.
+    # AÇÃO IRREVERSÍVEL -- exige confirmação explícita antes do botão
+    # ficar disponível.
+    with st.expander('🗑️ Apagar este fechamento (irreversível)'):
+        st.caption(
+            f'Apaga PERMANENTEMENTE o fechamento "{_label_fech(slug_atual)}" '
+            f'(período: {dados.get("periodo", "-")}) -- não dá pra desfazer. '
+            'Use só pra remover sobras/duplicatas, nunca a semana que você '
+            'quer manter.'
+        )
+        confirma_del_fech = st.checkbox(
+            'Confirmo que quero apagar esse fechamento permanentemente',
+            key=f'ger_fech_del_conf_{slug_atual}',
+        )
+        if st.button('🗑️ Apagar definitivamente', key=f'ger_fech_del_btn_{slug_atual}',
+                      disabled=not confirma_del_fech):
+            try:
+                ok_del_f, err_del_f = ds.delete_record(MOD_FECHAMENTO, 'semanal', slug_atual)
+                st.session_state[idx_key] = 0
+                st.session_state.pop('ger_fech_sel', None)
+                if ok_del_f:
+                    st.session_state['_ger_fech_corrigir_msg'] = (
+                        'success', f'🗑️ Fechamento "{_label_fech(slug_atual)}" apagado.',
+                    )
+                else:
+                    st.session_state['_ger_fech_corrigir_msg'] = (
+                        'warning', f'Não deu pra apagar: {err_del_f}',
+                    )
+                st.rerun()
+            except Exception as e:
+                st.error(f'Erro ao apagar: {e}')
 
     prods = dados.get('produtos', [])
 
