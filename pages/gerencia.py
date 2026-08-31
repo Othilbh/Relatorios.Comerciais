@@ -785,6 +785,17 @@ def _listar_ontrack_clientes_hist():
 def _render_ontrack_publicado():
     st.header('📊 On Track Atual')
 
+    # Mensagem da correção de semana (ver "🔧 Corrigir a semana desta
+    # publicação" abaixo) -- precisa ficar guardada no session_state e
+    # exibida SÓ no rerun seguinte: st.success() chamado bem antes de um
+    # st.rerun() nunca chega a aparecer na tela (o rerun já troca a página
+    # antes da pessoa ver), dando a falsa impressão de que o botão não fez
+    # nada (bug real reportado pela Ingrid, 31/08/2026 -- ela clicou,
+    # "nada aconteceu", mas o registro novo tinha sido salvo mesmo assim).
+    _msg_corr_ot = st.session_state.pop('_ger_ot_corrigir_msg', None)
+    if _msg_corr_ot:
+        (st.success if _msg_corr_ot[0] == 'success' else st.warning)(_msg_corr_ot[1])
+
     historico_ot = _listar_ontrack_metas_hist()
     slug_ot = None
 
@@ -873,12 +884,27 @@ def _render_ontrack_publicado():
                             valores=snap, usuario=st.session_state.get('usuario_nome'),
                         )
                         _erro_corr_ot = _reg_corr_ot.get('_erro_persistencia_remota') if _reg_corr_ot else None
+                        # Reseleciona automaticamente o registro CORRIGIDO --
+                        # sem isso, o índice do seletor ficava numa posição
+                        # numérica fixa que, dependendo de como as semanas
+                        # ordenam, podia continuar apontando pro registro
+                        # ANTIGO (mal rotulado) mesmo depois de salvar o novo
+                        # certinho -- reforçando a falsa impressão de que
+                        # nada tinha acontecido.
+                        _hist_novo_ot = _listar_ontrack_metas_hist()
+                        _slugs_novo_ot = [s for s, _ in _hist_novo_ot]
+                        if novo_slug_ot in _slugs_novo_ot:
+                            st.session_state[idx_key_ot] = _slugs_novo_ot.index(novo_slug_ot)
                         if _erro_corr_ot:
-                            st.warning(f'Salvo, mas houve um problema ao persistir de forma permanente: {_erro_corr_ot}')
+                            st.session_state['_ger_ot_corrigir_msg'] = (
+                                'warning',
+                                f'Salvo, mas houve um problema ao persistir de forma permanente: {_erro_corr_ot}',
+                            )
                         else:
-                            st.success(
+                            st.session_state['_ger_ot_corrigir_msg'] = (
+                                'success',
                                 f'✅ Salvo como {calc.label_semana(novo_slug_ot)}. A publicação antiga '
-                                '(sob a semana errada) continua no histórico, sem uso.'
+                                '(sob a semana errada) continua no histórico, sem uso.',
                             )
                         st.rerun()
                     except Exception as e:
@@ -1049,6 +1075,17 @@ def _sort_key_semana_slug(slug: str) -> str:
 
 def _render_fechamentos_semanais():
     st.header('🏁 Fechamentos Semanais')
+
+    # Mensagem da correção de semana (ver "🔧 Corrigir a semana deste
+    # fechamento" abaixo) -- mesmo motivo do comentário equivalente em
+    # _render_ontrack_publicado() acima: st.success() logo antes de um
+    # st.rerun() nunca chega a aparecer (bug real reportado pela Ingrid,
+    # 31/08/2026 -- "não está dando certo" / "nada acontece", quando na
+    # real o registro novo tinha sido salvo).
+    _msg_corr_fech = st.session_state.pop('_ger_fech_corrigir_msg', None)
+    if _msg_corr_fech:
+        (st.success if _msg_corr_fech[0] == 'success' else st.warning)(_msg_corr_fech[1])
+
     historico = _listar_fechamentos()
 
     if not historico:
@@ -1125,10 +1162,25 @@ def _render_fechamentos_semanais():
                         valores=dados, usuario=st.session_state.get('usuario_nome'),
                     )
                     _erro_corr = _reg_corr.get('_erro_persistencia_remota') if _reg_corr else None
+                    # Reseleciona automaticamente o registro CORRIGIDO --
+                    # mesmo motivo do comentário equivalente na correção de
+                    # On Track acima (o índice fixo podia continuar
+                    # apontando pro registro antigo mal rotulado).
+                    _hist_novo_fech = _listar_fechamentos()
+                    _slugs_novo_fech = [s for s, _ in _hist_novo_fech]
+                    if novo_slug_fech in _slugs_novo_fech:
+                        st.session_state[idx_key] = _slugs_novo_fech.index(novo_slug_fech)
                     if _erro_corr:
-                        st.warning(f'Salvo, mas houve um problema ao persistir de forma permanente: {_erro_corr}')
+                        st.session_state['_ger_fech_corrigir_msg'] = (
+                            'warning',
+                            f'Salvo, mas houve um problema ao persistir de forma permanente: {_erro_corr}',
+                        )
                     else:
-                        st.success(f'✅ Salvo como {calc.label_semana(novo_slug_fech)}. O fechamento antigo (sob a semana errada) continua no histórico, sem uso.')
+                        st.session_state['_ger_fech_corrigir_msg'] = (
+                            'success',
+                            f'✅ Salvo como {calc.label_semana(novo_slug_fech)}. O fechamento antigo '
+                            '(sob a semana errada) continua no histórico, sem uso.',
+                        )
                     st.rerun()
                 except Exception as e:
                     st.error(f'Erro ao corrigir: {e}')
