@@ -4,6 +4,7 @@ import os
 import re
 import datetime
 import tempfile
+import io
 
 import streamlit as st
 import streamlit.components.v1 as components
@@ -2316,6 +2317,34 @@ def _render_metas_gerais():
         # Só faz sentido por mês (cada PDF é de um período fechado
         # específico), por isso só fica ativo com Tipo de período = Mensal --
         # mesmo padrão já usado no OnTrack Semanal logo abaixo.
+        #
+        # BUG REAL corrigido (31/08/2026, achado pela Ingrid: subiu os PDFs de
+        # Vendas E de Quebra juntos, publicou a Vendas, e o botão "Processar e
+        # publicar Quebra" simplesmente sumiu da tela): os dois uploaders
+        # ficam na mesma tela, e assim que um deles publica -- o que chama
+        # st.rerun() em seguida -- o Streamlit recarrega o script inteiro. Nesse
+        # recarregamento automático, o OUTRO st.file_uploader (o que ainda não
+        # tinha sido processado) perde o arquivo que já estava selecionado
+        # (reproduzido isolado com streamlit.testing.v1.AppTest antes de
+        # corrigir -- não é impressão, é um comportamento real do Streamlit
+        # nessa versão). Como a condição era `pdf_quebra_mg is not None and
+        # st.button(...)`, com pdf_quebra_mg virando None nesse rerun o
+        # st.button(...) nunca chegava a ser chamado, e o botão simplesmente
+        # desaparecia sem nenhum erro. Fix: assim que um arquivo é
+        # selecionado, seu conteúdo (bytes) é guardado em st.session_state --
+        # que SOBREVIVE a st.rerun(), diferente do valor ao vivo do uploader
+        # -- e é essa cópia que decide se o botão aparece e o que é
+        # publicado. As mensagens de sucesso também passam a ser persistidas
+        # em session_state (mesmo padrão já usado em _render_ontrack_publicado
+        # / _render_fechamentos_semanais), porque um st.success() seguido de
+        # st.rerun() nunca chega a aparecer na tela.
+        _msg_mg_v = st.session_state.pop('_mg_msg_vendas', None)
+        if _msg_mg_v:
+            (st.success if _msg_mg_v[0] == 'success' else st.warning)(_msg_mg_v[1])
+        _msg_mg_q = st.session_state.pop('_mg_msg_quebra', None)
+        if _msg_mg_q:
+            (st.success if _msg_mg_q[0] == 'success' else st.warning)(_msg_mg_q[1])
+
         with st.expander(f'📤 Publicar Realizado — {periodo_mod.rotulo(tipo_mg, ref_mg)}'):
             if tipo_mg != 'mensal':
                 st.caption('Publicação é sempre por mês -- mude "Tipo de período" acima pra '
@@ -2328,24 +2357,30 @@ def _render_metas_gerais():
                     st.markdown('**💰 Faturamento / Volume / Margem**')
                     pdf_vendas_mg = st.file_uploader(
                         'PDF Lucratividade por Vendedor', type='pdf', key='mg_pdf_vendas')
-                    if pdf_vendas_mg is not None and st.button(
+                    if pdf_vendas_mg is not None:
+                        st.session_state['_mg_bytes_vendas'] = (pdf_vendas_mg.name, pdf_vendas_mg.getvalue())
+                    _cache_v = st.session_state.get('_mg_bytes_vendas')
+                    if _cache_v is not None and st.button(
                             '📊 Processar e publicar Vendas', key='mg_btn_pub_vendas'):
                         with st.spinner('Lendo PDF...'):
                             try:
                                 _reg_v = mg.publicar_vendas_pdf(
-                                    ref_mg, pdf_vendas_mg,
+                                    ref_mg, io.BytesIO(_cache_v[1]),
                                     usuario=st.session_state.get('usuario_nome'))
                                 _erro_v = _reg_v.get('_erro_persistencia_remota') if _reg_v else None
                                 _tg = (_reg_v.get('valores') or {}).get('total_geral') or {}
                                 if _erro_v:
-                                    st.warning(f'Processado, mas houve um problema ao salvar de '
-                                               f'forma permanente: {_erro_v}')
+                                    st.session_state['_mg_msg_vendas'] = (
+                                        'warning',
+                                        f'Processado, mas houve um problema ao salvar de '
+                                        f'forma permanente: {_erro_v}')
                                 else:
-                                    st.success(
+                                    st.session_state['_mg_msg_vendas'] = (
+                                        'success',
                                         f"✅ Publicado: R$ {_num_vc(_tg.get('fat', 0), 2)} de "
                                         f"faturamento, {_num_vc(_tg.get('vol', 0), 0)} cx, "
-                                        f"{_tg.get('resultado_real', 0):.2f}% de margem."
-                                    )
+                                        f"{_tg.get('resultado_real', 0):.2f}% de margem.")
+                                st.session_state.pop('_mg_bytes_vendas', None)
                                 st.rerun()
                             except Exception as _e_pub_v:
                                 st.error(f'Erro ao processar o PDF: {_e_pub_v}')
@@ -2353,25 +2388,31 @@ def _render_metas_gerais():
                     st.markdown('**📦 Quebra**')
                     pdf_quebra_mg = st.file_uploader(
                         'PDF Resumo do Estoque (Quebra)', type='pdf', key='mg_pdf_quebra')
-                    if pdf_quebra_mg is not None and st.button(
+                    if pdf_quebra_mg is not None:
+                        st.session_state['_mg_bytes_quebra'] = (pdf_quebra_mg.name, pdf_quebra_mg.getvalue())
+                    _cache_q = st.session_state.get('_mg_bytes_quebra')
+                    if _cache_q is not None and st.button(
                             '📊 Processar e publicar Quebra', key='mg_btn_pub_quebra'):
                         with st.spinner('Lendo PDF...'):
                             try:
                                 _reg_q = mg.publicar_quebra_pdf(
-                                    ref_mg, pdf_quebra_mg,
+                                    ref_mg, io.BytesIO(_cache_q[1]),
                                     usuario=st.session_state.get('usuario_nome'))
                                 _erro_q = _reg_q.get('_erro_persistencia_remota') if _reg_q else None
                                 _vq = (_reg_q.get('valores') or {}) if _reg_q else {}
                                 if _erro_q:
-                                    st.warning(f'Processado, mas houve um problema ao salvar de '
-                                               f'forma permanente: {_erro_q}')
+                                    st.session_state['_mg_msg_quebra'] = (
+                                        'warning',
+                                        f'Processado, mas houve um problema ao salvar de '
+                                        f'forma permanente: {_erro_q}')
                                 else:
                                     _custo_txt = (f", R$ {_num_vc(_vq.get('total_custo'), 2)}"
                                                   if _vq.get('total_custo') is not None else '')
-                                    st.success(
+                                    st.session_state['_mg_msg_quebra'] = (
+                                        'success',
                                         f"✅ Publicado: {_num_vc(_vq.get('total_cx', 0), 0)} cx "
-                                        f"quebradas{_custo_txt}."
-                                    )
+                                        f"quebradas{_custo_txt}.")
+                                st.session_state.pop('_mg_bytes_quebra', None)
                                 st.rerun()
                             except Exception as _e_pub_q:
                                 st.error(f'Erro ao processar o PDF: {_e_pub_q}')
