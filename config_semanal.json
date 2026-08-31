@@ -89,6 +89,12 @@
       "codigos_texto": "830100828",
       "estoque": 220,
       "prioridade": "🔥 Alta Prioridade"
+    },
+    {
+      "nome": "LARANJA NEDEL",
+      "codigos_texto": "390100105\n390100104",
+      "estoque": 194,
+      "prioridade": "🚨 Grande Urgência"
     }
   ],
   "vendedor_pcts": {
