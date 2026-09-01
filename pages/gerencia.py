@@ -2102,11 +2102,23 @@ def _render_metas_gerais():
             format_func=periodo_mod.rotulo_tipo, index=0, key='mg_tipo',
         )
     with col_periodo:
-        opcoes_periodo = periodo_mod.listar_periodos(tipo_mg, n=16)
-        ref_mg = st.selectbox(
-            'Período', opcoes_periodo,
-            format_func=lambda r: periodo_mod.rotulo(tipo_mg, r), index=0, key='mg_periodo',
+        # Calendário em vez de lista suspensa (pedido explícito da Ingrid,
+        # 31/08/2026: "no período, preciso que tenha um calendário") -- antes
+        # só dava pra escolher entre os últimos 16 períodos prontos
+        # (periodo_mod.listar_periodos), o que não alcançava períodos mais
+        # antigos. Agora escolhe QUALQUER data no calendário e o app calcula
+        # sozinho, via periodo_mod.periodo_ref(), o mês/trimestre/semestre/ano
+        # que contém essa data -- a mesma data escolhida também vale ao trocar
+        # o "Tipo de período" ao lado (ex.: escolheu 15/08/2026, troca pra
+        # Trimestral, cai automaticamente no 3º trimestre/2026, sem precisar
+        # reescolher a data).
+        data_ref_mg = st.date_input(
+            'Período', value=datetime.date.today(), format='DD/MM/YYYY', key='mg_data_ref',
+            help='Escolhe qualquer data dentro do período que você quer ver -- '
+                 'o app calcula sozinho o mês/trimestre/semestre/ano que contém essa data.',
         )
+        ref_mg = periodo_mod.periodo_ref(tipo_mg, data_ref_mg)
+        st.caption(f'Período selecionado: **{periodo_mod.rotulo(tipo_mg, ref_mg)}**')
 
     # ── Realizado (agregado automaticamente) ────────────────────────────────
     rv = mg.realizado_vendas(tipo_mg, ref_mg)
