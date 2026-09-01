@@ -2202,10 +2202,23 @@ def _render_metas_gerais():
             # usa custo real (R$) quando já extraído do PDF e o Teto em R$
             # já foi definido; senão cai pra cx.
             _qbr_meta_rs = meta_atual.get('quebra_max_rs')
+            _qbr_meta_pct = meta_atual.get('quebra_max_pct')
             _qbr_realizado_rs = rq.get('total_custo')
             _usa_rs_qbr = bool(_qbr_meta_rs) and _qbr_realizado_rs is not None
             if _usa_rs_qbr:
-                _ot_qbr = mg.status_quebra(_qbr_meta_rs, _qbr_realizado_rs, tipo_mg, ref_mg)
+                # Pedido explícito da Ingrid, 31/08/2026: quando o Teto é em %
+                # do Faturamento, o "quanto já podia ter quebrado até agora"
+                # (usado no status Verde/Atenção/Fora) é esse % sobre o
+                # FATURAMENTO REALIZADO até agora -- não o teto total
+                # pro-rateado pelo tempo decorrido (comportamento padrão de
+                # status_quebra, mantido como fallback pra Teto em CX ou pra
+                # períodos antigos com Teto em R$ digitado manualmente, sem %).
+                _qbr_orcamento_ja = (
+                    _qbr_meta_pct / 100 * rv.get('faturamento')
+                    if (_qbr_meta_pct and rv.get('faturamento') is not None) else None
+                )
+                _ot_qbr = mg.status_quebra(_qbr_meta_rs, _qbr_realizado_rs, tipo_mg, ref_mg,
+                                            orcamento_ate_agora=_qbr_orcamento_ja)
             else:
                 _ot_qbr = mg.status_quebra(meta_atual.get('quebra_max_cx'), rq.get('total_cx'),
                                             tipo_mg, ref_mg)
@@ -2233,7 +2246,8 @@ def _render_metas_gerais():
             # _usa_rs_qbr fica True mesmo quando o % não deu pra calcular
             # por falta de faturamento, e nesse caso _qbr_txt já caiu pra cx.
             if _qbr_txt_em_rs and _qbr_meta_rs:
-                _qbr_det = f"Teto: R$ {_num_vc(_qbr_meta_rs, 2)}"
+                _qbr_pct_sufixo = f" ({_qbr_meta_pct:.2f}% do faturamento)" if _qbr_meta_pct else ''
+                _qbr_det = f"Teto: R$ {_num_vc(_qbr_meta_rs, 2)}{_qbr_pct_sufixo}"
             elif meta_atual.get('quebra_max_cx'):
                 _qbr_det = f"Teto: {_num_vc(meta_atual['quebra_max_cx'], 0)} cx"
             elif _qbr_meta_rs:
@@ -2254,6 +2268,20 @@ def _render_metas_gerais():
         st.divider()
 
         with st.expander(f'🎯 Definir/editar meta — {periodo_mod.rotulo(tipo_mg, ref_mg)}'):
+            # Mensagem de sucesso persistida via session_state (mesmo padrão já
+            # usado em _render_ontrack_publicado / _render_fechamentos_semanais
+            # / Publicar Realizado acima) -- um st.success() seguido de
+            # st.rerun() na mesma execução nunca chega a aparecer na tela.
+            _msg_mg_meta = st.session_state.pop('_mg_msg_meta', None)
+            if _msg_mg_meta:
+                (st.success if _msg_mg_meta[0] == 'success' else st.warning)(_msg_mg_meta[1])
+
+            if meta_atual.get('quebra_max_pct'):
+                st.caption(
+                    f"Teto de Quebra atual: {meta_atual['quebra_max_pct']:.2f}% × "
+                    f"R$ {_num_vc(meta_atual.get('faturamento') or 0, 2)} (Meta Faturamento) = "
+                    f"R$ {_num_vc(meta_atual.get('quebra_max_rs') or 0, 2)}")
+
             with st.form(key='mg_form_meta'):
                 mc1, mc2 = st.columns(2)
                 with mc1:
@@ -2266,15 +2294,29 @@ def _render_metas_gerais():
                                                  value=float(meta_atual.get('margem_pct') or 0.0), step=1.0)
                     meta_qbr = st.number_input('Teto de Quebra (CX)', min_value=0.0,
                                                 value=float(meta_atual.get('quebra_max_cx') or 0.0), step=10.0)
-                    meta_qbr_rs = st.number_input(
-                        'Teto de Quebra (R$)', min_value=0.0,
-                        value=float(meta_atual.get('quebra_max_rs') or 0.0), step=1000.0,
-                        help='Opcional -- independente do Teto em CX acima (não converte um no outro). '
-                             'Usado só pra calcular quanto isso representa em % da Meta de Faturamento, '
-                             'exibido no indicador de Quebra acima.')
+                    # Trocado de "Teto de Quebra (R$)" digitado direto pra "(%)
+                    # sobre Faturamento" -- pedido explícito da Ingrid,
+                    # 31/08/2026: "o teto de quebra é para ser em porcentagem...
+                    # o teto aceitável de quebra é de 0,6% sobre o faturamento".
+                    # O R$ guardado (quebra_max_rs, ainda usado por todo o resto
+                    # do app -- indicador, histórico, on_track) passa a ser
+                    # CALCULADO daqui (% × Meta Faturamento acima, no momento em
+                    # que a meta é salva) em vez de digitado à parte -- os dois
+                    # nunca mais podem ficar dessincronizados um do outro.
+                    meta_qbr_pct = st.number_input(
+                        'Teto de Quebra (%) sobre Faturamento', min_value=0.0,
+                        value=float(meta_atual.get('quebra_max_pct') or 0.0), step=0.1, format='%.2f',
+                        help='Percentual aceitável de quebra sobre a Meta Faturamento ao lado -- '
+                             'ex.: 0,6 = 0,6% de R$ 18.000.000,00 = R$ 108.000,00 de teto pro período '
+                             'inteiro (calcula sozinho, sem precisar digitar o R$ à parte). Não confundir '
+                             'com o Teto em CX acima -- os dois continuam independentes. No indicador de '
+                             'On Track, o "quanto já podia ter quebrado até agora" passa a usar esse % '
+                             'sobre o Faturamento REALIZADO até agora, não o tempo decorrido no período.')
                 if st.form_submit_button('💾 Salvar meta', type='primary'):
+                    _meta_qbr_rs_calc = (meta_qbr_pct / 100 * meta_fat) if meta_qbr_pct else None
                     _reg_meta = mg.salvar_meta(tipo_mg, ref_mg, meta_fat, meta_vol, meta_marg, meta_qbr,
-                                                quebra_max_rs=meta_qbr_rs or None,
+                                                quebra_max_rs=_meta_qbr_rs_calc,
+                                                quebra_max_pct=meta_qbr_pct or None,
                                                 usuario=st.session_state.get('usuario_nome'))
                     # data_store.save_record devolve '_erro_persistencia_remota' quando
                     # a gravação no GitHub falha (token expirado, instabilidade da API,
@@ -2284,10 +2326,14 @@ def _render_metas_gerais():
                     # se tivesse persistido de verdade, mesmo quando não persistiu.
                     _erro_meta = _reg_meta.get('_erro_persistencia_remota') if _reg_meta else None
                     if _erro_meta:
-                        st.warning(f'Meta salva localmente, mas houve um problema ao salvar de forma '
-                                   f'permanente: {_erro_meta}. Tente salvar de novo em alguns instantes.')
+                        st.session_state['_mg_msg_meta'] = (
+                            'warning',
+                            f'Meta salva localmente, mas houve um problema ao salvar de forma '
+                            f'permanente: {_erro_meta}. Tente salvar de novo em alguns instantes.')
                     else:
-                        st.success('Meta salva.')
+                        _msg_qbr = (f" Teto de Quebra: {meta_qbr_pct:.2f}% × R$ {_num_vc(meta_fat, 2)} "
+                                    f"= R$ {_num_vc(_meta_qbr_rs_calc, 2)}." if _meta_qbr_rs_calc else '')
+                        st.session_state['_mg_msg_meta'] = ('success', 'Meta salva.' + _msg_qbr)
                     st.rerun()
 
         _hist_meta = mg.historico_meta(tipo_mg, ref_mg)
@@ -2309,6 +2355,8 @@ def _render_metas_gerais():
                         'Volume (CX)': f"{_num_vc(_vals.get('volume', 0), 0)}",
                         'Margem (%)': f"{_vals.get('margem_pct', 0):.2f}%",
                         'Teto Quebra (CX)': f"{_num_vc(_vals.get('quebra_max_cx', 0), 0)}",
+                        'Teto Quebra (%)': (f"{_vals['quebra_max_pct']:.2f}%"
+                                             if _vals.get('quebra_max_pct') else '—'),
                         'Teto Quebra (R$)': (f"R$ {_num_vc(_vals.get('quebra_max_rs'), 2)}"
                                               if _vals.get('quebra_max_rs') else '—'),
                     })
