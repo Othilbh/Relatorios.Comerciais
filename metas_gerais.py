@@ -68,22 +68,34 @@ MOD_MG_QUEBRA = 'metas_gerais_quebra'
 
 def salvar_meta(tipo_periodo: str, periodo_ref: str, faturamento: float, volume: float,
                  margem_pct: float, quebra_max_cx: float, quebra_max_rs: float = None,
-                 usuario: str = None) -> dict:
+                 quebra_max_pct: float = None, usuario: str = None) -> dict:
     """quebra_max_rs (opcional): teto de Quebra também expresso em R$ (pedido
     Ingrid, 19/08/2026) -- ela pensa/define esse teto em valor, não em
     caixas. É um campo INDEPENDENTE de quebra_max_cx: não converte um no
     outro (não há preço médio por caixa confiável pra isso) -- os dois
-    convivem. quebra_max_cx continua sendo o único usado no status On
-    Track de Quebra (compara com o realizado, que só vem em CX dos
-    relatórios de Quebra); quebra_max_rs só alimenta o cálculo de
-    'quanto isso representa em % do faturamento' (ver
-    quebra_pct_faturamento abaixo)."""
+    convivem. Quando há Teto em R$ (calculado ou digitado) E realizado de
+    Quebra em R$ publicado, o status On Track usa o R$ (não o CX) -- ver
+    gerencia.py; quebra_max_cx continua sendo o único usado quando falta
+    um dos dois lados em R$.
+
+    quebra_max_pct (opcional, pedido Ingrid 31/08/2026: "o teto de quebra
+    é para ser em porcentagem... 0,6% sobre o faturamento"): o teto
+    ACEITÁVEL como percentual do Faturamento -- ex.: 0,6. Quando
+    preenchido, é a FONTE do quebra_max_rs (gerencia.py calcula
+    quebra_max_rs = quebra_max_pct/100 * faturamento META antes de chamar
+    esta função, então quebra_max_rs guardado aqui já vem pronto em R$ --
+    é a "meta" fixa do período, calculada uma vez sobre o faturamento
+    META, sem depender do que acontecer depois). Guardado separado (não só
+    o R$ já calculado) pra reabrir o formulário depois mostrando o %
+    original digitado, não um % re-derivado. Períodos antigos sem
+    quebra_max_pct continuam funcionando normalmente com o quebra_max_rs
+    digitado manualmente (não migra dado antigo sozinho)."""
     return ds.save_record(
         modulo=MODULO_META, tipo_periodo=tipo_periodo, periodo_ref=periodo_ref,
         valores={
             'faturamento': faturamento, 'volume': volume,
             'margem_pct': margem_pct, 'quebra_max_cx': quebra_max_cx,
-            'quebra_max_rs': quebra_max_rs,
+            'quebra_max_rs': quebra_max_rs, 'quebra_max_pct': quebra_max_pct,
         },
         usuario=usuario,
     )
@@ -479,7 +491,20 @@ def realizado_quebra(tipo_periodo: str, periodo_ref: str) -> dict:
 
 def status_quebra(quebra_max_cx, quebra_realizada_cx, tipo_periodo: str, periodo_ref: str,
                    hoje=None, limiar_verde: float = on_track.LIMIAR_VERDE_PADRAO,
-                   limiar_amarelo: float = on_track.LIMIAR_AMARELO_PADRAO) -> dict:
+                   limiar_amarelo: float = on_track.LIMIAR_AMARELO_PADRAO,
+                   orcamento_ate_agora: float = None) -> dict:
+    """`orcamento_ate_agora` (opcional): pedido explícito da Ingrid,
+    31/08/2026 -- quando o Teto de Quebra é definido em % do Faturamento
+    (ver quebra_max_pct em salvar_meta), o "quanto já podia ter quebrado
+    até agora" NÃO deve ser o teto total do período pro-rateado pelo TEMPO
+    decorrido (o cálculo padrão abaixo) -- deve ser o percentual aplicado
+    sobre o FATURAMENTO REALIZADO até agora ("Mas no ontrack vai sendo
+    calculado conforme o faturamento realizado"), porque quebra é
+    proporcional a quanto se vendeu, não a quantos dias já passaram no
+    calendário. Quem chama (gerencia.py) calcula esse valor
+    (quebra_max_pct/100 * faturamento_realizado) e passa aqui pronto; se
+    não for passado (None), cai no cálculo por tempo decorrido de sempre
+    (teto CX, ou teto R$ sem % definido -- comportamento inalterado)."""
     if not quebra_max_cx:
         return {
             'meta': quebra_max_cx, 'realizado': quebra_realizada_cx,
@@ -489,7 +514,8 @@ def status_quebra(quebra_max_cx, quebra_realizada_cx, tipo_periodo: str, periodo
             'projecao_fechamento': None,
         }
     pct_tempo = periodo.pct_tempo_decorrido(tipo_periodo, periodo_ref, hoje=hoje)
-    orcamento_ate_agora = quebra_max_cx * pct_tempo
+    if orcamento_ate_agora is None:
+        orcamento_ate_agora = quebra_max_cx * pct_tempo
 
     if quebra_realizada_cx is None:
         ratio = None
