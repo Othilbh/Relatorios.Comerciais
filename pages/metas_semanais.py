@@ -556,7 +556,7 @@ def _render_resumo_geral_inline(resultados: list, totais_rs: dict, dia: int = 6)
 
 
 def _render_fechamento_semanal():
-    st.header('📅 Fechamento Semanal')
+    st.header('📅 Acompanhamento Semanal')
 
     resultados = st.session_state.get('resultados')
     cfg_atual  = st.session_state.get('config', {})
@@ -717,7 +717,7 @@ st.session_state.setdefault('usuario_nome', 'Ingrid')
 tab_cfg, tab_on_track, tab_fechamento = st.tabs([
     '⚙️ Configuração',
     '📊 On Track',
-    '📅 Fechamento Semanal',
+    '📅 Acompanhamento Semanal',
 ])
 
 # ============================================================
