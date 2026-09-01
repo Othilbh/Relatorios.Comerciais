@@ -1,0 +1,2167 @@
+{
+  "current": {
+    "id": "a728f99c-8626-4e37-8516-16c1f5dbf3ad",
+    "modulo_origem": "vendedor_cliente_historico",
+    "tipo_periodo": "mensal",
+    "periodo_ref": "2026-09",
+    "data_referencia": "2026-09-01",
+    "criado_em": "2026-09-01T12:22:20+00:00",
+    "atualizado_em": "2026-09-01T12:22:20+00:00",
+    "usuario": "Ingrid",
+    "versao": 1,
+    "valores": {
+      "historico": {
+        "ref_label": "SET/2026",
+        "gerado_em": "2026-09-01T12:22:20",
+        "ant_ano": {
+          "label": "SET./2025",
+          "vendedores": {
+            "Afanais": {
+              "clientes": {
+                "ABC ADICAO": {
+                  "vol": 12145,
+                  "fat": 931547.52,
+                  "custo": 0.0,
+                  "mc_rs": 0.0,
+                  "mc_pct": 0.0,
+                  "resultado_real": 5.91
+                },
+                "ALISSON CARATINGA": {
+                  "vol": 847,
+                  "fat": 88935.0,
+                  "custo": 0.0,
+                  "mc_rs": 0.0,
+                  "mc_pct": 0.0,
+                  "resultado_real": 8.07
+                },
+                "BAIAO E PIRES": {
+                  "vol": 616,
+                  "fat": 35343.0,
+                  "custo": 0.0,
+                  "mc_rs": 0.0,
+                  "mc_pct": 0.0,
+                  "resultado_real": 10.82
+                },
+                "CATALAO": {
+                  "vol": 2344,
+                  "fat": 192724.0,
+                  "custo": 0.0,
+                  "mc_rs": 0.0,
+                  "mc_pct": 0.0,
+                  "resultado_real": 10.56
+                },
+                "DARIO": {
+                  "vol": 1101,
+                  "fat": 92050.0,
+                  "custo": 0.0,
+                  "mc_rs": 0.0,
+                  "mc_pct": 0.0,
+                  "resultado_real": 17.05
+                },
+                "ECONOMART": {
+                  "vol": 1692,
+                  "fat": 106822.94,
+                  "custo": 0.0,
+                  "mc_rs": 0.0,
+                  "mc_pct": 0.0,
+                  "resultado_real": 9.66
+                },
+                "HERCULANO": {
+                  "vol": 1855,
+                  "fat": 127735.0,
+                  "custo": 0.0,
+                  "mc_rs": 0.0,
+                  "mc_pct": 0.0,
+                  "resultado_real": 12.92
+                },
+                "JOSE PEREIRA DE SOUZA": {
+                  "vol": 2324,
+                  "fat": 239540.33,
+                  "custo": 0.0,
+                  "mc_rs": 0.0,
+                  "mc_pct": 0.0,
+                  "resultado_real": 9.72
+                },
+                "MART MINAS": {
+                  "vol": 29142,
+                  "fat": 2460745.1,
+                  "custo": 0.0,
+                  "mc_rs": 0.0,
+                  "mc_pct": 0.0,
+                  "resultado_real": 9.01
+                },
+                "NOVO HORIZONTE": {
+                  "vol": 1938,
+                  "fat": 185125.0,
+                  "custo": 0.0,
+                  "mc_rs": 0.0,
+                  "mc_pct": 0.0,
+                  "resultado_real": 11.52
+                },
+                "SO BANANAS": {
+                  "vol": 4212,
+                  "fat": 423176.0,
+                  "custo": 0.0,
+                  "mc_rs": 0.0,
+                  "mc_pct": 0.0,
+                  "resultado_real": 11.1
+                },
+                "TONINHO BOY": {
+                  "vol": 863,
+                  "fat": 90941.0,
+                  "custo": 0.0,
+                  "mc_rs": 0.0,
+                  "mc_pct": 0.0,
+                  "resultado_real": 9.69
+                },
+                "VERA CRUZ": {
+                  "vol": 1352,
+                  "fat": 127030.36,
+                  "custo": 0.0,
+                  "mc_rs": 0.0,
+                  "mc_pct": 0.0,
+                  "resultado_real": 11.07
+                }
+              },
+              "TOTAL": {
+                "vol": 78333,
+                "fat": 6743275.19,
+                "custo": 0.0,
+                "mc_rs": 0.0,
+                "mc_pct": 0.0,
+                "resultado_real": -6.03
+              }
+            },
+            "Dora": {
+              "clientes": {
+                "ADELIO CROL": {
+                  "vol": 1391,
+                  "fat": 114495.95,
+                  "custo": 0.0,
+                  "mc_rs": 0.0,
+                  "mc_pct": 0.0,
+                  "resultado_real": 13.92
+                },
+                "ANDRE MACHACALIS": {
+                  "vol": 217,
+                  "fat": 19205.0,
+                  "custo": 0.0,
+                  "mc_rs": 0.0,
+                  "mc_pct": 0.0,
+                  "resultado_real": 10.87
+                },
+                "CARLOS MAGNO / WHATSAPP": {
+                  "vol": 1639,
+                  "fat": 140040.0,
+                  "custo": 0.0,
+                  "mc_rs": 0.0,
+                  "mc_pct": 0.0,
+                  "resultado_real": 10.43
+                },
+                "ELIZEU TEIXEIRA / WHATSAPP": {
+                  "vol": 30,
+                  "fat": 2265.0,
+                  "custo": 0.0,
+                  "mc_rs": 0.0,
+                  "mc_pct": 0.0,
+                  "resultado_real": 16.61
+                },
+                "FLAVIO VENEZA": {
+                  "vol": 216,
+                  "fat": 21345.0,
+                  "custo": 0.0,
+                  "mc_rs": 0.0,
+                  "mc_pct": 0.0,
+                  "resultado_real": 13.8
+                },
+                "GATINHO": {
+                  "vol": 422,
+                  "fat": 29985.0,
+                  "custo": 0.0,
+                  "mc_rs": 0.0,
+                  "mc_pct": 0.0,
+                  "resultado_real": 12.63
+                },
+                "GOMES & SANTOS JUIZ DE FORA": {
+                  "vol": 484,
+                  "fat": 30145.0,
+                  "custo": 0.0,
+                  "mc_rs": 0.0,
+                  "mc_pct": 0.0,
+                  "resultado_real": 6.2
+                },
+                "KAKA": {
+                  "vol": 299,
+                  "fat": 19730.0,
+                  "custo": 0.0,
+                  "mc_rs": 0.0,
+                  "mc_pct": 0.0,
+                  "resultado_real": 12.91
+                },
+                "MARCELO CARATINGA": {
+                  "vol": 313,
+                  "fat": 28385.0,
+                  "custo": 0.0,
+                  "mc_rs": 0.0,
+                  "mc_pct": 0.0,
+                  "resultado_real": 13.59
+                },
+                "NATURAL DA TERRA": {
+                  "vol": 148,
+                  "fat": 9224.5,
+                  "custo": 0.0,
+                  "mc_rs": 0.0,
+                  "mc_pct": 0.0,
+                  "resultado_real": 15.5
+                },
+                "CLIMERIO": {
+                  "vol": 0,
+                  "fat": 0.0,
+                  "custo": 0.0,
+                  "mc_rs": 0.0,
+                  "mc_pct": 0.0,
+                  "resultado_real": 0.0
+                }
+              },
+              "TOTAL": {
+                "vol": 12813,
+                "fat": 1051195.37,
+                "custo": 0.0,
+                "mc_rs": 0.0,
+                "mc_pct": 0.0,
+                "resultado_real": -2.22
+              }
+            },
+            "Farley": {
+              "clientes": {
+                "ABC CAMPEAO /CAMINHAO/WHATSSAP": {
+                  "vol": 0,
+                  "fat": 0.0,
+                  "custo": 0.0,
+                  "mc_rs": 0.0,
+                  "mc_pct": 0.0,
+                  "resultado_real": 0.0
+                },
+                "ADELSON BOY": {
+                  "vol": 0,
+                  "fat": 0.0,
+                  "custo": 0.0,
+                  "mc_rs": 0.0,
+                  "mc_pct": 0.0,
+                  "resultado_real": 0.0
+                },
+                "ATACADO VITORIA MINAS": {
+                  "vol": 0,
+                  "fat": 0.0,
+                  "custo": 0.0,
+                  "mc_rs": 0.0,
+                  "mc_pct": 0.0,
+                  "resultado_real": 0.0
+                },
+                "BENASSI": {
+                  "vol": 0,
+                  "fat": 0.0,
+                  "custo": 0.0,
+                  "mc_rs": 0.0,
+                  "mc_pct": 0.0,
+                  "resultado_real": 0.0
+                },
+                "CARRANCA": {
+                  "vol": 0,
+                  "fat": 0.0,
+                  "custo": 0.0,
+                  "mc_rs": 0.0,
+                  "mc_pct": 0.0,
+                  "resultado_real": 0.0
+                },
+                "ESQUINAO": {
+                  "vol": 0,
+                  "fat": 0.0,
+                  "custo": 0.0,
+                  "mc_rs": 0.0,
+                  "mc_pct": 0.0,
+                  "resultado_real": 0.0
+                },
+                "GATINHO BARBACENA": {
+                  "vol": 0,
+                  "fat": 0.0,
+                  "custo": 0.0,
+                  "mc_rs": 0.0,
+                  "mc_pct": 0.0,
+                  "resultado_real": 0.0
+                },
+                "LOSCHI": {
+                  "vol": 0,
+                  "fat": 0.0,
+                  "custo": 0.0,
+                  "mc_rs": 0.0,
+                  "mc_pct": 0.0,
+                  "resultado_real": 0.0
+                },
+                "MAC": {
+                  "vol": 0,
+                  "fat": 0.0,
+                  "custo": 0.0,
+                  "mc_rs": 0.0,
+                  "mc_pct": 0.0,
+                  "resultado_real": 0.0
+                },
+                "MERCANTIL BASTOS": {
+                  "vol": 0,
+                  "fat": 0.0,
+                  "custo": 0.0,
+                  "mc_rs": 0.0,
+                  "mc_pct": 0.0,
+                  "resultado_real": 0.0
+                },
+                "NATURAL DA TERRA": {
+                  "vol": 0,
+                  "fat": 0.0,
+                  "custo": 0.0,
+                  "mc_rs": 0.0,
+                  "mc_pct": 0.0,
+                  "resultado_real": 0.0
+                },
+                "OLS ANDRADAS - WHATSAPP": {
+                  "vol": 0,
+                  "fat": 0.0,
+                  "custo": 0.0,
+                  "mc_rs": 0.0,
+                  "mc_pct": 0.0,
+                  "resultado_real": 0.0
+                },
+                "OPA": {
+                  "vol": 0,
+                  "fat": 0.0,
+                  "custo": 0.0,
+                  "mc_rs": 0.0,
+                  "mc_pct": 0.0,
+                  "resultado_real": 0.0
+                },
+                "PAULO JUIZ DE FORA": {
+                  "vol": 0,
+                  "fat": 0.0,
+                  "custo": 0.0,
+                  "mc_rs": 0.0,
+                  "mc_pct": 0.0,
+                  "resultado_real": 0.0
+                },
+                "SACOLAO CASTELO": {
+                  "vol": 0,
+                  "fat": 0.0,
+                  "custo": 0.0,
+                  "mc_rs": 0.0,
+                  "mc_pct": 0.0,
+                  "resultado_real": 0.0
+                },
+                "SACOLAO MAXIMO - JARDIM CANADA": {
+                  "vol": 0,
+                  "fat": 0.0,
+                  "custo": 0.0,
+                  "mc_rs": 0.0,
+                  "mc_pct": 0.0,
+                  "resultado_real": 0.0
+                },
+                "SANTOS E OLIVEIRA SUPERM.": {
+                  "vol": 0,
+                  "fat": 0.0,
+                  "custo": 0.0,
+                  "mc_rs": 0.0,
+                  "mc_pct": 0.0,
+                  "resultado_real": 0.0
+                },
+                "SUPER SO": {
+                  "vol": 0,
+                  "fat": 0.0,
+                  "custo": 0.0,
+                  "mc_rs": 0.0,
+                  "mc_pct": 0.0,
+                  "resultado_real": 0.0
+                },
+                "TRES IRMAOS": {
+                  "vol": 0,
+                  "fat": 0.0,
+                  "custo": 0.0,
+                  "mc_rs": 0.0,
+                  "mc_pct": 0.0,
+                  "resultado_real": 0.0
+                },
+                "VERDE MINAS": {
+                  "vol": 0,
+                  "fat": 0.0,
+                  "custo": 0.0,
+                  "mc_rs": 0.0,
+                  "mc_pct": 0.0,
+                  "resultado_real": 0.0
+                },
+                "VILLEFORT ATACADISTA - CD": {
+                  "vol": 0,
+                  "fat": 0.0,
+                  "custo": 0.0,
+                  "mc_rs": 0.0,
+                  "mc_pct": 0.0,
+                  "resultado_real": 0.0
+                }
+              },
+              "TOTAL": {
+                "vol": 0,
+                "fat": 0.0,
+                "custo": 0.0,
+                "mc_rs": 0.0,
+                "mc_pct": 0.0,
+                "resultado_real": 0.0
+              }
+            },
+            "Luca": {
+              "clientes": {
+                "APOIO MINEIRO / MANUAL E WHATSAPP": {
+                  "vol": 8899,
+                  "fat": 955955.06,
+                  "custo": 0.0,
+                  "mc_rs": 0.0,
+                  "mc_pct": 0.0,
+                  "resultado_real": 10.31
+                },
+                "ECONOMART": {
+                  "vol": 0,
+                  "fat": 0.0,
+                  "custo": 0.0,
+                  "mc_rs": 0.0,
+                  "mc_pct": 0.0,
+                  "resultado_real": 0.0
+                },
+                "EPA": {
+                  "vol": 0,
+                  "fat": 0.0,
+                  "custo": 0.0,
+                  "mc_rs": 0.0,
+                  "mc_pct": 0.0,
+                  "resultado_real": 0.0
+                },
+                "FRIOS RAMOS/ WHATSAPP": {
+                  "vol": 132,
+                  "fat": 14313.0,
+                  "custo": 0.0,
+                  "mc_rs": 0.0,
+                  "mc_pct": 0.0,
+                  "resultado_real": 8.6
+                },
+                "SUPER LUNA/ WHATSAPP": {
+                  "vol": 1070,
+                  "fat": 155205.0,
+                  "custo": 0.0,
+                  "mc_rs": 0.0,
+                  "mc_pct": 0.0,
+                  "resultado_real": 11.2
+                },
+                "PAIS E FILHOS": {
+                  "vol": 0,
+                  "fat": 0.0,
+                  "custo": 0.0,
+                  "mc_rs": 0.0,
+                  "mc_pct": 0.0,
+                  "resultado_real": 0.0
+                }
+              },
+              "TOTAL": {
+                "vol": 11440,
+                "fat": 1206911.56,
+                "custo": 0.0,
+                "mc_rs": 0.0,
+                "mc_pct": 0.0,
+                "resultado_real": -4.64
+              }
+            },
+            "Reginaldo": {
+              "clientes": {
+                "BONFIM": {
+                  "vol": 5577,
+                  "fat": 634654.0,
+                  "custo": 0.0,
+                  "mc_rs": 0.0,
+                  "mc_pct": 0.0,
+                  "resultado_real": 6.73
+                },
+                "BRIXX": {
+                  "vol": 1624,
+                  "fat": 221524.8,
+                  "custo": 0.0,
+                  "mc_rs": 0.0,
+                  "mc_pct": 0.0,
+                  "resultado_real": 5.61
+                },
+                "CAMPONES": {
+                  "vol": 106,
+                  "fat": 8285.0,
+                  "custo": 0.0,
+                  "mc_rs": 0.0,
+                  "mc_pct": 0.0,
+                  "resultado_real": 29.51
+                },
+                "ENESIO": {
+                  "vol": 561,
+                  "fat": 84080.0,
+                  "custo": 0.0,
+                  "mc_rs": 0.0,
+                  "mc_pct": 0.0,
+                  "resultado_real": 4.3
+                },
+                "EPA CD": {
+                  "vol": 4090,
+                  "fat": 485124.15,
+                  "custo": 0.0,
+                  "mc_rs": 0.0,
+                  "mc_pct": 0.0,
+                  "resultado_real": 8.45
+                },
+                "LEGOMES": {
+                  "vol": 1028,
+                  "fat": 95821.0,
+                  "custo": 0.0,
+                  "mc_rs": 0.0,
+                  "mc_pct": 0.0,
+                  "resultado_real": 13.75
+                },
+                "PATRICIA HORTSUL": {
+                  "vol": 2818,
+                  "fat": 300466.95,
+                  "custo": 0.0,
+                  "mc_rs": 0.0,
+                  "mc_pct": 0.0,
+                  "resultado_real": 9.31
+                },
+                "RR LEGUMES": {
+                  "vol": 343,
+                  "fat": 35737.0,
+                  "custo": 0.0,
+                  "mc_rs": 0.0,
+                  "mc_pct": 0.0,
+                  "resultado_real": 5.17
+                },
+                "VILMA": {
+                  "vol": 52,
+                  "fat": 3520.0,
+                  "custo": 0.0,
+                  "mc_rs": 0.0,
+                  "mc_pct": 0.0,
+                  "resultado_real": 22.84
+                }
+              },
+              "TOTAL": {
+                "vol": 25696,
+                "fat": 2898301.59,
+                "custo": 0.0,
+                "mc_rs": 0.0,
+                "mc_pct": 0.0,
+                "resultado_real": -6.16
+              }
+            },
+            "Roni": {
+              "clientes": {
+                "BH SUPERMERCADO": {
+                  "vol": 15001,
+                  "fat": 1373833.41,
+                  "custo": 0.0,
+                  "mc_rs": 0.0,
+                  "mc_pct": 0.0,
+                  "resultado_real": 4.58
+                },
+                "BIG MAIS SUPERMERCADO / WHATSAPP": {
+                  "vol": 0,
+                  "fat": 0.0,
+                  "custo": 0.0,
+                  "mc_rs": 0.0,
+                  "mc_pct": 0.0,
+                  "resultado_real": 0.0
+                },
+                "BRIXX": {
+                  "vol": 9633,
+                  "fat": 732637.15,
+                  "custo": 0.0,
+                  "mc_rs": 0.0,
+                  "mc_pct": 0.0,
+                  "resultado_real": 4.71
+                },
+                "ENESIO": {
+                  "vol": 502,
+                  "fat": 41021.0,
+                  "custo": 0.0,
+                  "mc_rs": 0.0,
+                  "mc_pct": 0.0,
+                  "resultado_real": 12.09
+                },
+                "EPA CD": {
+                  "vol": 15,
+                  "fat": 2147.0,
+                  "custo": 0.0,
+                  "mc_rs": 0.0,
+                  "mc_pct": 0.0,
+                  "resultado_real": 17.3
+                },
+                "EXPERFRUT": {
+                  "vol": 5392,
+                  "fat": 392862.05,
+                  "custo": 0.0,
+                  "mc_rs": 0.0,
+                  "mc_pct": 0.0,
+                  "resultado_real": 5.34
+                },
+                "FRUTAS BARBACENA- JUIZ DE FORA": {
+                  "vol": 3183,
+                  "fat": 211480.0,
+                  "custo": 0.0,
+                  "mc_rs": 0.0,
+                  "mc_pct": 0.0,
+                  "resultado_real": 8.37
+                },
+                "HERBERT / WHATSAPP": {
+                  "vol": 2102,
+                  "fat": 163902.0,
+                  "custo": 0.0,
+                  "mc_rs": 0.0,
+                  "mc_pct": 0.0,
+                  "resultado_real": 13.17
+                },
+                "HORTIFARIA": {
+                  "vol": 0,
+                  "fat": 0.0,
+                  "custo": 0.0,
+                  "mc_rs": 0.0,
+                  "mc_pct": 0.0,
+                  "resultado_real": 0.0
+                },
+                "JOSE ONOFRE": {
+                  "vol": 2026,
+                  "fat": 145867.03,
+                  "custo": 0.0,
+                  "mc_rs": 0.0,
+                  "mc_pct": 0.0,
+                  "resultado_real": 9.77
+                },
+                "MAGNOLI": {
+                  "vol": 0,
+                  "fat": 0.0,
+                  "custo": 0.0,
+                  "mc_rs": 0.0,
+                  "mc_pct": 0.0,
+                  "resultado_real": 0.0
+                },
+                "NL CD": {
+                  "vol": 2506,
+                  "fat": 204440.95,
+                  "custo": 0.0,
+                  "mc_rs": 0.0,
+                  "mc_pct": 0.0,
+                  "resultado_real": 13.52
+                },
+                "RAFAEL SOARES MATRIZ": {
+                  "vol": 830,
+                  "fat": 60860.0,
+                  "custo": 0.0,
+                  "mc_rs": 0.0,
+                  "mc_pct": 0.0,
+                  "resultado_real": 5.24
+                },
+                "SAPAO": {
+                  "vol": 184,
+                  "fat": 12709.0,
+                  "custo": 0.0,
+                  "mc_rs": 0.0,
+                  "mc_pct": 0.0,
+                  "resultado_real": 12.75
+                },
+                "SUPERMERCADOS REX LTDA": {
+                  "vol": 1691,
+                  "fat": 172049.75,
+                  "custo": 0.0,
+                  "mc_rs": 0.0,
+                  "mc_pct": 0.0,
+                  "resultado_real": 10.44
+                },
+                "VAREJAO OBA": {
+                  "vol": 713,
+                  "fat": 96426.9,
+                  "custo": 0.0,
+                  "mc_rs": 0.0,
+                  "mc_pct": 0.0,
+                  "resultado_real": 12.68
+                }
+              },
+              "TOTAL": {
+                "vol": 57529,
+                "fat": 4800043.29,
+                "custo": 0.0,
+                "mc_rs": 0.0,
+                "mc_pct": 0.0,
+                "resultado_real": -8.38
+              }
+            },
+            "Juliana": {
+              "clientes": {
+                "ADAILSON BAHIA": {
+                  "vol": 0,
+                  "fat": 0.0,
+                  "custo": 0.0,
+                  "mc_rs": 0.0,
+                  "mc_pct": 0.0,
+                  "resultado_real": 0.0
+                },
+                "DADO BAHIA": {
+                  "vol": 0,
+                  "fat": 0.0,
+                  "custo": 0.0,
+                  "mc_rs": 0.0,
+                  "mc_pct": 0.0,
+                  "resultado_real": 0.0
+                },
+                "DHF - WHATSAPP": {
+                  "vol": 0,
+                  "fat": 0.0,
+                  "custo": 0.0,
+                  "mc_rs": 0.0,
+                  "mc_pct": 0.0,
+                  "resultado_real": 0.0
+                },
+                "DOUGLAS LEMOS": {
+                  "vol": 0,
+                  "fat": 0.0,
+                  "custo": 0.0,
+                  "mc_rs": 0.0,
+                  "mc_pct": 0.0,
+                  "resultado_real": 0.0
+                },
+                "ENTRE RIOS": {
+                  "vol": 0,
+                  "fat": 0.0,
+                  "custo": 0.0,
+                  "mc_rs": 0.0,
+                  "mc_pct": 0.0,
+                  "resultado_real": 0.0
+                },
+                "ESQUINAO": {
+                  "vol": 0,
+                  "fat": 0.0,
+                  "custo": 0.0,
+                  "mc_rs": 0.0,
+                  "mc_pct": 0.0,
+                  "resultado_real": 0.0
+                },
+                "FERNANDO SOARES": {
+                  "vol": 0,
+                  "fat": 0.0,
+                  "custo": 0.0,
+                  "mc_rs": 0.0,
+                  "mc_pct": 0.0,
+                  "resultado_real": 0.0
+                },
+                "JOAOZINHO AMARANTINA": {
+                  "vol": 0,
+                  "fat": 0.0,
+                  "custo": 0.0,
+                  "mc_rs": 0.0,
+                  "mc_pct": 0.0,
+                  "resultado_real": 0.0
+                },
+                "MATHEUS LINDEBERG": {
+                  "vol": 0,
+                  "fat": 0.0,
+                  "custo": 0.0,
+                  "mc_rs": 0.0,
+                  "mc_pct": 0.0,
+                  "resultado_real": 0.0
+                },
+                "MOISES FURTADO": {
+                  "vol": 0,
+                  "fat": 0.0,
+                  "custo": 0.0,
+                  "mc_rs": 0.0,
+                  "mc_pct": 0.0,
+                  "resultado_real": 0.0
+                },
+                "NOVA ALIANCA": {
+                  "vol": 0,
+                  "fat": 0.0,
+                  "custo": 0.0,
+                  "mc_rs": 0.0,
+                  "mc_pct": 0.0,
+                  "resultado_real": 0.0
+                },
+                "POUPY DISTRIBUIDORA": {
+                  "vol": 0,
+                  "fat": 0.0,
+                  "custo": 0.0,
+                  "mc_rs": 0.0,
+                  "mc_pct": 0.0,
+                  "resultado_real": 0.0
+                },
+                "RENILSON BAHIA": {
+                  "vol": 0,
+                  "fat": 0.0,
+                  "custo": 0.0,
+                  "mc_rs": 0.0,
+                  "mc_pct": 0.0,
+                  "resultado_real": 0.0
+                },
+                "SITIO NATURA": {
+                  "vol": 0,
+                  "fat": 0.0,
+                  "custo": 0.0,
+                  "mc_rs": 0.0,
+                  "mc_pct": 0.0,
+                  "resultado_real": 0.0
+                },
+                "TEREZINHA": {
+                  "vol": 0,
+                  "fat": 0.0,
+                  "custo": 0.0,
+                  "mc_rs": 0.0,
+                  "mc_pct": 0.0,
+                  "resultado_real": 0.0
+                },
+                "UBERABA": {
+                  "vol": 0,
+                  "fat": 0.0,
+                  "custo": 0.0,
+                  "mc_rs": 0.0,
+                  "mc_pct": 0.0,
+                  "resultado_real": 0.0
+                },
+                "VALTERLI": {
+                  "vol": 0,
+                  "fat": 0.0,
+                  "custo": 0.0,
+                  "mc_rs": 0.0,
+                  "mc_pct": 0.0,
+                  "resultado_real": 0.0
+                }
+              },
+              "TOTAL": {
+                "vol": 0,
+                "fat": 0.0,
+                "custo": 0.0,
+                "mc_rs": 0.0,
+                "mc_pct": 0.0,
+                "resultado_real": 0.0
+              }
+            }
+          }
+        },
+        "ant_mes": {
+          "label": "AGO./2026",
+          "vendedores": {
+            "Afanais": {
+              "clientes": {
+                "ABC ADICAO": {
+                  "vol": 18706,
+                  "fat": 1162298.8,
+                  "custo": 0.0,
+                  "mc_rs": 0.0,
+                  "mc_pct": 0.0,
+                  "resultado_real": 34.84
+                },
+                "ALISSON CARATINGA": {
+                  "vol": 1691,
+                  "fat": 108432.0,
+                  "custo": 0.0,
+                  "mc_rs": 0.0,
+                  "mc_pct": 0.0,
+                  "resultado_real": 13.64
+                },
+                "BAIAO E PIRES": {
+                  "vol": 452,
+                  "fat": 25995.0,
+                  "custo": 0.0,
+                  "mc_rs": 0.0,
+                  "mc_pct": 0.0,
+                  "resultado_real": 15.59
+                },
+                "CATALAO": {
+                  "vol": 728,
+                  "fat": 47765.0,
+                  "custo": 0.0,
+                  "mc_rs": 0.0,
+                  "mc_pct": 0.0,
+                  "resultado_real": 10.13
+                },
+                "DARIO": {
+                  "vol": 642,
+                  "fat": 55388.0,
+                  "custo": 0.0,
+                  "mc_rs": 0.0,
+                  "mc_pct": 0.0,
+                  "resultado_real": 16.01
+                },
+                "ECONOMART": {
+                  "vol": 324,
+                  "fat": 15557.0,
+                  "custo": 0.0,
+                  "mc_rs": 0.0,
+                  "mc_pct": 0.0,
+                  "resultado_real": 11.34
+                },
+                "HERCULANO": {
+                  "vol": 2181,
+                  "fat": 129607.0,
+                  "custo": 0.0,
+                  "mc_rs": 0.0,
+                  "mc_pct": 0.0,
+                  "resultado_real": 11.6
+                },
+                "JOSE PEREIRA DE SOUZA": {
+                  "vol": 35832,
+                  "fat": 2632488.52,
+                  "custo": 0.0,
+                  "mc_rs": 0.0,
+                  "mc_pct": 0.0,
+                  "resultado_real": 16.28
+                },
+                "MART MINAS": {
+                  "vol": 4212,
+                  "fat": 389387.9,
+                  "custo": 0.0,
+                  "mc_rs": 0.0,
+                  "mc_pct": 0.0,
+                  "resultado_real": 9.51
+                },
+                "NOVO HORIZONTE": {
+                  "vol": 2193,
+                  "fat": 139790.0,
+                  "custo": 0.0,
+                  "mc_rs": 0.0,
+                  "mc_pct": 0.0,
+                  "resultado_real": 12.82
+                },
+                "SO BANANAS": {
+                  "vol": 4359,
+                  "fat": 320951.0,
+                  "custo": 0.0,
+                  "mc_rs": 0.0,
+                  "mc_pct": 0.0,
+                  "resultado_real": 15.85
+                },
+                "TONINHO BOY": {
+                  "vol": 442,
+                  "fat": 42920.0,
+                  "custo": 0.0,
+                  "mc_rs": 0.0,
+                  "mc_pct": 0.0,
+                  "resultado_real": 10.75
+                },
+                "VERA CRUZ": {
+                  "vol": 1690,
+                  "fat": 110641.0,
+                  "custo": 0.0,
+                  "mc_rs": 0.0,
+                  "mc_pct": 0.0,
+                  "resultado_real": 7.97
+                }
+              },
+              "TOTAL": {
+                "vol": 82947,
+                "fat": 5816776.72,
+                "custo": 0.0,
+                "mc_rs": 0.0,
+                "mc_pct": 0.0,
+                "resultado_real": -1.49
+              }
+            },
+            "Dora": {
+              "clientes": {
+                "ADELIO CROL": {
+                  "vol": 1043,
+                  "fat": 81616.0,
+                  "custo": 0.0,
+                  "mc_rs": 0.0,
+                  "mc_pct": 0.0,
+                  "resultado_real": 16.99
+                },
+                "ANDRE MACHACALIS": {
+                  "vol": 526,
+                  "fat": 38490.0,
+                  "custo": 0.0,
+                  "mc_rs": 0.0,
+                  "mc_pct": 0.0,
+                  "resultado_real": 17.99
+                },
+                "CARLOS MAGNO / WHATSAPP": {
+                  "vol": 407,
+                  "fat": 28170.0,
+                  "custo": 0.0,
+                  "mc_rs": 0.0,
+                  "mc_pct": 0.0,
+                  "resultado_real": 12.59
+                },
+                "ELIZEU TEIXEIRA / WHATSAPP": {
+                  "vol": 719,
+                  "fat": 50140.0,
+                  "custo": 0.0,
+                  "mc_rs": 0.0,
+                  "mc_pct": 0.0,
+                  "resultado_real": 14.48
+                },
+                "FLAVIO VENEZA": {
+                  "vol": 97,
+                  "fat": 10270.0,
+                  "custo": 0.0,
+                  "mc_rs": 0.0,
+                  "mc_pct": 0.0,
+                  "resultado_real": 25.89
+                },
+                "GATINHO": {
+                  "vol": 198,
+                  "fat": 12297.0,
+                  "custo": 0.0,
+                  "mc_rs": 0.0,
+                  "mc_pct": 0.0,
+                  "resultado_real": 14.14
+                },
+                "GOMES & SANTOS JUIZ DE FORA": {
+                  "vol": 418,
+                  "fat": 29320.0,
+                  "custo": 0.0,
+                  "mc_rs": 0.0,
+                  "mc_pct": 0.0,
+                  "resultado_real": 14.42
+                },
+                "KAKA": {
+                  "vol": 10,
+                  "fat": 550.0,
+                  "custo": 0.0,
+                  "mc_rs": 0.0,
+                  "mc_pct": 0.0,
+                  "resultado_real": 1.96
+                },
+                "MARCELO CARATINGA": {
+                  "vol": 262,
+                  "fat": 20015.0,
+                  "custo": 0.0,
+                  "mc_rs": 0.0,
+                  "mc_pct": 0.0,
+                  "resultado_real": 20.45
+                },
+                "NATURAL DA TERRA": {
+                  "vol": 585,
+                  "fat": 23267.4,
+                  "custo": 0.0,
+                  "mc_rs": 0.0,
+                  "mc_pct": 0.0,
+                  "resultado_real": 3.92
+                },
+                "CLIMERIO": {
+                  "vol": 0,
+                  "fat": 0.0,
+                  "custo": 0.0,
+                  "mc_rs": 0.0,
+                  "mc_pct": 0.0,
+                  "resultado_real": 0.0
+                }
+              },
+              "TOTAL": {
+                "vol": 10929,
+                "fat": 803581.64,
+                "custo": 0.0,
+                "mc_rs": 0.0,
+                "mc_pct": 0.0,
+                "resultado_real": 1.1
+              }
+            },
+            "Farley": {
+              "clientes": {
+                "ABC CAMPEAO /CAMINHAO/WHATSSAP": {
+                  "vol": 0,
+                  "fat": 0.0,
+                  "custo": 0.0,
+                  "mc_rs": 0.0,
+                  "mc_pct": 0.0,
+                  "resultado_real": 0.0
+                },
+                "ADELSON BOY": {
+                  "vol": 0,
+                  "fat": 0.0,
+                  "custo": 0.0,
+                  "mc_rs": 0.0,
+                  "mc_pct": 0.0,
+                  "resultado_real": 0.0
+                },
+                "ATACADO VITORIA MINAS": {
+                  "vol": 0,
+                  "fat": 0.0,
+                  "custo": 0.0,
+                  "mc_rs": 0.0,
+                  "mc_pct": 0.0,
+                  "resultado_real": 0.0
+                },
+                "BENASSI": {
+                  "vol": 124,
+                  "fat": 14810.5,
+                  "custo": 0.0,
+                  "mc_rs": 0.0,
+                  "mc_pct": 0.0,
+                  "resultado_real": 15.53
+                },
+                "CARRANCA": {
+                  "vol": 0,
+                  "fat": 0.0,
+                  "custo": 0.0,
+                  "mc_rs": 0.0,
+                  "mc_pct": 0.0,
+                  "resultado_real": 0.0
+                },
+                "ESQUINAO": {
+                  "vol": 0,
+                  "fat": 0.0,
+                  "custo": 0.0,
+                  "mc_rs": 0.0,
+                  "mc_pct": 0.0,
+                  "resultado_real": 0.0
+                },
+                "GATINHO BARBACENA": {
+                  "vol": 0,
+                  "fat": 0.0,
+                  "custo": 0.0,
+                  "mc_rs": 0.0,
+                  "mc_pct": 0.0,
+                  "resultado_real": 0.0
+                },
+                "LOSCHI": {
+                  "vol": 0,
+                  "fat": 0.0,
+                  "custo": 0.0,
+                  "mc_rs": 0.0,
+                  "mc_pct": 0.0,
+                  "resultado_real": 0.0
+                },
+                "MAC": {
+                  "vol": 0,
+                  "fat": 0.0,
+                  "custo": 0.0,
+                  "mc_rs": 0.0,
+                  "mc_pct": 0.0,
+                  "resultado_real": 0.0
+                },
+                "MERCANTIL BASTOS": {
+                  "vol": 3,
+                  "fat": 180.0,
+                  "custo": 0.0,
+                  "mc_rs": 0.0,
+                  "mc_pct": 0.0,
+                  "resultado_real": -2.18
+                },
+                "NATURAL DA TERRA": {
+                  "vol": 550,
+                  "fat": 20273.0,
+                  "custo": 0.0,
+                  "mc_rs": 0.0,
+                  "mc_pct": 0.0,
+                  "resultado_real": 6.03
+                },
+                "OLS ANDRADAS - WHATSAPP": {
+                  "vol": 1511,
+                  "fat": 93785.0,
+                  "custo": 0.0,
+                  "mc_rs": 0.0,
+                  "mc_pct": 0.0,
+                  "resultado_real": 8.8
+                },
+                "OPA": {
+                  "vol": 0,
+                  "fat": 0.0,
+                  "custo": 0.0,
+                  "mc_rs": 0.0,
+                  "mc_pct": 0.0,
+                  "resultado_real": 0.0
+                },
+                "PAULO JUIZ DE FORA": {
+                  "vol": 474,
+                  "fat": 32730.0,
+                  "custo": 0.0,
+                  "mc_rs": 0.0,
+                  "mc_pct": 0.0,
+                  "resultado_real": 4.19
+                },
+                "SACOLAO CASTELO": {
+                  "vol": 9,
+                  "fat": 560.0,
+                  "custo": 0.0,
+                  "mc_rs": 0.0,
+                  "mc_pct": 0.0,
+                  "resultado_real": 13.5
+                },
+                "SACOLAO MAXIMO - JARDIM CANADA": {
+                  "vol": 1590,
+                  "fat": 101861.0,
+                  "custo": 0.0,
+                  "mc_rs": 0.0,
+                  "mc_pct": 0.0,
+                  "resultado_real": 10.86
+                },
+                "SANTOS E OLIVEIRA SUPERM.": {
+                  "vol": 0,
+                  "fat": 0.0,
+                  "custo": 0.0,
+                  "mc_rs": 0.0,
+                  "mc_pct": 0.0,
+                  "resultado_real": 0.0
+                },
+                "SUPER SO": {
+                  "vol": 510,
+                  "fat": 39069.0,
+                  "custo": 0.0,
+                  "mc_rs": 0.0,
+                  "mc_pct": 0.0,
+                  "resultado_real": 19.8
+                },
+                "TRES IRMAOS": {
+                  "vol": 285,
+                  "fat": 13780.0,
+                  "custo": 0.0,
+                  "mc_rs": 0.0,
+                  "mc_pct": 0.0,
+                  "resultado_real": 10.01
+                },
+                "VERDE MINAS": {
+                  "vol": 0,
+                  "fat": 0.0,
+                  "custo": 0.0,
+                  "mc_rs": 0.0,
+                  "mc_pct": 0.0,
+                  "resultado_real": 0.0
+                },
+                "VILLEFORT ATACADISTA - CD": {
+                  "vol": 8212,
+                  "fat": 530612.05,
+                  "custo": 0.0,
+                  "mc_rs": 0.0,
+                  "mc_pct": 0.0,
+                  "resultado_real": 13.37
+                }
+              },
+              "TOTAL": {
+                "vol": 17939,
+                "fat": 1168746.61,
+                "custo": 0.0,
+                "mc_rs": 0.0,
+                "mc_pct": 0.0,
+                "resultado_real": -2.36
+              }
+            },
+            "Luca": {
+              "clientes": {
+                "APOIO MINEIRO / MANUAL E WHATSAPP": {
+                  "vol": 6972,
+                  "fat": 547071.99,
+                  "custo": 0.0,
+                  "mc_rs": 0.0,
+                  "mc_pct": 0.0,
+                  "resultado_real": 14.47
+                },
+                "ECONOMART": {
+                  "vol": 1687,
+                  "fat": 151149.57,
+                  "custo": 0.0,
+                  "mc_rs": 0.0,
+                  "mc_pct": 0.0,
+                  "resultado_real": 16.52
+                },
+                "EPA": {
+                  "vol": 1270,
+                  "fat": 162877.5,
+                  "custo": 0.0,
+                  "mc_rs": 0.0,
+                  "mc_pct": 0.0,
+                  "resultado_real": 21.96
+                },
+                "FRIOS RAMOS/ WHATSAPP": {
+                  "vol": 369,
+                  "fat": 25560.0,
+                  "custo": 0.0,
+                  "mc_rs": 0.0,
+                  "mc_pct": 0.0,
+                  "resultado_real": 7.63
+                },
+                "SUPER LUNA/ WHATSAPP": {
+                  "vol": 4837,
+                  "fat": 534558.0,
+                  "custo": 0.0,
+                  "mc_rs": 0.0,
+                  "mc_pct": 0.0,
+                  "resultado_real": 12.3
+                },
+                "PAIS E FILHOS": {
+                  "vol": 0,
+                  "fat": 0.0,
+                  "custo": 0.0,
+                  "mc_rs": 0.0,
+                  "mc_pct": 0.0,
+                  "resultado_real": 0.0
+                }
+              },
+              "TOTAL": {
+                "vol": 18208,
+                "fat": 1658436.06,
+                "custo": 0.0,
+                "mc_rs": 0.0,
+                "mc_pct": 0.0,
+                "resultado_real": 0.68
+              }
+            },
+            "Reginaldo": {
+              "clientes": {
+                "BONFIM": {
+                  "vol": 4607,
+                  "fat": 397260.0,
+                  "custo": 0.0,
+                  "mc_rs": 0.0,
+                  "mc_pct": 0.0,
+                  "resultado_real": 23.93
+                },
+                "BRIXX": {
+                  "vol": 2968,
+                  "fat": 231260.4,
+                  "custo": 0.0,
+                  "mc_rs": 0.0,
+                  "mc_pct": 0.0,
+                  "resultado_real": 17.16
+                },
+                "CAMPONES": {
+                  "vol": 144,
+                  "fat": 8440.0,
+                  "custo": 0.0,
+                  "mc_rs": 0.0,
+                  "mc_pct": 0.0,
+                  "resultado_real": 15.61
+                },
+                "ENESIO": {
+                  "vol": 402,
+                  "fat": 31489.0,
+                  "custo": 0.0,
+                  "mc_rs": 0.0,
+                  "mc_pct": 0.0,
+                  "resultado_real": 12.46
+                },
+                "EPA CD": {
+                  "vol": 5506,
+                  "fat": 452770.0,
+                  "custo": 0.0,
+                  "mc_rs": 0.0,
+                  "mc_pct": 0.0,
+                  "resultado_real": 9.84
+                },
+                "LEGOMES": {
+                  "vol": 971,
+                  "fat": 79574.0,
+                  "custo": 0.0,
+                  "mc_rs": 0.0,
+                  "mc_pct": 0.0,
+                  "resultado_real": 21.38
+                },
+                "PATRICIA HORTSUL": {
+                  "vol": 1995,
+                  "fat": 220844.6,
+                  "custo": 0.0,
+                  "mc_rs": 0.0,
+                  "mc_pct": 0.0,
+                  "resultado_real": 15.97
+                },
+                "RR LEGUMES": {
+                  "vol": 330,
+                  "fat": 18296.0,
+                  "custo": 0.0,
+                  "mc_rs": 0.0,
+                  "mc_pct": 0.0,
+                  "resultado_real": 11.43
+                },
+                "VILMA": {
+                  "vol": 183,
+                  "fat": 13640.0,
+                  "custo": 0.0,
+                  "mc_rs": 0.0,
+                  "mc_pct": 0.0,
+                  "resultado_real": 10.58
+                }
+              },
+              "TOTAL": {
+                "vol": 22479,
+                "fat": 1954738.95,
+                "custo": 0.0,
+                "mc_rs": 0.0,
+                "mc_pct": 0.0,
+                "resultado_real": 1.2
+              }
+            },
+            "Roni": {
+              "clientes": {
+                "BH SUPERMERCADO": {
+                  "vol": 3711,
+                  "fat": 323336.44,
+                  "custo": 0.0,
+                  "mc_rs": 0.0,
+                  "mc_pct": 0.0,
+                  "resultado_real": 8.1
+                },
+                "BIG MAIS SUPERMERCADO / WHATSAPP": {
+                  "vol": 5653,
+                  "fat": 397661.1,
+                  "custo": 0.0,
+                  "mc_rs": 0.0,
+                  "mc_pct": 0.0,
+                  "resultado_real": 9.47
+                },
+                "BRIXX": {
+                  "vol": 8860,
+                  "fat": 473929.1,
+                  "custo": 0.0,
+                  "mc_rs": 0.0,
+                  "mc_pct": 0.0,
+                  "resultado_real": 7.93
+                },
+                "ENESIO": {
+                  "vol": 2036,
+                  "fat": 170955.0,
+                  "custo": 0.0,
+                  "mc_rs": 0.0,
+                  "mc_pct": 0.0,
+                  "resultado_real": 18.86
+                },
+                "EPA CD": {
+                  "vol": 0,
+                  "fat": 0.0,
+                  "custo": 0.0,
+                  "mc_rs": 0.0,
+                  "mc_pct": 0.0,
+                  "resultado_real": 0.0
+                },
+                "EXPERFRUT": {
+                  "vol": 4090,
+                  "fat": 291915.55,
+                  "custo": 0.0,
+                  "mc_rs": 0.0,
+                  "mc_pct": 0.0,
+                  "resultado_real": 12.37
+                },
+                "FRUTAS BARBACENA- JUIZ DE FORA": {
+                  "vol": 4269,
+                  "fat": 237911.0,
+                  "custo": 0.0,
+                  "mc_rs": 0.0,
+                  "mc_pct": 0.0,
+                  "resultado_real": 8.25
+                },
+                "HERBERT / WHATSAPP": {
+                  "vol": 436,
+                  "fat": 35510.0,
+                  "custo": 0.0,
+                  "mc_rs": 0.0,
+                  "mc_pct": 0.0,
+                  "resultado_real": 8.21
+                },
+                "HORTIFARIA": {
+                  "vol": 5780,
+                  "fat": 241859.0,
+                  "custo": 0.0,
+                  "mc_rs": 0.0,
+                  "mc_pct": 0.0,
+                  "resultado_real": 8.05
+                },
+                "JOSE ONOFRE": {
+                  "vol": 1598,
+                  "fat": 104144.0,
+                  "custo": 0.0,
+                  "mc_rs": 0.0,
+                  "mc_pct": 0.0,
+                  "resultado_real": 10.11
+                },
+                "MAGNOLI": {
+                  "vol": 0,
+                  "fat": 0.0,
+                  "custo": 0.0,
+                  "mc_rs": 0.0,
+                  "mc_pct": 0.0,
+                  "resultado_real": 0.0
+                },
+                "NL CD": {
+                  "vol": 1755,
+                  "fat": 121044.74,
+                  "custo": 0.0,
+                  "mc_rs": 0.0,
+                  "mc_pct": 0.0,
+                  "resultado_real": 19.88
+                },
+                "RAFAEL SOARES MATRIZ": {
+                  "vol": 1142,
+                  "fat": 78819.0,
+                  "custo": 0.0,
+                  "mc_rs": 0.0,
+                  "mc_pct": 0.0,
+                  "resultado_real": 14.95
+                },
+                "SAPAO": {
+                  "vol": 713,
+                  "fat": 64742.0,
+                  "custo": 0.0,
+                  "mc_rs": 0.0,
+                  "mc_pct": 0.0,
+                  "resultado_real": 20.45
+                },
+                "SUPERMERCADOS REX LTDA": {
+                  "vol": 2386,
+                  "fat": 193143.65,
+                  "custo": 0.0,
+                  "mc_rs": 0.0,
+                  "mc_pct": 0.0,
+                  "resultado_real": 10.94
+                },
+                "VAREJAO OBA": {
+                  "vol": 472,
+                  "fat": 74199.75,
+                  "custo": 0.0,
+                  "mc_rs": 0.0,
+                  "mc_pct": 0.0,
+                  "resultado_real": 29.94
+                }
+              },
+              "TOTAL": {
+                "vol": 52807,
+                "fat": 3577016.66,
+                "custo": 0.0,
+                "mc_rs": 0.0,
+                "mc_pct": 0.0,
+                "resultado_real": -3.43
+              }
+            },
+            "Juliana": {
+              "clientes": {
+                "ADAILSON BAHIA": {
+                  "vol": 0,
+                  "fat": 0.0,
+                  "custo": 0.0,
+                  "mc_rs": 0.0,
+                  "mc_pct": 0.0,
+                  "resultado_real": 0.0
+                },
+                "DADO BAHIA": {
+                  "vol": 0,
+                  "fat": 0.0,
+                  "custo": 0.0,
+                  "mc_rs": 0.0,
+                  "mc_pct": 0.0,
+                  "resultado_real": 0.0
+                },
+                "DHF - WHATSAPP": {
+                  "vol": 694,
+                  "fat": 33470.0,
+                  "custo": 0.0,
+                  "mc_rs": 0.0,
+                  "mc_pct": 0.0,
+                  "resultado_real": 9.99
+                },
+                "DOUGLAS LEMOS": {
+                  "vol": 211,
+                  "fat": 11013.0,
+                  "custo": 0.0,
+                  "mc_rs": 0.0,
+                  "mc_pct": 0.0,
+                  "resultado_real": 12.15
+                },
+                "ENTRE RIOS": {
+                  "vol": 1765,
+                  "fat": 116278.0,
+                  "custo": 0.0,
+                  "mc_rs": 0.0,
+                  "mc_pct": 0.0,
+                  "resultado_real": 11.89
+                },
+                "ESQUINAO": {
+                  "vol": 0,
+                  "fat": 0.0,
+                  "custo": 0.0,
+                  "mc_rs": 0.0,
+                  "mc_pct": 0.0,
+                  "resultado_real": 0.0
+                },
+                "FERNANDO SOARES": {
+                  "vol": 207,
+                  "fat": 12880.0,
+                  "custo": 0.0,
+                  "mc_rs": 0.0,
+                  "mc_pct": 0.0,
+                  "resultado_real": 15.29
+                },
+                "JOAOZINHO AMARANTINA": {
+                  "vol": 229,
+                  "fat": 17484.0,
+                  "custo": 0.0,
+                  "mc_rs": 0.0,
+                  "mc_pct": 0.0,
+                  "resultado_real": 13.37
+                },
+                "MATHEUS LINDEBERG": {
+                  "vol": 90,
+                  "fat": 4851.0,
+                  "custo": 0.0,
+                  "mc_rs": 0.0,
+                  "mc_pct": 0.0,
+                  "resultado_real": 8.99
+                },
+                "MOISES FURTADO": {
+                  "vol": 3,
+                  "fat": 120.0,
+                  "custo": 0.0,
+                  "mc_rs": 0.0,
+                  "mc_pct": 0.0,
+                  "resultado_real": 20.4
+                },
+                "NOVA ALIANCA": {
+                  "vol": 0,
+                  "fat": 0.0,
+                  "custo": 0.0,
+                  "mc_rs": 0.0,
+                  "mc_pct": 0.0,
+                  "resultado_real": 0.0
+                },
+                "POUPY DISTRIBUIDORA": {
+                  "vol": 1017,
+                  "fat": 57470.0,
+                  "custo": 0.0,
+                  "mc_rs": 0.0,
+                  "mc_pct": 0.0,
+                  "resultado_real": 11.45
+                },
+                "RENILSON BAHIA": {
+                  "vol": 308,
+                  "fat": 21150.0,
+                  "custo": 0.0,
+                  "mc_rs": 0.0,
+                  "mc_pct": 0.0,
+                  "resultado_real": 9.08
+                },
+                "SITIO NATURA": {
+                  "vol": 820,
+                  "fat": 46160.0,
+                  "custo": 0.0,
+                  "mc_rs": 0.0,
+                  "mc_pct": 0.0,
+                  "resultado_real": 10.03
+                },
+                "TEREZINHA": {
+                  "vol": 249,
+                  "fat": 20570.0,
+                  "custo": 0.0,
+                  "mc_rs": 0.0,
+                  "mc_pct": 0.0,
+                  "resultado_real": 18.25
+                },
+                "UBERABA": {
+                  "vol": 0,
+                  "fat": 0.0,
+                  "custo": 0.0,
+                  "mc_rs": 0.0,
+                  "mc_pct": 0.0,
+                  "resultado_real": 0.0
+                },
+                "VALTERLI": {
+                  "vol": 199,
+                  "fat": 13780.0,
+                  "custo": 0.0,
+                  "mc_rs": 0.0,
+                  "mc_pct": 0.0,
+                  "resultado_real": 9.47
+                }
+              },
+              "TOTAL": {
+                "vol": 9712,
+                "fat": 629676.25,
+                "custo": 0.0,
+                "mc_rs": 0.0,
+                "mc_pct": 0.0,
+                "resultado_real": 1.33
+              }
+            }
+          }
+        },
+        "meta": {
+          "AFANAIS": {
+            "ABC ADICAO": {
+              "vol": null,
+              "fat": 1300000.0,
+              "margem": 0.15
+            },
+            "ALISSON CARATINGA": {
+              "vol": null,
+              "fat": 120000.0,
+              "margem": 0.15
+            },
+            "BAIAO E PIRES": {
+              "vol": null,
+              "fat": 50000.0,
+              "margem": 0.15
+            },
+            "CATALAO": {
+              "vol": null,
+              "fat": 100000.0,
+              "margem": 0.15
+            },
+            "DARIO": {
+              "vol": null,
+              "fat": 70000.0,
+              "margem": 0.15
+            },
+            "ECONOMART": {
+              "vol": null,
+              "fat": 200000.0,
+              "margem": 0.15
+            },
+            "HERCULANO": {
+              "vol": null,
+              "fat": 150000.0,
+              "margem": 0.15
+            },
+            "JOSE PEREIRA DE SOUZA": {
+              "vol": null,
+              "fat": 250000.0,
+              "margem": 0.15
+            },
+            "MART MINAS": {
+              "vol": null,
+              "fat": 3000000.0,
+              "margem": 0.15
+            },
+            "NOVO HORIZONTE": {
+              "vol": null,
+              "fat": 200000.0,
+              "margem": 0.15
+            },
+            "SO BANANAS": {
+              "vol": null,
+              "fat": 350000.0,
+              "margem": 0.15
+            },
+            "TONINHO BOY": {
+              "vol": null,
+              "fat": 70000.0,
+              "margem": 0.15
+            },
+            "VERA CRUZ": {
+              "vol": null,
+              "fat": 130000.0,
+              "margem": 0.15
+            }
+          },
+          "DORA": {
+            "ADELIO CROL": {
+              "vol": null,
+              "fat": 120000.0,
+              "margem": 0.15
+            },
+            "ANDRE MACHACALIS": {
+              "vol": null,
+              "fat": 60000.0,
+              "margem": 0.15
+            },
+            "CARLOS MAGNO / WHATSAPP": {
+              "vol": null,
+              "fat": 120000.0,
+              "margem": 0.15
+            },
+            "ELIZEU TEIXEIRA / WHATSAPP": {
+              "vol": null,
+              "fat": 100000.0,
+              "margem": 0.15
+            },
+            "FLAVIO VENEZA": {
+              "vol": null,
+              "fat": 30000.0,
+              "margem": 0.15
+            },
+            "GATINHO": {
+              "vol": null,
+              "fat": 70000.0,
+              "margem": 0.15
+            },
+            "GOMES & SANTOS JUIZ DE FORA": {
+              "vol": null,
+              "fat": 40000.0,
+              "margem": 0.15
+            },
+            "KAKA": {
+              "vol": null,
+              "fat": 20000.0,
+              "margem": 0.15
+            },
+            "MARCELO CARATINGA": {
+              "vol": null,
+              "fat": 40000.0,
+              "margem": 0.15
+            },
+            "NATURAL DA TERRA": {
+              "vol": null,
+              "fat": 50000.0,
+              "margem": 0.15
+            },
+            "CLIMERIO": {
+              "vol": null,
+              "fat": null,
+              "margem": 0.15
+            }
+          },
+          "FARLEY": {
+            "ABC CAMPEAO /CAMINHAO/WHATSSAP": {
+              "vol": null,
+              "fat": null,
+              "margem": 0.15
+            },
+            "ADELSON BOY": {
+              "vol": null,
+              "fat": null,
+              "margem": 0.15
+            },
+            "ATACADO VITORIA MINAS": {
+              "vol": null,
+              "fat": null,
+              "margem": 0.15
+            },
+            "BENASSI": {
+              "vol": null,
+              "fat": null,
+              "margem": 0.15
+            },
+            "CARRANCA": {
+              "vol": null,
+              "fat": null,
+              "margem": 0.15
+            },
+            "ESQUINAO": {
+              "vol": null,
+              "fat": null,
+              "margem": 0.15
+            },
+            "GATINHO BARBACENA": {
+              "vol": null,
+              "fat": null,
+              "margem": 0.15
+            },
+            "LOSCHI": {
+              "vol": null,
+              "fat": null,
+              "margem": 0.15
+            },
+            "MAC": {
+              "vol": null,
+              "fat": null,
+              "margem": 0.15
+            },
+            "MERCANTIL BASTOS": {
+              "vol": null,
+              "fat": null,
+              "margem": 0.15
+            },
+            "NATURAL DA TERRA": {
+              "vol": null,
+              "fat": null,
+              "margem": 0.15
+            },
+            "OLS ANDRADAS - WHATSAPP": {
+              "vol": null,
+              "fat": null,
+              "margem": 0.15
+            },
+            "OPA": {
+              "vol": null,
+              "fat": null,
+              "margem": 0.15
+            },
+            "PAULO JUIZ DE FORA": {
+              "vol": null,
+              "fat": null,
+              "margem": 0.15
+            },
+            "SACOLAO CASTELO": {
+              "vol": null,
+              "fat": null,
+              "margem": 0.15
+            },
+            "SACOLAO MAXIMO - JARDIM CANADA": {
+              "vol": null,
+              "fat": null,
+              "margem": 0.15
+            },
+            "SANTOS E OLIVEIRA SUPERM.": {
+              "vol": null,
+              "fat": null,
+              "margem": 0.15
+            },
+            "SUPER SO": {
+              "vol": null,
+              "fat": null,
+              "margem": 0.15
+            },
+            "TRES IRMAOS": {
+              "vol": null,
+              "fat": null,
+              "margem": 0.15
+            },
+            "VERDE MINAS": {
+              "vol": null,
+              "fat": null,
+              "margem": 0.15
+            },
+            "VILLEFORT ATACADISTA - CD": {
+              "vol": null,
+              "fat": null,
+              "margem": 0.15
+            }
+          },
+          "LUCA": {
+            "APOIO MINEIRO / MANUAL E WHATSAPP": {
+              "vol": null,
+              "fat": 550000.0,
+              "margem": 0.15
+            },
+            "ECONOMART": {
+              "vol": null,
+              "fat": 200000.0,
+              "margem": 0.15
+            },
+            "EPA": {
+              "vol": null,
+              "fat": 20000.0,
+              "margem": 0.15
+            },
+            "FRIOS RAMOS/ WHATSAPP": {
+              "vol": null,
+              "fat": 35000.0,
+              "margem": 0.15
+            },
+            "SUPER LUNA/ WHATSAPP": {
+              "vol": null,
+              "fat": 650000.0,
+              "margem": 0.15
+            },
+            "PAIS E FILHOS": {
+              "vol": null,
+              "fat": 350000.0,
+              "margem": 0.15
+            }
+          },
+          "REGINALDO": {
+            "BONFIM": {
+              "vol": null,
+              "fat": 500000.0,
+              "margem": 0.15
+            },
+            "BRIXX": {
+              "vol": null,
+              "fat": 400000.0,
+              "margem": 0.15
+            },
+            "CAMPONES": {
+              "vol": null,
+              "fat": 80000.0,
+              "margem": 0.15
+            },
+            "ENESIO": {
+              "vol": null,
+              "fat": 50000.0,
+              "margem": 0.15
+            },
+            "EPA CD": {
+              "vol": null,
+              "fat": 700000.0,
+              "margem": 0.15
+            },
+            "LEGOMES": {
+              "vol": null,
+              "fat": 100000.0,
+              "margem": 0.15
+            },
+            "PATRICIA HORTSUL": {
+              "vol": null,
+              "fat": 300000.0,
+              "margem": 0.15
+            },
+            "RR LEGUMES": {
+              "vol": null,
+              "fat": 35000.0,
+              "margem": 0.15
+            },
+            "VILMA": {
+              "vol": null,
+              "fat": 25000.0,
+              "margem": 0.15
+            }
+          },
+          "RONISTONIS": {
+            "BH SUPERMERCADO": {
+              "vol": null,
+              "fat": 1000000.0,
+              "margem": 0.15
+            },
+            "BIG MAIS SUPERMERCADO / WHATSAPP": {
+              "vol": null,
+              "fat": 450000.0,
+              "margem": 0.15
+            },
+            "BRIXX": {
+              "vol": null,
+              "fat": 500000.0,
+              "margem": 0.15
+            },
+            "ENESIO": {
+              "vol": null,
+              "fat": 180000.0,
+              "margem": 0.15
+            },
+            "EPA CD": {
+              "vol": null,
+              "fat": 200000.0,
+              "margem": 0.15
+            },
+            "EXPERFRUT": {
+              "vol": null,
+              "fat": 400000.0,
+              "margem": 0.15
+            },
+            "FRUTAS BARBACENA- JUIZ DE FORA": {
+              "vol": null,
+              "fat": 250000.0,
+              "margem": 0.15
+            },
+            "HERBERT / WHATSAPP": {
+              "vol": null,
+              "fat": 150000.0,
+              "margem": 0.15
+            },
+            "HORTIFARIA": {
+              "vol": null,
+              "fat": 250000.0,
+              "margem": 0.15
+            },
+            "JOSE ONOFRE": {
+              "vol": null,
+              "fat": 150000.0,
+              "margem": 0.15
+            },
+            "MAGNOLI": {
+              "vol": null,
+              "fat": null,
+              "margem": 0.15
+            },
+            "NL CD": {
+              "vol": null,
+              "fat": 130000.0,
+              "margem": 0.15
+            },
+            "RAFAEL SOARES MATRIZ": {
+              "vol": null,
+              "fat": 100000.0,
+              "margem": 0.15
+            },
+            "SAPAO": {
+              "vol": null,
+              "fat": 100000.0,
+              "margem": 0.15
+            },
+            "SUPERMERCADOS REX LTDA": {
+              "vol": null,
+              "fat": 250000.0,
+              "margem": 0.15
+            },
+            "VAREJAO OBA": {
+              "vol": null,
+              "fat": 120000.0,
+              "margem": 0.15
+            }
+          },
+          "JULIANA": {
+            "ADAILSON BAHIA": {
+              "vol": null,
+              "fat": null,
+              "margem": 0.15
+            },
+            "DADO BAHIA": {
+              "vol": null,
+              "fat": null,
+              "margem": 0.15
+            },
+            "DHF - WHATSAPP": {
+              "vol": null,
+              "fat": null,
+              "margem": 0.15
+            },
+            "DOUGLAS LEMOS": {
+              "vol": null,
+              "fat": null,
+              "margem": 0.15
+            },
+            "ENTRE RIOS": {
+              "vol": null,
+              "fat": null,
+              "margem": 0.15
+            },
+            "ESQUINAO": {
+              "vol": null,
+              "fat": null,
+              "margem": 0.15
+            },
+            "FERNANDO SOARES": {
+              "vol": null,
+              "fat": null,
+              "margem": 0.15
+            },
+            "JOAOZINHO AMARANTINA": {
+              "vol": null,
+              "fat": null,
+              "margem": 0.15
+            },
+            "MATHEUS LINDEBERG": {
+              "vol": null,
+              "fat": null,
+              "margem": 0.15
+            },
+            "MOISES FURTADO": {
+              "vol": null,
+              "fat": null,
+              "margem": 0.15
+            },
+            "NOVA ALIANCA": {
+              "vol": null,
+              "fat": null,
+              "margem": 0.15
+            },
+            "POUPY DISTRIBUIDORA": {
+              "vol": null,
+              "fat": null,
+              "margem": 0.15
+            },
+            "RENILSON BAHIA": {
+              "vol": null,
+              "fat": null,
+              "margem": 0.15
+            },
+            "SITIO NATURA": {
+              "vol": null,
+              "fat": null,
+              "margem": 0.15
+            },
+            "TEREZINHA": {
+              "vol": null,
+              "fat": null,
+              "margem": 0.15
+            },
+            "UBERABA": {
+              "vol": null,
+              "fat": null,
+              "margem": 0.15
+            },
+            "VALTERLI": {
+              "vol": null,
+              "fat": null,
+              "margem": 0.15
+            }
+          }
+        }
+      }
+    }
+  },
+  "history": []
+}
