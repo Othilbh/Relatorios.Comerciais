@@ -24,6 +24,7 @@ import calc
 import rentabilidade as rent
 import produtos as prod
 import resumo_matriz
+import marcas_fornecedor as mf
 from xlsx_vendedor_cliente import VENDOR_TAB, _normalize
 
 MOD_RELATORIO_DIARIO = 'relatorio_diario'
@@ -2893,11 +2894,14 @@ def _render_produtos_resumo():
     st.header('📦 Relatórios de Produtos — Resumo')
     st.caption('Visão consolidada para a Gerência (reaproveita o mesmo motor de cálculo do módulo '
                'completo -- nenhuma lógica de faturamento/volume foi duplicada aqui).')
-    try:
-        st.page_link('pages/7_Relatorios_Produtos_OTHIL.py',
-                      label='Abrir módulo completo (filtros, rankings, matrizes, histórico) →', icon='📦')
-    except Exception:
-        pass
+    # O link que existia aqui pro "módulo completo" (filtros/rankings/
+    # matrizes/histórico) foi removido em 02/09/2026: aquele conteúdo em
+    # pages/7_Relatorios_Produtos_OTHIL.py nunca chegava a ficar visível
+    # (bloqueado por acesso.parar_se_upload(), política de upload de
+    # 27/08/2026) e foi removido junto com a renomeação daquela página pra
+    # "Resultado de Produtos" (pedido da Ingrid -- ver marcas_fornecedor.py
+    # e a aba "🏷️ Marca/Fornecedor" logo abaixo, que é o que passou a viver
+    # ali). Este resumo aqui é independente disso e continua igual.
 
     itens_base, avisos = prod.carregar_base_consolidada()
     if not itens_base:
@@ -2985,6 +2989,142 @@ def _render_produtos_resumo():
             st.markdown(f"{icone} **{a['tipo']}** — {a['detalhe']}")
         if len(alertas) > 5:
             st.caption(f'+ {len(alertas) - 5} outro(s) ponto(s) de atenção. Veja o módulo completo para a lista inteira.')
+
+
+# ── Marca/Fornecedor ─────────────────────────────────────────────────────────
+# Pedido da Ingrid, 02/09/2026: reunião comercial do 1º sábado do mês pra
+# discutir fornecedores. Upload dos PDFs mensais ("Resumo do Estoque",
+# Vendas+Bonificação e Quebra) é feito em Resultado de Produtos, NUNCA
+# aqui -- pedido explícito dela ("TODAS as opções que forem fazer upload,
+# o upload é feito no módulo e não na gerência"). Toda a classificação por
+# marca e o ajuste de +15pp vêm de marcas_fornecedor.py (não duplicados
+# aqui). Comparação com o mês anterior usa o mês anterior QUE TEM DADO
+# publicado (não necessariamente o mês civil anterior -- pode faltar um
+# mês se ela esquecer de enviar), mesmo espírito de outras comparações do
+# app que lidam com meses sem dado.
+
+def _render_marca_fornecedor():
+    st.header('🏷️ Resultado por Marca/Fornecedor')
+    st.caption('Base: PDFs "Resumo do Estoque" (Vendas+Bonificação e Quebra) enviados mensalmente em '
+               '**Resultado de Produtos**. Margem com o mesmo ajuste de +15pp usado no resto do app.')
+
+    meses = mf.meses_disponiveis()
+    if not meses:
+        st.info('Nenhum Resumo do Estoque enviado ainda.')
+        st.page_link('pages/7_Relatorios_Produtos_OTHIL.py',
+                      label='Ir para Resultado de Produtos →', icon='📦')
+        return
+
+    mes_sel = st.selectbox('Mês', meses, format_func=lambda m: periodo_mod.rotulo('mensal', m),
+                            key='mf_mes_sel')
+    itens_v, itens_q = mf.carregar_mes(mes_sel)
+    if not itens_v and not itens_q:
+        st.info(f'Nenhum dado publicado para {periodo_mod.rotulo("mensal", mes_sel)}.')
+        return
+    if not itens_v:
+        st.warning('Só a Quebra foi enviada neste mês -- faturamento/custo de Vendas ficam zerados '
+                   'até o PDF de Vendas+Bonificação ser enviado.')
+    elif not itens_q:
+        st.caption('Quebra ainda não enviada neste mês.')
+
+    marcas_cad = mp.carregar_marcas()
+    resultado = mf.agregar_por_marca(itens_v, itens_q, marcas_cad)
+    marcas = resultado['marcas']
+    sem_v = resultado['sem_marca_vendas']
+    sem_q = resultado['sem_marca_quebra']
+
+    # mês anterior COM dado (vendas ou quebra), pra comparação -- pode não
+    # ser o mês civil anterior se ela pulou algum envio.
+    idx = meses.index(mes_sel)
+    resultado_ant = None
+    mes_ant = None
+    for candidato in meses[idx + 1:]:
+        iv_a, iq_a = mf.carregar_mes(candidato)
+        if iv_a or iq_a:
+            mes_ant = candidato
+            resultado_ant = mf.agregar_por_marca(iv_a, iq_a, marcas_cad)
+            break
+
+    fat_marcas = sum(d['faturamento'] for d in marcas.values())
+    custo_marcas = sum(d['custo'] for d in marcas.values())
+    sem_v_valor = sum(d['valor'] for d in sem_v.values())
+    sem_v_custo = sum(d['custo'] for d in sem_v.values())
+    grand_fat = fat_marcas + sem_v_valor
+    grand_custo = custo_marcas + sem_v_custo
+    resultado_real_geral = ((grand_fat - grand_custo) / grand_custo * 100 + mf.AJUSTE_RESULTADO_REAL_PP
+                             ) if grand_custo else 0.0
+
+    fat_ant = None
+    if resultado_ant:
+        sv_ant = resultado_ant['sem_marca_vendas']
+        fat_ant = (sum(d['faturamento'] for d in resultado_ant['marcas'].values())
+                   + sum(d['valor'] for d in sv_ant.values()))
+
+    c1, c2, c3, c4 = st.columns(4)
+    comp_fat = comparativo.calcular(grand_fat, fat_ant) if resultado_ant else None
+    c1.metric('Faturamento (Vendas)', _brl_vc(grand_fat),
+              delta=comparativo.formatar_variacao(comp_fat) if comp_fat else None)
+    c2.metric('Resultado Real geral', f"{resultado_real_geral:.2f}".replace('.', ',') + '%')
+    c3.metric('Marcas com movimento', len(marcas))
+    pct_sem_marca = (sem_v_valor / grand_fat * 100) if grand_fat else 0.0
+    c4.metric('Faturamento sem marca', f"{pct_sem_marca:.1f}".replace('.', ',') + '%')
+    st.caption(f"Comparando com {periodo_mod.rotulo('mensal', mes_ant)}." if mes_ant else
+               'Sem mês anterior publicado pra comparar ainda.')
+
+    if not marcas:
+        st.info('Nenhuma marca reconhecida neste mês.')
+        return
+
+    linhas = [{
+        'Marca': nome, 'CX': d['cx'], 'Faturamento': d['faturamento'], 'Custo': d['custo'],
+        'MC R$': d['mc_rs'], 'Resultado Real %': d['resultado_real_pct'],
+        'Quebra CX': d['quebra_cx'], 'Quebra R$': d['quebra_rs'],
+    } for nome, d in marcas.items()]
+    linhas.sort(key=lambda r: -r['Faturamento'])
+
+    df_fmt = pd.DataFrame(linhas)
+    df_fmt['CX'] = df_fmt['CX'].apply(lambda v: _num_vc(v, 0))
+    df_fmt['Faturamento'] = df_fmt['Faturamento'].apply(_brl_vc)
+    df_fmt['Custo'] = df_fmt['Custo'].apply(_brl_vc)
+    df_fmt['MC R$'] = df_fmt['MC R$'].apply(_brl_vc)
+    df_fmt['Resultado Real %'] = df_fmt['Resultado Real %'].apply(lambda v: f"{v:.2f}".replace('.', ',') + '%')
+    df_fmt['Quebra CX'] = df_fmt['Quebra CX'].apply(lambda v: _num_vc(v, 0))
+    df_fmt['Quebra R$'] = df_fmt['Quebra R$'].apply(_brl_vc)
+    st.dataframe(df_fmt, use_container_width=True, hide_index=True)
+
+    st.markdown('**🔎 Detalhe por marca**')
+    nomes_marcas = [r['Marca'] for r in linhas]
+    marca_sel = st.selectbox('Marca', nomes_marcas, key='mf_marca_sel')
+    if marca_sel:
+        produtos_marca = marcas[marca_sel]['produtos']
+        linhas_p = [{
+            'Produto': prod_nome, 'CX': _num_vc(pdet['cx'], 0), 'Faturamento': _brl_vc(pdet['faturamento']),
+            'Custo': _brl_vc(pdet['custo']), 'MC R$': _brl_vc(pdet['mc_rs']),
+            'Resultado Real %': f"{pdet['resultado_real_pct']:.2f}".replace('.', ',') + '%',
+            'Quebra CX': _num_vc(pdet['quebra_cx'], 0), 'Quebra R$': _brl_vc(pdet['quebra_rs']),
+        } for prod_nome, pdet in sorted(produtos_marca.items(), key=lambda kv: -kv[1]['faturamento'])]
+        st.dataframe(pd.DataFrame(linhas_p), use_container_width=True, hide_index=True)
+
+    if sem_v or sem_q:
+        with st.expander(f'⚠️ {len(sem_v)} produto(s) de Vendas e {len(sem_q)} de Quebra sem marca reconhecida'):
+            st.caption('Não bateram com nenhuma marca do **Cadastro de Marcas** nem com as unificações '
+                       'manuais já pedidas (Itaueira, Vitória, Thompson, Mamão, Kiwi Importado, Pimentão, '
+                       'Tâmara, Red Globe, Mirtilo). Cadastre a marca ou peça mais uma unificação se for o caso.')
+            if sem_v:
+                st.caption(f'Vendas -- top produtos por faturamento (R$ {_num_vc(sem_v_valor, 0)} no total):')
+                top_sv = sorted(sem_v.items(), key=lambda kv: -kv[1]['valor'])[:15]
+                st.dataframe(pd.DataFrame([
+                    {'Produto': p, 'CX': _num_vc(d['cx'], 0), 'Faturamento': _brl_vc(d['valor'])}
+                    for p, d in top_sv
+                ]), use_container_width=True, hide_index=True)
+            if sem_q:
+                sem_q_custo = sum(d['custo'] for d in sem_q.values())
+                st.caption(f'Quebra -- top produtos por custo (R$ {_num_vc(sem_q_custo, 0)} no total):')
+                top_sq = sorted(sem_q.items(), key=lambda kv: -kv[1]['custo'])[:15]
+                st.dataframe(pd.DataFrame([
+                    {'Produto': p, 'CX': _num_vc(d['cx'], 0), 'Custo': _brl_vc(d['custo'])}
+                    for p, d in top_sq
+                ]), use_container_width=True, hide_index=True)
 
 
 def _render_recorrencia_resumo():
@@ -3169,9 +3309,10 @@ with grp_top_dashboards:
 
 # ══ GRUPO: RESULTADOS ═════════════════════════════════════════════════════════
 with grp_top_resultados:
-    grp_rentabilidade, grp_produtos, grp_recorrencia = st.tabs([
+    grp_rentabilidade, grp_produtos, grp_marca_fornecedor, grp_recorrencia = st.tabs([
         '💰 Rentabilidade',
         '📦 Produtos',
+        '🏷️ Marca/Fornecedor',
         '🔄 Recorrência',
     ])
 
@@ -3182,6 +3323,10 @@ with grp_top_resultados:
     # ── PRODUTOS ──────────────────────────────────────────────────────────────
     with grp_produtos:
         _render_produtos_resumo()
+
+    # ── MARCA/FORNECEDOR ─────────────────────────────────────────────────────
+    with grp_marca_fornecedor:
+        _render_marca_fornecedor()
 
     # ── RECORRÊNCIA ───────────────────────────────────────────────────────────
     with grp_recorrencia:
