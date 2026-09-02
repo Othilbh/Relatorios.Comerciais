@@ -2574,29 +2574,75 @@ def _render_metas_gerais():
         if not vendedores_mg:
             st.info('Sem dado de vendedores para este período ainda.')
         else:
+            # On Track por vendedor (Faturamento e Margem) -- pedido explícito
+            # da Ingrid, 02/09/2026: "nos vendedores, também deve ter o
+            # ontrack, faturamento e margem", no Ranking e no Detalhe (os dois).
+            #   Faturamento: contra a meta fixa INDIVIDUAL de cada vendedor
+            #   (mg.carregar_metas_vendedores -- a mesma meta configurada mais
+            #   abaixo em "🎯 Definir/editar meta fixa de Faturamento por
+            #   vendedor"; só existe pra tipo_mg 'mensal', então em
+            #   trimestral/semestral/anual aparece "sem meta").
+            #   Margem: NÃO existe meta de margem individual por vendedor --
+            #   só a meta de Margem da EMPRESA (meta_atual['margem_pct']).
+            #   Decisão explícita da Ingrid quando perguntada (02/09/2026):
+            #   "Compara" -- cada vendedor é comparado contra essa mesma meta
+            #   única da empresa, sem precisar cadastrar nada novo por
+            #   vendedor.
+            # OBS: v['mc_pct'] aqui é a margem BRUTA do vendedor (fat-custo)/
+            # custo, sem o ajuste "+15pp Resultado Real" que a margem da
+            # EMPRESA (rv['margem_pct'], usada na meta) já tem (ver
+            # metas_gerais.realizado_vendas) -- mesma base que a coluna
+            # "Margem %" já mostrava antes desta mudança no Ranking/Detalhe,
+            # não é um cálculo novo. Por isso o % da meta batido aqui pode
+            # ficar sistematicamente abaixo do que apareceria se a mesma
+            # correção fosse aplicada -- vale conferir com a Ingrid se algum
+            # dia isso causar estranheza.
+            _metas_vend_ot = mg.carregar_metas_vendedores(tipo_mg, ref_mg)
+
+            def _ontrack_vendedor(nome_v, v_dados):
+                _meta_fat_v = _metas_vend_ot.get(nome_v)
+                _ot_fat_v = on_track.calcular(_meta_fat_v or 0, v_dados.get('fat'), tipo_mg, ref_mg,
+                                               pct_tempo_decorrido=pct_tempo_mg)
+                _ot_marg_v = on_track.calcular(meta_atual.get('margem_pct') or 0, v_dados.get('mc_pct'),
+                                                tipo_mg, ref_mg, pct_tempo_decorrido=pct_tempo_mg)
+                return _ot_fat_v, _ot_marg_v
+
+            def _ontrack_txt(ot):
+                _pct = ot.get('pct_atingido')
+                return f"{ot['emoji']} {_pct * 100:.0f}%" if _pct is not None else f"{ot['emoji']} —"
+
             st.subheader('🏆 Ranking de Vendedores')
             ordenar_por = st.selectbox('Ordenar por', ['Faturamento', 'Volume (CX)', 'Margem %'],
                                         key='mg_rank_ordenar')
             fat_total_emp = sum(v.get('fat', 0) or 0 for v in vendedores_mg.values())
             rows_rank = []
             for nome, v in vendedores_mg.items():
+                _ot_fat_r, _ot_marg_r = _ontrack_vendedor(nome, v)
                 rows_rank.append({
                     'Vendedor': nome,
                     'Faturamento': v.get('fat', 0) or 0,
                     'Volume (CX)': v.get('vol', 0) or 0,
                     'Margem %': v.get('mc_pct', 0) or 0,
                     'Participação': (v.get('fat', 0) or 0) / fat_total_emp * 100 if fat_total_emp else 0,
+                    'On Track Faturamento': _ontrack_txt(_ot_fat_r),
+                    'On Track Margem': _ontrack_txt(_ot_marg_r),
                 })
             chave_ord = {'Faturamento': 'Faturamento', 'Volume (CX)': 'Volume (CX)', 'Margem %': 'Margem %'}[ordenar_por]
             rows_rank.sort(key=lambda r: r[chave_ord], reverse=True)
             for i, r in enumerate(rows_rank, start=1):
                 r['#'] = i
-            df_rank = pd.DataFrame(rows_rank)[['#', 'Vendedor', 'Faturamento', 'Volume (CX)', 'Margem %', 'Participação']]
+            df_rank = pd.DataFrame(rows_rank)[['#', 'Vendedor', 'Faturamento', 'Volume (CX)', 'Margem %',
+                                                'Participação', 'On Track Faturamento', 'On Track Margem']]
             styled_rank = df_rank.style.format({
                 'Faturamento': lambda v: f"R$ {_num_vc(v, 2)}", 'Volume (CX)': lambda v: _num_vc(v, 3),
                 'Margem %': '{:.2f}%', 'Participação': '{:.1f}%',
             })
             st.dataframe(styled_rank, use_container_width=True, hide_index=True)
+            st.caption(
+                '"On Track Faturamento" compara com a meta fixa individual de cada vendedor '
+                '(definida mais abaixo); "On Track Margem" compara com a meta de Margem da '
+                'empresa (não existe meta de margem individual por vendedor).'
+            )
 
             # Drill-down individual
             st.divider()
@@ -2611,6 +2657,30 @@ def _render_metas_gerais():
                        f"{(v_sel.get('fat', 0) / fat_total_emp * 100) if fat_total_emp else 0:.1f}%")
             # Comparativo vs período anterior removido a pedido explícito da
             # Ingrid em 26/08/2026 ("remover completamente").
+
+            st.markdown('<div style="height:0.6rem;"></div>', unsafe_allow_html=True)
+            _ot_fat_sel, _ot_marg_sel = _ontrack_vendedor(vend_sel_mg, v_sel)
+            _dcol_fat_sel, _dcol_marg_sel = st.columns(2)
+            with _dcol_fat_sel:
+                _fat_sel_txt = (f"{_ot_fat_sel['pct_atingido'] * 100:.0f}% da meta"
+                                 if _ot_fat_sel['pct_atingido'] is not None else '—')
+                _meta_fat_sel = _metas_vend_ot.get(vend_sel_mg)
+                if _meta_fat_sel:
+                    _fat_sel_det = f"R$ {_num_vc(v_sel.get('fat', 0), 0)} de R$ {_num_vc(_meta_fat_sel, 0)}"
+                else:
+                    _fat_sel_det = 'Meta individual de Faturamento não definida'
+                _badge_indicador_simples(_ot_fat_sel['status'], '💰 Faturamento (On Track)',
+                                          _fat_sel_txt, _fat_sel_det)
+            with _dcol_marg_sel:
+                _marg_sel_txt = (f"{_ot_marg_sel['pct_atingido'] * 100:.0f}% da meta"
+                                  if _ot_marg_sel['pct_atingido'] is not None else '—')
+                if meta_atual.get('margem_pct'):
+                    _marg_sel_det = (f"{v_sel.get('mc_pct', 0):.1f}% de {meta_atual['margem_pct']:.1f}% "
+                                      f"de meta (meta da empresa)")
+                else:
+                    _marg_sel_det = 'Meta de Margem da empresa não definida'
+                _badge_indicador_simples(_ot_marg_sel['status'], '📊 Margem (On Track)',
+                                          _marg_sel_txt, _marg_sel_det)
 
         # ── OnTrack Semanal por Vendedor — quebra da meta MENSAL fixa dele ──
         # Fica FORA do if/else acima de propósito: precisa estar disponível
