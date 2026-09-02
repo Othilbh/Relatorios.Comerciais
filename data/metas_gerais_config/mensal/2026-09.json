@@ -6,16 +6,16 @@
     "periodo_ref": "2026-09",
     "data_referencia": "2026-09-02",
     "criado_em": "2026-09-02T12:10:21+00:00",
-    "atualizado_em": "2026-09-02T12:12:15+00:00",
+    "atualizado_em": "2026-09-02T12:12:31+00:00",
     "usuario": "Ingrid",
-    "versao": 2,
+    "versao": 3,
     "valores": {
       "faturamento": 18000000.0,
       "volume": 0.0,
       "margem_pct": 13.5,
       "quebra_max_cx": 0.0,
-      "quebra_max_rs": null,
-      "quebra_max_pct": null
+      "quebra_max_rs": 108000.0,
+      "quebra_max_pct": 0.6
     }
   },
   "history": [
@@ -33,6 +33,25 @@
         "faturamento": 18000000.0,
         "volume": 0.0,
         "margem_pct": 0.0,
+        "quebra_max_cx": 0.0,
+        "quebra_max_rs": null,
+        "quebra_max_pct": null
+      }
+    },
+    {
+      "id": "efa4ebac-b1f7-49d8-a149-c4535ddab107",
+      "modulo_origem": "metas_gerais_config",
+      "tipo_periodo": "mensal",
+      "periodo_ref": "2026-09",
+      "data_referencia": "2026-09-02",
+      "criado_em": "2026-09-02T12:10:21+00:00",
+      "atualizado_em": "2026-09-02T12:12:15+00:00",
+      "usuario": "Ingrid",
+      "versao": 2,
+      "valores": {
+        "faturamento": 18000000.0,
+        "volume": 0.0,
+        "margem_pct": 13.5,
         "quebra_max_cx": 0.0,
         "quebra_max_rs": null,
         "quebra_max_pct": null
