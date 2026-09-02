@@ -445,8 +445,11 @@ def publicar_quebra_pdf(mes_ref: str, pdf_file, usuario: str = None) -> dict:
 
 
 def realizado_vendas(tipo_periodo: str, periodo_ref: str) -> dict:
-    """{faturamento, volume, margem_pct, vendedores: {nome: {fat,vol,custo,mc_rs,mc_pct}},
+    """{faturamento, volume, margem_pct,
+    vendedores: {nome: {fat,vol,custo,mc_rs,mc_pct,resultado_real}},
     completude: 'completo'|'parcial'|'sem_dado'|'erro_leitura', erro_leitura, origem}.
+    resultado_real = mc_pct + 15pp (mesma base do margem_pct da empresa, que
+    já é "Resultado Real" -- ver comentário mais abaixo).
 
     Meta Geral é independente de Metas Semanais E de Vendedor-Cliente —
     cobre apenas mensal, trimestral, semestral e anual, agregando por mês
@@ -482,6 +485,17 @@ def realizado_vendas(tipo_periodo: str, periodo_ref: str) -> dict:
     for a in vend_agg.values():
         a['mc_rs']  = a['fat'] - a['custo']
         a['mc_pct'] = (a['mc_rs'] / a['custo'] * 100) if a['custo'] else 0.0
+        # Resultado Real = MC_PCT + 15pp -- mesmo ajuste de despesa
+        # administrativa aplicado à Margem da EMPRESA logo abaixo
+        # (margem_pct) e em todo o resto do app (parsers_vendedor._agg,
+        # dashboard_diario, xlsx_diario). Adicionado em 02/09/2026 a pedido
+        # explícito da Ingrid -- o On Track de Margem por vendedor
+        # (gerencia.py) compara contra a mesma meta de Margem da empresa,
+        # e essa meta é pensada/digitada na base "Resultado Real", não na
+        # margem bruta -- sem isso o % batido de cada vendedor saía
+        # sistematicamente 15pp mais apertado do que deveria. mc_pct (bruto)
+        # continua disponível como estava, sem alterar quem já lê esse campo.
+        a['resultado_real'] = round(a['mc_pct'] + 15, 2)
 
     if not meses_com_dado:
         # Só chama de "sem dado" quando a leitura foi CONCLUSIVA (confirmou
