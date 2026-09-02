@@ -43,9 +43,11 @@ from datetime import timedelta, date
 import periodo
 import on_track
 import data_store as ds
+import vendedores as vd
 
 MODULO_META = 'metas_gerais_config'
 MODULO_META_VENDEDORES = 'metas_gerais_config_vendedores'
+MODULO_VENDEDORES_ATIVOS = 'metas_gerais_vendedores_ativos'
 MODULO_PCTS_SEMANAIS = 'metas_gerais_pcts_semanais'
 PCTS_SEMANAIS_PADRAO = [30.0, 28.0, 25.0, 25.0]
 
@@ -122,6 +124,73 @@ def historico_meta(tipo_periodo: str, periodo_ref: str) -> list:
     o histórico versionado do data_store -- salvar uma meta nova nunca
     apaga a anterior, ela só passa a aparecer aqui."""
     return ds.load_history(MODULO_META, tipo_periodo, periodo_ref)
+
+
+# ---------------------------------------------------------------------------
+# Vendedores ativos -- lista de quem aparece no formulário de "Meta fixa
+# individual de Faturamento por vendedor" (gerencia.py). Editável pela
+# própria Ingrid (adicionar/remover), sem precisar de alteração de código --
+# pedido explícito dela, 02/09/2026: "já tem vendedores que não fazem mais
+# parte da equipe, assim como tem vendedores que precisamos acrescentar...
+# melhor criarmos um campo para adicionar e excluir". Cadastro GLOBAL (não
+# por período) -- é a equipe atual, não muda mês a mês -- mas versionado
+# como todo o resto via data_store (nada se perde, dá pra ver quem tirou/
+# adicionou quem e quando). Mesmo padrão de margem_produto.py:carregar_marcas
+# /salvar_marcas (persistência central + semente automática enquanto nunca
+# foi salvo).
+#
+# IMPORTANTE: esta lista só decide QUEM aparece no formulário de meta fixa
+# de Faturamento (Meta Geral). Não mexe no reconhecimento de vendedor nos
+# PDFs (vendedores.py/parsers_diario.py) nem nas Metas Semanais por produto
+# (calc.py:VENDEDORES_PADRAO) -- são cadastros independentes, de propósito
+# diferente, e não foram tocados.
+# ---------------------------------------------------------------------------
+
+def carregar_vendedores_ativos() -> list:
+    """Lista de vendedores (nomes) que aparecem no formulário de meta fixa
+    de Faturamento da Meta Geral. Se a Ingrid nunca editou esse cadastro
+    ainda, usa como semente a lista canônica de vendedores conhecida do
+    sistema (vendedores.VENDEDORES_TODOS), pra já vir preenchida com quem
+    já vende hoje."""
+    try:
+        reg = ds.load_current(MODULO_VENDEDORES_ATIVOS, 'global', 'lista')
+    except Exception:
+        reg = None
+    if reg and reg.get('valores', {}).get('vendedores'):
+        return list(reg['valores']['vendedores'])
+    return list(vd.VENDEDORES_TODOS)
+
+
+def salvar_vendedores_ativos(vendedores: list, usuario: str = None) -> dict:
+    """Salva a lista completa (substitui a anterior -- histórico de versões
+    antigas continua disponível via historico_vendedores_ativos). Normaliza
+    (remove espaços/duplicados, ignora nomes vazios) antes de gravar --
+    NÃO mexe nas metas já salvas de nenhum vendedor (mesmo um removido
+    daqui continua com o valor antigo em carregar_metas_vendedores até
+    a Ingrid salvar o formulário de metas de novo sem ele)."""
+    limpos, vistos = [], set()
+    for nome in vendedores:
+        nome_limpo = str(nome).strip()
+        if not nome_limpo:
+            continue
+        chave = nome_limpo.upper()
+        if chave in vistos:
+            continue
+        vistos.add(chave)
+        limpos.append(nome_limpo)
+    return ds.save_record(
+        modulo=MODULO_VENDEDORES_ATIVOS, tipo_periodo='global', periodo_ref='lista',
+        valores={'vendedores': limpos}, usuario=usuario,
+    )
+
+
+def historico_vendedores_ativos() -> list:
+    """Versões anteriores da lista de vendedores ativos (mais recente
+    primeiro), pra auditoria -- quem adicionou/removeu quem e quando."""
+    try:
+        return list(reversed(ds.load_history(MODULO_VENDEDORES_ATIVOS, 'global', 'lista')))
+    except Exception:
+        return []
 
 
 # ---------------------------------------------------------------------------
