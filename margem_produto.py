@@ -163,8 +163,21 @@ def historico_marcas() -> list:
 def marcas_no_produto(produto_nome: str, marcas: dict = None):
     """Lista as marcas cadastradas que aparecem como palavra (ou sequência
     de palavras) inteira dentro do nome do produto -- comparação por
-    limite de palavra (\\b), não substring solta, pra 'PP' não bater sozinho
-    dentro de outra palavra maior por acidente."""
+    limite de palavra, não substring solta, pra 'PP' não bater sozinho
+    dentro de outra palavra maior por acidente.
+
+    Usa (?<!\\w)...(?!\\w) em vez de \\b...\\b nas duas pontas -- \\b só marca
+    posição numa TRANSIÇÃO entre caractere de palavra e não-palavra, então
+    quando a marca cadastrada começa ou termina com um caractere que não é
+    letra/número (ex.: 'VIDA +', pedido real da Ingrid -- 02/09/2026: 'estão
+    cadastrados, porém constam como sem % administrativo cadastrado') o \\b
+    logo depois do '+' nunca fecha (não há transição de não-palavra pra
+    não-palavra), e a marca NUNCA é encontrada, mesmo digitada certinha no
+    cadastro. (?<!\\w)/(?!\\w) resolve isso -- exige só que o caractere
+    imediatamente antes/depois não seja letra/número (ou não exista, início/
+    fim da string), sem depender de uma transição específica -- continua
+    tendo exatamente o mesmo comportamento de antes pra marcas comuns
+    (só letras/números nas pontas, a grande maioria)."""
     if marcas is None:
         marcas = carregar_marcas()
     nome = (produto_nome or '').strip().upper()
@@ -175,23 +188,38 @@ def marcas_no_produto(produto_nome: str, marcas: dict = None):
         m_norm = str(m).strip().upper()
         if not m_norm:
             continue
-        if re.search(r'\b' + re.escape(m_norm) + r'\b', nome):
+        if re.search(r'(?<!\w)' + re.escape(m_norm) + r'(?!\w)', nome):
             achadas.append(m)
     return achadas
 
 
 def pct_admin(produto_nome: str, marcas: dict = None):
-    """Retorna (pct, encontrado). `encontrado=True` só quando exatamente
-    UMA marca cadastrada aparece no nome do produto. Nome sem nenhuma
-    marca reconhecida, ou ambíguo (mais de uma marca cadastrada aparece),
+    """Retorna (pct, encontrado). `encontrado=True` quando exatamente UMA
+    marca cadastrada aparece no nome do produto, OU quando mais de uma
+    aparece mas todas as outras são sub-frase inteira da mais ESPECÍFICA
+    (mais longa) -- ex.: 'PILGER' e 'TANGERINA PILGER' cadastradas juntas
+    (caso real, 02/09/2026): um produto 'TANGERINA PILGER GRAUDA' bate com
+    as duas, mas não é ambiguidade de verdade -- é a Ingrid tendo cadastrado
+    a mesma marca em dois níveis de detalhe (genérico + específico), e o
+    específico é o que soa mais correto. Nesse caso usa o % da mais longa.
+    Nome sem nenhuma marca reconhecida, ou com 2+ marcas que NÃO são
+    aninhadas entre si (marcas de verdade diferentes, não relacionadas),
     usa PADRAO_PCT e volta encontrado=False, pra ficar sinalizado no
-    dashboard Margem Real (nunca adivinha -- decisão explícita da Ingrid).
-    `marcas` é opcional -- passe o cadastro já carregado (carregar_marcas())
-    quando for chamar isso muitas vezes em loop, pra não ler a persistência
-    central a cada item; se omitido, carrega uma vez internamente."""
+    dashboard Margem Real (nunca adivinha nesse caso -- decisão explícita
+    da Ingrid). `marcas` é opcional -- passe o cadastro já carregado
+    (carregar_marcas()) quando for chamar isso muitas vezes em loop, pra
+    não ler a persistência central a cada item; se omitido, carrega uma vez
+    internamente."""
     if marcas is None:
         marcas = carregar_marcas()
     achadas = marcas_no_produto(produto_nome, marcas)
     if len(achadas) == 1:
         return float(marcas[achadas[0]]), True
+    if len(achadas) > 1:
+        mais_especifica = max(achadas, key=lambda a: len(str(a).strip()))
+        outras = [a for a in achadas if a != mais_especifica]
+        alvo = str(mais_especifica).strip().upper()
+        if all(re.search(r'(?<!\w)' + re.escape(str(a).strip().upper()) + r'(?!\w)', alvo)
+               for a in outras):
+            return float(marcas[mais_especifica]), True
     return PADRAO_PCT, False
