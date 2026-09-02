@@ -2624,11 +2624,68 @@ def _render_metas_gerais():
                 'da empresa) -- nunca é calculada como fatia da meta geral nem como soma '
                 'de outra coisa, você digita direto aqui.'
             )
+            # Cadastro de vendedores ativos -- pedido explícito da Ingrid,
+            # 02/09/2026: "já tem vendedores que não fazem mais parte da
+            # equipe, assim como tem vendedores que precisamos acrescentar...
+            # melhor criarmos um campo para adicionar e excluir". Antes essa
+            # lista vinha fixa de calc.VENDEDORES_PADRAO (só dava pra mudar
+            # editando código) -- agora é um cadastro editável e persistido
+            # (mg.carregar_vendedores_ativos/salvar_vendedores_ativos), mesmo
+            # padrão já usado em "Cadastro de Marcas"
+            # (pages/8_Cadastro_Produtos_OTHIL.py: st.data_editor com linhas
+            # dinâmicas + persistência central versionada). Essa lista só
+            # decide quem aparece no formulário de meta fixa logo abaixo --
+            # não mexe no reconhecimento de vendedor nos PDFs (vendedores.py)
+            # nem nas Metas Semanais por produto (calc.VENDEDORES_PADRAO),
+            # que continuam intocados.
+            with st.expander('👥 Vendedores ativos (adicionar / remover)'):
+                st.caption(
+                    'Edite direto na tabela: clique numa célula pra corrigir o nome, use o "+" '
+                    'no fim da tabela pra adicionar um vendedor novo, ou selecione uma linha e '
+                    'aperte a lixeira pra remover quem não faz mais parte da equipe. Remover '
+                    'aqui não apaga a meta antiga já salva dele -- só faz ele sumir do '
+                    'formulário abaixo na próxima vez que as metas forem salvas.'
+                )
+                if 'mg_vend_ativos_df' not in st.session_state:
+                    st.session_state['mg_vend_ativos_df'] = pd.DataFrame(
+                        {'Vendedor': mg.carregar_vendedores_ativos()}
+                    )
+                _df_vend_ativos_ed = st.data_editor(
+                    st.session_state['mg_vend_ativos_df'],
+                    num_rows='dynamic', use_container_width=True, hide_index=True,
+                    column_config={
+                        'Vendedor': st.column_config.TextColumn('Vendedor', required=True, width='large'),
+                    },
+                    key='mg_vend_ativos_editor',
+                )
+                st.session_state['mg_vend_ativos_df'] = _df_vend_ativos_ed
+                if st.button('💾 Salvar lista de vendedores', key='mg_btn_salvar_vend_ativos'):
+                    _nomes_novos_va = [str(n).strip() for n in _df_vend_ativos_ed['Vendedor'].tolist()
+                                        if str(n).strip()]
+                    _norm_va = [n.upper() for n in _nomes_novos_va]
+                    if len(set(_norm_va)) != len(_norm_va):
+                        _dups_va = sorted({n for n in _norm_va if _norm_va.count(n) > 1})
+                        st.error(
+                            f"Não salvei: nome(s) repetido(s) na tabela (mesmo nome, ignorando "
+                            f"maiúsculas/espaços): {', '.join(_dups_va)}. Corrija e tente de novo."
+                        )
+                    else:
+                        mg.salvar_vendedores_ativos(_nomes_novos_va,
+                                                     usuario=st.session_state.get('usuario_nome'))
+                        st.session_state.pop('mg_vend_ativos_df', None)
+                        st.success(f'Lista salva -- {len(_nomes_novos_va)} vendedor(es) ativo(s).')
+                        st.rerun()
+
             _metas_vend_atuais = mg.carregar_metas_vendedores(tipo_mg, ref_mg)
             with st.expander('🎯 Definir/editar meta fixa de Faturamento por vendedor'):
                 with st.form(key='mg_form_metas_vendedores'):
                     _novas_metas_vend = {}
-                    _nomes_vend_cfg = list(calc.VENDEDORES_PADRAO.keys())
+                    _nomes_vend_cfg = mg.carregar_vendedores_ativos()
+                    if not _nomes_vend_cfg:
+                        st.info(
+                            'Nenhum vendedor ativo cadastrado -- adicione ao menos um na seção '
+                            '"Vendedores ativos" acima.'
+                        )
                     _cols_mv = st.columns(4)
                     for _i, _nome_v in enumerate(_nomes_vend_cfg):
                         with _cols_mv[_i % 4]:
