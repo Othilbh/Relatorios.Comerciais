@@ -6,14 +6,14 @@
     "periodo_ref": "2026-09",
     "data_referencia": "2026-09-02",
     "criado_em": "2026-09-02T12:13:31+00:00",
-    "atualizado_em": "2026-09-02T12:13:40+00:00",
+    "atualizado_em": "2026-09-02T12:14:55+00:00",
     "usuario": "Ingrid",
-    "versao": 2,
+    "versao": 3,
     "valores": {
       "metas": {
         "Farley": 1500000.0,
         "Dora": 1050000.0,
-        "Afanais": 0.0,
+        "Afanais": 0.007,
         "Roni": 0.0,
         "Reginaldo": 0.0,
         "Luciano": 0.0,
@@ -37,6 +37,29 @@
         "metas": {
           "Farley": 1500000.0,
           "Dora": 0.00105,
+          "Afanais": 0.0,
+          "Roni": 0.0,
+          "Reginaldo": 0.0,
+          "Luciano": 0.0,
+          "Juliana": 0.0,
+          "Claudia": 0.0
+        }
+      }
+    },
+    {
+      "id": "bc9dc762-456d-40f8-b3a5-22ffcca9ea75",
+      "modulo_origem": "metas_gerais_config_vendedores",
+      "tipo_periodo": "mensal",
+      "periodo_ref": "2026-09",
+      "data_referencia": "2026-09-02",
+      "criado_em": "2026-09-02T12:13:31+00:00",
+      "atualizado_em": "2026-09-02T12:13:40+00:00",
+      "usuario": "Ingrid",
+      "versao": 2,
+      "valores": {
+        "metas": {
+          "Farley": 1500000.0,
+          "Dora": 1050000.0,
           "Afanais": 0.0,
           "Roni": 0.0,
           "Reginaldo": 0.0,
