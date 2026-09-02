@@ -85,7 +85,7 @@ pg = st.navigation(
             st.Page("pages/4_Quebra_OTHIL.py", title="Quebras", icon="📦"),
             st.Page("pages/5_Prevencao_Perdas_OTHIL.py", title="Prevenção de Perdas", icon="🚨"),
             st.Page("pages/6_Rentabilidade_Margens_OTHIL.py", title="Rentabilidade e Margens", icon="💰"),
-            st.Page("pages/7_Relatorios_Produtos_OTHIL.py", title="Relatórios de Produtos", icon="📈"),
+            st.Page("pages/7_Relatorios_Produtos_OTHIL.py", title="Resultado de Produtos", icon="📈"),
         ],
         "Administração": [
             st.Page("pages/gerencia.py", title="Gerência", icon="🔐"),
