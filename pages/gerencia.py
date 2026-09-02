@@ -2588,22 +2588,25 @@ def _render_metas_gerais():
             #   "Compara" -- cada vendedor é comparado contra essa mesma meta
             #   única da empresa, sem precisar cadastrar nada novo por
             #   vendedor.
-            # OBS: v['mc_pct'] aqui é a margem BRUTA do vendedor (fat-custo)/
-            # custo, sem o ajuste "+15pp Resultado Real" que a margem da
-            # EMPRESA (rv['margem_pct'], usada na meta) já tem (ver
-            # metas_gerais.realizado_vendas) -- mesma base que a coluna
-            # "Margem %" já mostrava antes desta mudança no Ranking/Detalhe,
-            # não é um cálculo novo. Por isso o % da meta batido aqui pode
-            # ficar sistematicamente abaixo do que apareceria se a mesma
-            # correção fosse aplicada -- vale conferir com a Ingrid se algum
-            # dia isso causar estranheza.
+            # IMPORTANTE: a Margem de cada vendedor usada aqui (Ranking,
+            # Detalhe e no On Track de Margem) é v['resultado_real']
+            # (= mc_pct + 15pp), NÃO v['mc_pct'] bruto -- pedido explícito da
+            # Ingrid, 02/09/2026 ("é para ter o ajuste de 15pp"), pra ficar
+            # na MESMA base da margem da EMPRESA (rv['margem_pct'], usada na
+            # meta -- já vinha com esse ajuste, ver metas_gerais.
+            # realizado_vendas) e do resto do app (parsers_vendedor._agg,
+            # dashboard_diario, xlsx_diario -- mesmo "+15pp de despesa
+            # administrativa" de sempre, não é um cálculo novo). Sem isso,
+            # comparar a margem crua do vendedor com a meta da empresa (que
+            # já é na base ajustada) subestimava o quanto ele bateu da meta.
             _metas_vend_ot = mg.carregar_metas_vendedores(tipo_mg, ref_mg)
 
             def _ontrack_vendedor(nome_v, v_dados):
                 _meta_fat_v = _metas_vend_ot.get(nome_v)
                 _ot_fat_v = on_track.calcular(_meta_fat_v or 0, v_dados.get('fat'), tipo_mg, ref_mg,
                                                pct_tempo_decorrido=pct_tempo_mg)
-                _ot_marg_v = on_track.calcular(meta_atual.get('margem_pct') or 0, v_dados.get('mc_pct'),
+                _ot_marg_v = on_track.calcular(meta_atual.get('margem_pct') or 0,
+                                                v_dados.get('resultado_real'),
                                                 tipo_mg, ref_mg, pct_tempo_decorrido=pct_tempo_mg)
                 return _ot_fat_v, _ot_marg_v
 
@@ -2622,7 +2625,7 @@ def _render_metas_gerais():
                     'Vendedor': nome,
                     'Faturamento': v.get('fat', 0) or 0,
                     'Volume (CX)': v.get('vol', 0) or 0,
-                    'Margem %': v.get('mc_pct', 0) or 0,
+                    'Margem %': v.get('resultado_real', 0) or 0,
                     'Participação': (v.get('fat', 0) or 0) / fat_total_emp * 100 if fat_total_emp else 0,
                     'On Track Faturamento': _ontrack_txt(_ot_fat_r),
                     'On Track Margem': _ontrack_txt(_ot_marg_r),
@@ -2652,7 +2655,7 @@ def _render_metas_gerais():
             dc1, dc2, dc3, dc4 = st.columns(4)
             dc1.metric('Faturamento', f"R$ {_num_vc(v_sel.get('fat', 0), 2)}")
             dc2.metric('Volume (CX)', f"{_num_vc(v_sel.get('vol', 0), 3)}")
-            dc3.metric('Margem %', f"{v_sel.get('mc_pct', 0):.2f}%")
+            dc3.metric('Margem %', f"{v_sel.get('resultado_real', 0):.2f}%")
             dc4.metric('Participação na empresa',
                        f"{(v_sel.get('fat', 0) / fat_total_emp * 100) if fat_total_emp else 0:.1f}%")
             # Comparativo vs período anterior removido a pedido explícito da
@@ -2675,8 +2678,8 @@ def _render_metas_gerais():
                 _marg_sel_txt = (f"{_ot_marg_sel['pct_atingido'] * 100:.0f}% da meta"
                                   if _ot_marg_sel['pct_atingido'] is not None else '—')
                 if meta_atual.get('margem_pct'):
-                    _marg_sel_det = (f"{v_sel.get('mc_pct', 0):.1f}% de {meta_atual['margem_pct']:.1f}% "
-                                      f"de meta (meta da empresa)")
+                    _marg_sel_det = (f"{v_sel.get('resultado_real', 0):.1f}% de "
+                                      f"{meta_atual['margem_pct']:.1f}% de meta (meta da empresa)")
                 else:
                     _marg_sel_det = 'Meta de Margem da empresa não definida'
                 _badge_indicador_simples(_ot_marg_sel['status'], '📊 Margem (On Track)',
