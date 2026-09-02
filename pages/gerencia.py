@@ -2032,41 +2032,6 @@ def _render_prevperdas_secao(tipo, titulo):
 
 # ── Metas Gerais ────────────────────────────────────────────────────────────
 
-def _barra_horizontal_meta(titulo, realizado, meta, status, unidade_fmt, subtitulo=None):
-    """Barra horizontal de progresso (realizado vs meta), preenchendo da
-    esquerda pra direita conforme o % atingido -- pedido explícito da
-    Ingrid, 28/08/2026: "um gráfico na horizontal em que vai enchendo à
-    medida que vamos faturando de acordo com a meta". Cor igual ao status
-    on-track (mesmo mapa único _GER_STATUS_CORES usado no resto da tela --
-    nunca uma segunda paleta). O preenchimento visual nunca passa de 100%
-    da largura (fisicamente não cabe no container), mas o texto do %
-    sempre mostra o valor real mesmo acima de 100% -- nunca esconde o
-    número (mesma filosofia de mg.quebra_semanal_meta: passar de 100% não
-    é limitado nem escondido)."""
-    cor = _GER_STATUS_CORES[status]['cor']
-    pct = (realizado / meta * 100) if (meta and realizado is not None) else None
-    largura = min(pct, 100) if pct is not None else 0.0
-    pct_txt = f'{pct:.0f}%' if pct is not None else '—'
-    val_txt = unidade_fmt(realizado) if realizado is not None else '—'
-    meta_txt = unidade_fmt(meta) if meta else '—'
-    st.markdown(
-        f'<div style="margin-bottom:0.2rem;">'
-        f'<div style="display:flex; justify-content:space-between; font-size:0.95rem; '
-        f'margin-bottom:4px;"><span style="font-weight:600;">{titulo}</span>'
-        f'<span>{val_txt} <span style="color:#888;">/ {meta_txt}</span></span></div>'
-        f'<div style="background:#EDEDED; border-radius:8px; height:30px; '
-        f'overflow:hidden; position:relative;">'
-        f'<div style="background:{cor}; width:{largura:.1f}%; height:100%; '
-        f'border-radius:8px;"></div>'
-        f'<div style="position:absolute; top:0; left:0; width:100%; height:100%; '
-        f'display:flex; align-items:center; justify-content:center; font-weight:700; '
-        f'font-size:0.9rem; color:#1a1a1a;">{pct_txt}</div></div></div>',
-        unsafe_allow_html=True,
-    )
-    if subtitulo:
-        st.caption(subtitulo)
-
-
 def _badge_indicador_simples(status, titulo, valor_txt, detalhe=None):
     """Indicador simplificado (badge colorido, 1 número em destaque) --
     pedido explícito da Ingrid, 28/08/2026: "algum indicador simplificado
@@ -2159,18 +2124,22 @@ def _render_metas_gerais():
             'completo': None,
         }
 
-        # 3 indicadores simplificados -- substituem os 4 cards detalhados
-        # anteriores (Faturamento/Volume/Margem/Quebra, cada um com
-        # meta/realizado/%/status/projeção), a pedido explícito da Ingrid
-        # (28/08/2026): "Track da meta geral: um gráfico na horizontal que
-        # vai enchendo + indicador simplificado de margem + indicador de
-        # quebra vs faturamento. Apenas isso nos dá o que precisamos... e
-        # gera um baita engajamento." Os CÁLCULOS continuam os mesmos de
-        # sempre (mg.realizado_vendas / on_track.calcular / mg.status_quebra
-        # / mg.quebra_pct_faturamento) -- só a apresentação foi trocada por
-        # algo mais visual e direto. Volume (CX) deixou de ter indicador
-        # dedicado aqui (continua no gráfico de Evolução logo abaixo e no
-        # ranking da aba Vendedor).
+        # 3 indicadores simplificados -- Faturamento, Margem e Quebra, TODOS
+        # no mesmo formato de badge "ontrack" (_badge_indicador_simples),
+        # cada um mostrando a % da meta atingida como número principal.
+        # Antes (28/08/2026) o Faturamento tinha um formato diferente (barra
+        # horizontal enchendo) enquanto Margem/Quebra já usavam o badge --
+        # pedido explícito da Ingrid, 31/08/2026: "tudo funciona com o
+        # ontrack, acho que vai ser melhor que o gráfico... Faturamento,
+        # margem, quebra. Tudo um ontrack. E esse ontrack deverá ter a
+        # porcentagem da meta" -- unificou os três no badge, com a % da meta
+        # (pct_atingido, que on_track.calcular/mg.status_quebra já
+        # calculavam mas não apareciam na tela) como valor principal, e os
+        # números concretos (realizado/meta) no detalhe abaixo. Os CÁLCULOS
+        # continuam os mesmos de sempre (mg.realizado_vendas /
+        # on_track.calcular / mg.status_quebra / mg.quebra_pct_faturamento).
+        # Volume (CX) continua sem indicador dedicado aqui (fica no gráfico
+        # de Evolução logo abaixo e no ranking da aba Vendedor).
         st.subheader('Indicadores da Empresa')
 
         # NÃO usar `or 0` no realizado: rv.get(...) retorna None quando
@@ -2181,26 +2150,40 @@ def _render_metas_gerais():
         # assim que o período começava, mesmo sem nenhum dado publicado.
         ot_fat = on_track.calcular(meta_atual.get('faturamento') or 0, rv.get('faturamento'),
                                     tipo_mg, ref_mg, pct_tempo_decorrido=pct_tempo_mg)
-        _barra_horizontal_meta(
-            '💰 Faturamento', rv.get('faturamento'), meta_atual.get('faturamento'),
-            ot_fat['status'], lambda x: f'R$ {_num_vc(x, 0)}',
-            subtitulo=_completude_msgs.get(rv['completude']),
-        )
+        ot_marg = on_track.calcular(meta_atual.get('margem_pct') or 0, rv.get('margem_pct'),
+                                     tipo_mg, ref_mg, pct_tempo_decorrido=pct_tempo_mg)
 
-        st.markdown('<div style="height:0.6rem;"></div>', unsafe_allow_html=True)
-        _col_marg, _col_qbr = st.columns(2)
+        _col_fat, _col_marg, _col_qbr = st.columns(3)
+        with _col_fat:
+            _fat_pct_txt = (f"{ot_fat['pct_atingido'] * 100:.0f}% da meta"
+                             if ot_fat['pct_atingido'] is not None else '—')
+            _fat_msg_completude = _completude_msgs.get(rv['completude'])
+            if _fat_msg_completude:
+                _fat_det = _fat_msg_completude
+            elif not meta_atual.get('faturamento'):
+                _fat_det = 'Meta de faturamento não definida'
+            elif rv.get('faturamento') is not None:
+                _fat_det = f"R$ {_num_vc(rv['faturamento'], 0)} de R$ {_num_vc(meta_atual['faturamento'], 0)}"
+            else:
+                _fat_det = 'Faturamento ainda não publicado'
+            _badge_indicador_simples(ot_fat['status'], '💰 Faturamento', _fat_pct_txt, _fat_det)
         with _col_marg:
-            ot_marg = on_track.calcular(meta_atual.get('margem_pct') or 0, rv.get('margem_pct'),
-                                         tipo_mg, ref_mg, pct_tempo_decorrido=pct_tempo_mg)
-            _marg_realizado = rv.get('margem_pct')
-            _marg_txt = f"{_marg_realizado:.1f}%" if _marg_realizado is not None else '—'
-            _marg_det = (f"Meta: {meta_atual['margem_pct']:.1f}%" if meta_atual.get('margem_pct')
-                         else 'Meta de margem não definida')
-            _badge_indicador_simples(ot_marg['status'], '📊 Margem', _marg_txt, _marg_det)
+            _marg_pct_txt = (f"{ot_marg['pct_atingido'] * 100:.0f}% da meta"
+                              if ot_marg['pct_atingido'] is not None else '—')
+            _marg_msg_completude = _completude_msgs.get(rv['completude'])
+            if _marg_msg_completude:
+                _marg_det = _marg_msg_completude
+            elif not meta_atual.get('margem_pct'):
+                _marg_det = 'Meta de margem não definida'
+            elif rv.get('margem_pct') is not None:
+                _marg_det = f"{rv['margem_pct']:.1f}% de {meta_atual['margem_pct']:.1f}% de meta"
+            else:
+                _marg_det = 'Margem ainda não publicada'
+            _badge_indicador_simples(ot_marg['status'], '📊 Margem', _marg_pct_txt, _marg_det)
         with _col_qbr:
-            # Mesma prioridade R$ > cx da versão anterior do card de Quebra:
-            # usa custo real (R$) quando já extraído do PDF e o Teto em R$
-            # já foi definido; senão cai pra cx.
+            # Mesma prioridade R$ > cx de sempre: usa custo real (R$) quando
+            # já extraído do PDF e o Teto em R$ (calculado a partir do % ou
+            # digitado) já foi definido; senão cai pra cx.
             _qbr_meta_rs = meta_atual.get('quebra_max_rs')
             _qbr_meta_pct = meta_atual.get('quebra_max_pct')
             _qbr_realizado_rs = rq.get('total_custo')
@@ -2222,48 +2205,43 @@ def _render_metas_gerais():
             else:
                 _ot_qbr = mg.status_quebra(meta_atual.get('quebra_max_cx'), rq.get('total_cx'),
                                             tipo_mg, ref_mg)
-            # A "relação quebra vs faturamento" pedida pela Ingrid -- REALIZADO
+            # "% da meta" pra Quebra = % do TETO já consumido (_ot_qbr já
+            # calcula isso -- 'pct_atingido' -- só não aparecia na tela
+            # antes). Continua sendo a mesma badge/cor de status de sempre;
+            # só o número principal virou essa % em vez da relação
+            # quebra/faturamento (que continua disponível no detalhe abaixo).
+            _qbr_pct_atingido = _ot_qbr.get('pct_atingido')
+            _qbr_pct_txt = (f"{_qbr_pct_atingido * 100:.0f}% da meta"
+                             if _qbr_pct_atingido is not None else '—')
+            # Relação quebra vs faturamento pedida pela Ingrid -- REALIZADO
             # sobre REALIZADO (não meta sobre meta): quanto da quebra de
             # verdade já representa do faturamento de verdade até agora.
+            # Continua calculada (some no detalhe), mesmo não sendo mais o
+            # número principal do badge.
             _qbr_pct_real = mg.quebra_pct_faturamento(_qbr_realizado_rs, rv.get('faturamento'))
-            if _qbr_pct_real is not None:
-                _qbr_txt = f"{_qbr_pct_real:.2f}% do fat."
-                _qbr_txt_em_rs = True
-            elif rq.get('total_cx') is not None:
-                _qbr_txt = f"{_num_vc(rq.get('total_cx'), 0)} cx"
-                _qbr_txt_em_rs = False
-            else:
-                _qbr_txt = '—'
-                _qbr_txt_em_rs = _usa_rs_qbr  # sem valor nenhum -- tanto faz, não há unidade pra casar
-            # O Teto mostrado precisa estar na MESMA unidade do valor acima
-            # (_qbr_txt_em_rs), senão compara cx com R$ sem relação nenhuma
-            # entre si (bug real: com custo real ainda não extraído do PDF de
-            # quebra -- ou faturamento ainda não publicado pra calcular o %
-            # -- o valor cai pra cx mas o Teto continuava priorizando R$
-            # sempre que ele estivesse definido, mostrando ex. "831 cx" ao
-            # lado de "Teto: R$ 80.000,00"). Usa o que efetivamente formou
-            # _qbr_txt acima (_qbr_txt_em_rs), não _usa_rs_qbr sozinho --
-            # _usa_rs_qbr fica True mesmo quando o % não deu pra calcular
-            # por falta de faturamento, e nesse caso _qbr_txt já caiu pra cx.
-            if _qbr_txt_em_rs and _qbr_meta_rs:
-                _qbr_pct_sufixo = f" ({_qbr_meta_pct:.2f}% do faturamento)" if _qbr_meta_pct else ''
-                _qbr_det = f"Teto: R$ {_num_vc(_qbr_meta_rs, 2)}{_qbr_pct_sufixo}"
-            elif meta_atual.get('quebra_max_cx'):
-                _qbr_det = f"Teto: {_num_vc(meta_atual['quebra_max_cx'], 0)} cx"
-            elif _qbr_meta_rs:
-                _qbr_det = (f"Teto em R$ definido ({_num_vc(_qbr_meta_rs, 2)}), mas ainda falta "
-                            f"custo real de quebra e/ou faturamento publicado pra comparar -- "
-                            f"defina também um Teto de Quebra (CX) pra ter um indicador aqui.")
-            else:
+            if _ot_qbr.get('meta') and _ot_qbr.get('realizado') is not None:
+                if _usa_rs_qbr:
+                    _qbr_det = (f"R$ {_num_vc(_ot_qbr['realizado'], 2)} de "
+                                f"R$ {_num_vc(_ot_qbr['meta'], 2)} de teto")
+                    if _qbr_meta_pct:
+                        _qbr_det += f" (teto = {_qbr_meta_pct:.2f}% do faturamento)"
+                    if _qbr_pct_real is not None:
+                        _qbr_det += f" — quebra representa {_qbr_pct_real:.2f}% do faturamento realizado"
+                else:
+                    _qbr_det = (f"{_num_vc(_ot_qbr['realizado'], 0)} cx de "
+                                f"{_num_vc(_ot_qbr['meta'], 0)} cx de teto")
+            elif not (_qbr_meta_rs or meta_atual.get('quebra_max_cx')):
                 _qbr_det = 'Teto de quebra não definido'
+            else:
+                _qbr_det = 'Ainda sem realizado de Quebra publicado pra comparar com o teto.'
             # Mesma distinção "sem dado" vs "falha ao consultar" já aplicada
             # no Faturamento (ver _completude_msgs['erro_leitura']) -- sem
             # isso, uma falha de leitura no GitHub ficava idêntica a "nunca
             # publicou quebra nenhuma" aqui também.
-            if _qbr_txt == '—' and rq.get('erro_leitura'):
+            if _qbr_pct_atingido is None and rq.get('erro_leitura'):
                 _qbr_det = (f'🔴 Não deu pra confirmar -- consulta ao GitHub falhou. '
                             f'Detalhe técnico: {rq["erro_leitura"]}')
-            _badge_indicador_simples(_ot_qbr['status'], '📦 Quebra vs Faturamento', _qbr_txt, _qbr_det)
+            _badge_indicador_simples(_ot_qbr['status'], '📦 Quebra', _qbr_pct_txt, _qbr_det)
 
         st.divider()
 
