@@ -692,7 +692,24 @@ def _render_tab(tipo, label_tipo):
             # Login -> Upload -> Gerência, nunca fica numa tela de Dashboard.
             acesso.redirecionar_pos_upload()
 
-        if f'html_{key}' in st.session_state:
+        # BUG REAL corrigido 03/09/2026, pedido da Ingrid: "quando gera o
+        # relatório diário não é para aparecer o dashboard na geração,
+        # somente na gerência". O acesso.redirecionar_pos_upload() logo
+        # acima já interrompe (st.stop()) o rerun EM QUE o botão foi
+        # clicado -- por isso, no instante da geração, ela só via a
+        # mensagem de sucesso. Mas html_{key}/slug_{key} ficam salvos no
+        # session_state, e este bloco (download + preview) não tinha
+        # NENHUMA verificação de política -- só checava se esses valores
+        # existiam na sessão. Resultado: em qualquer rerun seguinte desta
+        # MESMA página (ex.: voltar do link "Ir para a Gerência", trocar
+        # de página e voltar, ou qualquer outra interação que faça o
+        # script rodar de novo com o PDF ainda "preso" no uploader), o
+        # dashboard reaparecia aqui, sem o st.stop() pra impedir. Mesma
+        # verificação já usada pra esconder a seção "4. Histórico" logo
+        # abaixo (deve_esconder_apos_upload()) resolve, porque ela não
+        # depende de o script ter parado no meio -- é reavaliada em TODO
+        # rerun.
+        if f'html_{key}' in st.session_state and not acesso.deve_esconder_apos_upload():
             slug = st.session_state[f'slug_{key}']
             st.download_button(
                 f'⬇️ Baixar dashboard {_label_slug(slug, tipo)}',
@@ -855,7 +872,17 @@ with tab_d:
                 # Perfil de upload (26/08/2026, pedido da Ingrid): fluxo
                 # Login -> Upload -> Gerência, nunca fica numa tela de Dashboard.
                 acesso.redirecionar_pos_upload()
-            if 'html_text' in st.session_state:
+            # BUG REAL corrigido 03/09/2026, pedido da Ingrid: "quando gera
+            # o relatório diário não é para aparecer o dashboard na
+            # geração, somente na gerência" -- mesma causa e mesma correção
+            # do bloco equivalente em _render_tab() (Semanal/Mensal, ver
+            # comentário lá): html_text fica salvo no session_state e este
+            # bloco não tinha nenhuma verificação de política, só olhava
+            # se o valor existia na sessão -- em qualquer rerun desta
+            # página DEPOIS do st.stop() do redirecionamento (ex.: voltar
+            # pra cá vindo da Gerência), o dashboard reaparecia sem nada
+            # pra impedir.
+            if 'html_text' in st.session_state and not acesso.deve_esconder_apos_upload():
                 st.download_button(
                     '⬇️ Baixar ' + st.session_state['html_nome'],
                     data=st.session_state['html_text'].encode('utf-8'),
@@ -863,7 +890,7 @@ with tab_d:
                     mime='text/html',
                 )
 
-        if 'html_text' in st.session_state:
+        if 'html_text' in st.session_state and not acesso.deve_esconder_apos_upload():
             with st.expander('Pré-visualizar dashboard', expanded=True):
                 components.html(st.session_state['html_text'], height=1400, scrolling=True)
 
