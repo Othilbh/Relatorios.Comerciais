@@ -38,7 +38,8 @@ durante o mês vira uma versão datada) -- pega a versão mais recente até o
 fim de cada semana, sem inventar número. Só existe pra tipo_periodo
 'mensal' (não faz sentido quebrar um trimestre/ano em "semanas 1-4").
 """
-from datetime import timedelta, date
+import re
+from datetime import timedelta, date, datetime
 
 import periodo
 import on_track
@@ -389,6 +390,28 @@ def _meses_do_periodo(tipo_periodo: str, periodo_ref: str) -> list:
         meses.append(periodo.periodo_ref('mensal', d))
         d = d.replace(year=d.year + 1, month=1) if d.month == 12 else d.replace(month=d.month + 1)
     return meses
+
+
+def mes_do_periodo_pdf(periodo_str, emissao_str=None):
+    """Deduz o periodo_ref (mensal) a partir da string 'periodo' (faixa de
+    datas, ex.: '01/08/2026 a 31/08/2026') que parsers_vendedor.
+    parse_totais_vendedor() e parser_quebra.parse_quebra() já devolvem --
+    usa a PRIMEIRA data (início do período que o relatório realmente
+    cobre), não a emissão, porque o relatório pode ser emitido dias depois
+    do fechamento do mês (mesma armadilha corrigida em
+    marcas_fornecedor.mes_detectado() pros PDFs que não têm faixa de
+    período). Cai pra `emissao_str` só se não achar nenhuma data em
+    `periodo_str`, e pro mês atual se nenhum dos dois estiver disponível --
+    é só a SUGESTÃO inicial mostrada na tela de upload, sempre editável."""
+    if periodo_str:
+        m = re.search(r'(\d{2}/\d{2}/\d{4})', periodo_str)
+        if m:
+            d = datetime.strptime(m.group(1), '%d/%m/%Y').date()
+            return periodo.periodo_ref('mensal', d)
+    if emissao_str:
+        d = datetime.strptime(emissao_str, '%d/%m/%Y').date()
+        return periodo.periodo_ref('mensal', d)
+    return periodo.periodo_atual('mensal')
 
 
 def publicar_vendas_pdf(mes_ref: str, pdf_file, usuario: str = None) -> dict:
