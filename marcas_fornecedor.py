@@ -92,9 +92,18 @@ def classificar_marca(produto_nome, marcas_cadastro=None):
     return None
 
 
-def _publicar(modulo, pdf_parsed, usuario):
+def mes_detectado(pdf_parsed):
+    """periodo_ref (mensal) sugerido a partir da data de Emissão do PDF --
+    mesma convenção de produtos.salvar_resumo_estoque(). É só a SUGESTÃO
+    inicial mostrada na tela de upload -- pode ser diferente do mês que os
+    dados realmente cobrem, se o relatório foi emitido só nos primeiros
+    dias do mês seguinte (ver publicar_vendas()/publicar_quebra())."""
     data_ref = pdf_parsed.get('emissao_date') or _dt.date.today()
-    periodo_ref_str = periodo_mod.periodo_ref('mensal', data_ref)
+    return periodo_mod.periodo_ref('mensal', data_ref)
+
+
+def _publicar(modulo, pdf_parsed, usuario, periodo_ref=None):
+    periodo_ref_str = periodo_ref or mes_detectado(pdf_parsed)
     valores = {
         'itens': pdf_parsed.get('itens') or [],
         'avisos': pdf_parsed.get('avisos') or [],
@@ -106,18 +115,22 @@ def _publicar(modulo, pdf_parsed, usuario):
     return periodo_ref_str, registro
 
 
-def publicar_vendas(pdf_parsed, usuario=None):
+def publicar_vendas(pdf_parsed, periodo_ref=None, usuario=None):
     """Salva um upload do Resumo do Estoque filtrado Vendas+Bonificação.
-    periodo_ref sempre mensal, pela data de Emissão do próprio PDF (mesma
-    convenção de produtos.salvar_resumo_estoque). Independente do upload
-    de Quebra do mesmo mês -- ver docstring do módulo."""
-    return _publicar(MOD_VENDAS, pdf_parsed, usuario)
+    periodo_ref (mensal) é o escolhido por quem chama -- normalmente
+    mes_detectado(pdf_parsed) (data de Emissão do próprio PDF, mesma
+    convenção de produtos.salvar_resumo_estoque), mas a tela de upload
+    deixa corrigir pra outro mês (03/09/2026, pedido da Ingrid: um PDF
+    emitido nos primeiros dias do mês seguinte cobre o mês anterior, e a
+    Emissão sozinha não dá pra distinguir isso). Independente do upload de
+    Quebra do mesmo mês -- ver docstring do módulo."""
+    return _publicar(MOD_VENDAS, pdf_parsed, usuario, periodo_ref)
 
 
-def publicar_quebra(pdf_parsed, usuario=None):
+def publicar_quebra(pdf_parsed, periodo_ref=None, usuario=None):
     """Salva um upload do Resumo do Estoque filtrado Quebra. Ver
     publicar_vendas()."""
-    return _publicar(MOD_QUEBRA, pdf_parsed, usuario)
+    return _publicar(MOD_QUEBRA, pdf_parsed, usuario, periodo_ref)
 
 
 def meses_disponiveis():
