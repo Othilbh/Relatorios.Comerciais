@@ -216,22 +216,38 @@ def _render_tab(tipo: str, label_tipo: str):
     )
     if pdf_up:
         if st.button('📊 Processar e Salvar', key=f'qbr_{tipo}_btn', type='primary'):
+            # BUG REAL corrigido 03/09/2026 (mesma causa raiz encontrada e
+            # corrigida em 3_Vendedor_Cliente_OTHIL.py nesta mesma data --
+            # reportada pela Ingrid como "Vendedor cliente, não carrega",
+            # print mostrando o spinner preso na tela junto com o resultado
+            # já pronto embaixo): acesso.redirecionar_pos_upload() (que faz
+            # st.stop()) não pode ser chamado enquanto o `with st.spinner()`
+            # ainda está aberto -- o Streamlit só remove o spinner da tela
+            # quando o bloco `with` fecha normalmente, e o st.stop() impede
+            # isso. Fix: o spinner passa a envolver só o processamento; o
+            # sucesso/redirecionamento é montado depois que ele já fechou.
+            _erro_qbr = None
+            _msg_qbr_ok = None
             with st.spinner('Processando PDF...'):
                 try:
                     dados = parse_quebra(pdf_up)
                     slug = _slug_semanal(data_ref) if tipo == 'semanal' else _slug_mensal(data_ref)
                     _salvar(dados, tipo, slug, usuario=st.session_state.get('usuario_nome'))
-                    st.success(
+                    _msg_qbr_ok = (
                         f"✅ Salvo! {_label_slug(slug, tipo)} — "
                         f"{_fmt_num(dados['total_cx'], 0)} CX quebradas  |  "
                         f"Período: {dados.get('periodo', '-')}"
                     )
-                    st.session_state[f'qbr_{tipo}_idx'] = 0
-                    # Fluxo Upload -> Gerência (pedido da Ingrid, 27/08/2026):
-                    # nunca fica numa tela de Dashboard depois de enviar o PDF.
-                    acesso.redirecionar_pos_upload()
                 except Exception as e:
-                    st.error(f'Erro ao processar PDF: {e}')
+                    _erro_qbr = e
+            if _erro_qbr is not None:
+                st.error(f'Erro ao processar PDF: {_erro_qbr}')
+            else:
+                st.success(_msg_qbr_ok)
+                st.session_state[f'qbr_{tipo}_idx'] = 0
+                # Fluxo Upload -> Gerência (pedido da Ingrid, 27/08/2026):
+                # nunca fica numa tela de Dashboard depois de enviar o PDF.
+                acesso.redirecionar_pos_upload()
 
     # Perfil de upload (27/08/2026, pedido da Ingrid): nunca vê o
     # histórico/dashboard de Quebra aqui -- só na Gerência. SEMPRE
@@ -482,23 +498,35 @@ with tab_m:
                          f"Corrija aqui se necessário.",
                 )
                 if st.button('📊 Processar e publicar na Meta Geral', key='mg_q_btn'):
+                    # Mesma correção de 03/09/2026 aplicada acima em
+                    # "Processar e Salvar" (ver comentário lá): o spinner não
+                    # pode conter a chamada de redirecionar_pos_upload()
+                    # (st.stop()) -- senão fica preso na tela.
+                    _erro_pub_q = None
+                    _sucesso_pub_q = None
                     with st.spinner('Publicando...'):
                         try:
                             _reg_mg_q = mg.publicar_quebra_pdf(
                                 _mes_escolhido_q, io.BytesIO(_raw_mg_q),
                                 usuario=st.session_state.get('usuario_nome'))
-                            _erro_mg_q = _reg_mg_q.get('_erro_persistencia_remota') if _reg_mg_q else None
-                            if _erro_mg_q:
-                                st.warning(
+                            _erro_persist_q = _reg_mg_q.get('_erro_persistencia_remota') if _reg_mg_q else None
+                            if _erro_persist_q:
+                                _sucesso_pub_q = (
+                                    'warning',
                                     f'Publicado localmente, mas houve um problema ao salvar de '
-                                    f'forma permanente: {_erro_mg_q}')
+                                    f'forma permanente: {_erro_persist_q}')
                             else:
-                                st.success(
+                                _sucesso_pub_q = (
+                                    'success',
                                     f"✅ Publicado na Meta Geral -- "
                                     f"{periodo_mod.rotulo('mensal', _mes_escolhido_q)}.")
-                            acesso.redirecionar_pos_upload()
                         except Exception as _e_pub_q:
-                            st.error(f'Erro ao publicar: {_e_pub_q}')
+                            _erro_pub_q = _e_pub_q
+                    if _erro_pub_q is not None:
+                        st.error(f'Erro ao publicar: {_erro_pub_q}')
+                    else:
+                        (st.success if _sucesso_pub_q[0] == 'success' else st.warning)(_sucesso_pub_q[1])
+                        acesso.redirecionar_pos_upload()
 
 with tab_comp:
     _render_comparativo()
