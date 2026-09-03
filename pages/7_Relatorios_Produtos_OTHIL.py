@@ -89,22 +89,42 @@ def _secao_upload(titulo, ajuda, modulo, publicar_fn, key_prefix):
             st.error('Não foi possível reconhecer nenhum produto neste PDF. Confirme que é o '
                      'relatório "Resumo do Estoque" (com seções "Grupo: ..." e coluna "Resultado").')
             return
-        periodo_ref_prev = periodo_mod.periodo_ref('mensal', parsed['emissao_date'])
-        uc1, uc2, uc3 = st.columns(3)
+        uc1, uc2 = st.columns(2)
         uc1.metric('Produtos reconhecidos', len(parsed['itens']))
         uc2.metric('Grupos oficiais', len(parsed['grupos']))
-        uc3.metric('Mês identificado', periodo_mod.rotulo('mensal', periodo_ref_prev))
         if parsed['avisos']:
             with st.expander(f"⚠️ {len(parsed['avisos'])} observação(ões) na leitura deste PDF "
                               f"(nenhum dado foi inventado ou descartado)"):
                 for a in parsed['avisos']:
                     st.caption('• ' + a)
-        if ds.has_data(modulo, 'mensal', periodo_ref_prev):
-            st.warning(f"Já existe um envio salvo para {periodo_mod.rotulo('mensal', periodo_ref_prev)}. "
+
+        # Mês de referência: sugerido pela data de Emissão do PDF, mas
+        # editável (03/09/2026, pedido da Ingrid: enviou PDFs de agosto
+        # emitidos já em setembro, e o app publicou como setembro -- a
+        # Emissão sozinha não distingue "dados de agosto, impressos em
+        # setembro" de "dados de setembro"). Ver mf.mes_detectado().
+        periodo_ref_detectado = mf.mes_detectado(parsed)
+        opcoes_mes = periodo_mod.listar_periodos('mensal', n=15)
+        if periodo_ref_detectado not in opcoes_mes:
+            opcoes_mes = sorted(set(opcoes_mes) | {periodo_ref_detectado}, reverse=True)
+        periodo_ref_escolhido = st.selectbox(
+            'Mês de referência', opcoes_mes, index=opcoes_mes.index(periodo_ref_detectado),
+            format_func=lambda r: periodo_mod.rotulo('mensal', r), key=f'{key_prefix}_mes_sel',
+            help=f"Detectado pela data de Emissão do PDF ({parsed.get('emissao') or '?'}). Corrija "
+                 "aqui se o relatório foi emitido só nos primeiros dias do mês seguinte."
+        )
+        if periodo_ref_escolhido != periodo_ref_detectado:
+            st.caption(f"⚠️ Mês detectado pela Emissão do PDF: "
+                       f"{periodo_mod.rotulo('mensal', periodo_ref_detectado)} -- "
+                       f"salvando como {periodo_mod.rotulo('mensal', periodo_ref_escolhido)}.")
+
+        if ds.has_data(modulo, 'mensal', periodo_ref_escolhido):
+            st.warning(f"Já existe um envio salvo para {periodo_mod.rotulo('mensal', periodo_ref_escolhido)}. "
                        f"Salvar de novo cria uma nova versão no histórico (a versão anterior NÃO é apagada).")
         if st.button('💾 Salvar', key=f'{key_prefix}_salvar'):
             periodo_ref_salvo, registro = publicar_fn(
-                parsed, usuario=st.session_state.get('usuario_nome', 'Ingrid'))
+                parsed, periodo_ref=periodo_ref_escolhido,
+                usuario=st.session_state.get('usuario_nome', 'Ingrid'))
             if registro.get('_erro_persistencia_remota'):
                 st.warning('Salvo localmente, mas houve um problema ao salvar de forma permanente: '
                            f"{registro['_erro_persistencia_remota']}")
