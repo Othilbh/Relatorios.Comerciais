@@ -6,15 +6,15 @@
     "periodo_ref": "2026-08",
     "data_referencia": "2026-09-03",
     "criado_em": "2026-09-03T12:25:21+00:00",
-    "atualizado_em": "2026-09-03T12:25:21+00:00",
+    "atualizado_em": "2026-09-03T12:25:43+00:00",
     "usuario": "Ingrid",
-    "versao": 1,
+    "versao": 2,
     "valores": {
       "periodo": "01/08/2026 00:00:00 até 31/08/2026",
       "emissao": "03/09/2026",
       "tipo_periodo": "mensal",
       "periodo_ref": "2026-08",
-      "gerado_em": "2026-09-03T12:25:20.847776",
+      "gerado_em": "2026-09-03T12:25:42.871933",
       "clientes": [
         {
           "Cliente": "MART MINAS - CD",
@@ -237,5 +237,244 @@
       }
     }
   },
-  "history": []
+  "history": [
+    {
+      "id": "44bc2bd3-e837-4348-9512-2e3549f55de8",
+      "modulo_origem": "recorrencia",
+      "tipo_periodo": "mensal",
+      "periodo_ref": "2026-08",
+      "data_referencia": "2026-09-03",
+      "criado_em": "2026-09-03T12:25:21+00:00",
+      "atualizado_em": "2026-09-03T12:25:21+00:00",
+      "usuario": "Ingrid",
+      "versao": 1,
+      "valores": {
+        "periodo": "01/08/2026 00:00:00 até 31/08/2026",
+        "emissao": "03/09/2026",
+        "tipo_periodo": "mensal",
+        "periodo_ref": "2026-08",
+        "gerado_em": "2026-09-03T12:25:20.847776",
+        "clientes": [
+          {
+            "Cliente": "MART MINAS - CD",
+            "Faturamento R$": 2971412.0,
+            "Caixas": 37667.0,
+            "MC R$": 146885.67,
+            "MC %": 5.2
+          },
+          {
+            "Cliente": "ADICAO",
+            "Faturamento R$": 1170920.0,
+            "Caixas": 18105.0,
+            "MC R$": 16385.54,
+            "MC %": 1.42
+          },
+          {
+            "Cliente": "BONFIM",
+            "Faturamento R$": 851395.0,
+            "Caixas": 12539.0,
+            "MC R$": 1114.65,
+            "MC %": 0.13
+          },
+          {
+            "Cliente": "VILLEFORT ATACADISTA - CD",
+            "Faturamento R$": 573515.0,
+            "Caixas": 8404.0,
+            "MC R$": 21430.07,
+            "MC %": 3.88
+          },
+          {
+            "Cliente": "EPA CD",
+            "Faturamento R$": 545120.0,
+            "Caixas": 5838.0,
+            "MC R$": 12128.68,
+            "MC %": 2.28
+          },
+          {
+            "Cliente": "BIG MAIS SUPERMERCADO / WHATSAPP",
+            "Faturamento R$": 433428.0,
+            "Caixas": 5819.0,
+            "MC R$": -13394.85,
+            "MC %": -3.0
+          },
+          {
+            "Cliente": "BH SUPERMERCADO - WHATSAPP",
+            "Faturamento R$": 389654.0,
+            "Caixas": 4286.0,
+            "MC R$": -13145.16,
+            "MC %": -3.26
+          },
+          {
+            "Cliente": "FRUTAS BARBACENA- JUIZ DE FORA",
+            "Faturamento R$": 261182.0,
+            "Caixas": 4560.0,
+            "MC R$": -16661.34,
+            "MC %": -6.0
+          },
+          {
+            "Cliente": "BRIXX - PAV Z",
+            "Faturamento R$": 254645.0,
+            "Caixas": 3226.0,
+            "MC R$": 16778.88,
+            "MC %": 7.05
+          },
+          {
+            "Cliente": "EXPERFRUT",
+            "Faturamento R$": 238579.0,
+            "Caixas": 3280.0,
+            "MC R$": 4629.14,
+            "MC %": 1.98
+          },
+          {
+            "Cliente": "PATRICIA HORTSUL - WHATSAPP",
+            "Faturamento R$": 227352.1,
+            "Caixas": 2059.0,
+            "MC R$": 2558.08,
+            "MC %": 1.14
+          },
+          {
+            "Cliente": "ENESIO - SACOLAO OPCAO",
+            "Faturamento R$": 137350.0,
+            "Caixas": 2106.0,
+            "MC R$": -4026.63,
+            "MC %": -2.85
+          },
+          {
+            "Cliente": "HERCULANO",
+            "Faturamento R$": 129607.0,
+            "Caixas": 2181.0,
+            "MC R$": -4636.85,
+            "MC %": -3.45
+          },
+          {
+            "Cliente": "VERA CRUZ - WHATSAPP",
+            "Faturamento R$": 113551.0,
+            "Caixas": 1713.0,
+            "MC R$": -8563.05,
+            "MC %": -7.01
+          },
+          {
+            "Cliente": "OLS ANDRADAS - WHATSAPP",
+            "Faturamento R$": 93785.0,
+            "Caixas": 1511.0,
+            "MC R$": -6203.76,
+            "MC %": -6.2
+          },
+          {
+            "Cliente": "VAREJAO OBA - WHATSAPP",
+            "Faturamento R$": 78705.0,
+            "Caixas": 482.0,
+            "MC R$": 13532.3,
+            "MC %": 20.76
+          },
+          {
+            "Cliente": "CATALAO - WHATSAPP",
+            "Faturamento R$": 52385.0,
+            "Caixas": 838.0,
+            "MC R$": -2576.29,
+            "MC %": -4.69
+          },
+          {
+            "Cliente": "ENTRE RIOS - ERRS ZAP",
+            "Faturamento R$": 50345.0,
+            "Caixas": 787.0,
+            "MC R$": -2254.32,
+            "MC %": -4.29
+          },
+          {
+            "Cliente": "SUPER SO",
+            "Faturamento R$": 39069.0,
+            "Caixas": 510.0,
+            "MC R$": 1775.22,
+            "MC %": 4.76
+          },
+          {
+            "Cliente": "BONFIM PAV H",
+            "Faturamento R$": 37482.0,
+            "Caixas": 738.0,
+            "MC R$": -4444.18,
+            "MC %": -10.6
+          },
+          {
+            "Cliente": "CARLOS MAGNO / WHATSAPP",
+            "Faturamento R$": 28170.0,
+            "Caixas": 407.0,
+            "MC R$": -695.93,
+            "MC %": -2.41
+          },
+          {
+            "Cliente": "BAIAO E PIRES",
+            "Faturamento R$": 25995.0,
+            "Caixas": 452.0,
+            "MC R$": 151.61,
+            "MC %": 0.59
+          },
+          {
+            "Cliente": "ENTRE RIOS - ERRC ZAP",
+            "Faturamento R$": 25831.0,
+            "Caixas": 387.0,
+            "MC R$": -680.65,
+            "MC %": -2.57
+          },
+          {
+            "Cliente": "APOIO MINEIRO / MANUAL E WHATSAPP",
+            "Faturamento R$": 20919.0,
+            "Caixas": 257.0,
+            "MC R$": 1773.66,
+            "MC %": 9.26
+          },
+          {
+            "Cliente": "ENTRE RIOS - ECON RS ZAP",
+            "Faturamento R$": 13939.0,
+            "Caixas": 201.0,
+            "MC R$": -483.61,
+            "MC %": -3.35
+          },
+          {
+            "Cliente": "VILLEFORT - CEASA WHATSAPP",
+            "Faturamento R$": 13350.0,
+            "Caixas": 178.0,
+            "MC R$": 16.27,
+            "MC %": 0.12
+          },
+          {
+            "Cliente": "ENTRE RIOS - ERSP ZAP",
+            "Faturamento R$": 11046.0,
+            "Caixas": 161.0,
+            "MC R$": -246.89,
+            "MC %": -2.19
+          },
+          {
+            "Cliente": "ENTRE RIOS - ECON SPF ZAP",
+            "Faturamento R$": 9280.0,
+            "Caixas": 147.0,
+            "MC R$": -360.74,
+            "MC %": -3.74
+          },
+          {
+            "Cliente": "ENTRE RIOS - BPT ZAP",
+            "Faturamento R$": 5377.0,
+            "Caixas": 82.0,
+            "MC R$": -181.03,
+            "MC %": -3.26
+          },
+          {
+            "Cliente": "MERCANTIL BASTOS - HIPER",
+            "Faturamento R$": 180.0,
+            "Caixas": 3.0,
+            "MC R$": -37.35,
+            "MC %": -17.18
+          }
+        ],
+        "totais": {
+          "faturamento": 8803568.1,
+          "caixas": 118924.0,
+          "mc_rs": 160567.14,
+          "mc_pct": 1.86,
+          "n_clientes": 30,
+          "n_vendedores": 7
+        }
+      }
+    }
+  ]
 }
