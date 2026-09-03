@@ -2,6 +2,7 @@
 Upload semanal/mensal do PDF de Quebra (Resumo do Estoque filtrado por QUEBRA).
 Gera KPIs por grupo de produto e categoria, com histórico navegável.
 """
+import io
 import os
 import json
 import datetime
@@ -12,6 +13,8 @@ from parser_quebra import parse_quebra
 import acesso
 import comparativo
 import data_store as ds
+import metas_gerais as mg
+import periodo as periodo_mod
 
 def _fmt_num(v, casas=0):
     return f"{v:,.{casas}f}".replace(',', 'X').replace('.', ',').replace('X', '.')
@@ -430,6 +433,72 @@ with tab_s:
 
 with tab_m:
     _render_tab('mensal', 'Mensal')
+
+    st.divider()
+
+    # ── Meta Geral — Realizado (Quebra) ──────────────────────────────────────
+    # Publica DIRETO no painel "🌐 Meta Geral" da Gerência -- pedido explícito
+    # da Ingrid, 29/08/2026 ("o mesmo para a quebra"): mesmo tipo de PDF do
+    # envio Mensal acima, mas publicação INDEPENDENTE (metas_gerais.
+    # MOD_MG_QUEBRA -- não depende de ter sido salvo acima, e o envio Mensal
+    # acima não alimenta isto). Movido pra cá em 03/09/2026, pedido da
+    # Ingrid: "na gerência não é para ficar upload de nada, apenas os
+    # resultados -- upload são todos nos módulos" (antes ficava dentro da
+    # própria Gerência). O resultado publicado aqui só aparece na aba
+    # "🌐 Meta Geral" da Gerência, nunca nesta página -- mesma política de
+    # acesso de 27/08/2026 (ver acesso.py).
+    with st.expander('📤 Publicar Realizado da Meta Geral (Quebra)'):
+        st.caption(
+            'Sobe o mesmo tipo de PDF (Resumo do Estoque, classificação QUEBRA) do envio '
+            'Mensal acima, mas publica DIRETO na Meta Geral (Gerência) -- independente do '
+            'envio Mensal acima.'
+        )
+        pdf_mg_q = st.file_uploader('PDF Resumo do Estoque (Quebra)', type='pdf', key='mg_q_upload')
+        if pdf_mg_q is not None:
+            _raw_mg_q = pdf_mg_q.getvalue()
+            try:
+                _prev_mg_q = parse_quebra(io.BytesIO(_raw_mg_q))
+            except Exception as _e_prev_q:
+                st.error(f'Não foi possível ler este PDF: {_e_prev_q}')
+                _prev_mg_q = None
+            if _prev_mg_q is not None:
+                puc1, puc2 = st.columns(2)
+                puc1.metric('CX quebradas no PDF', _fmt_num(_prev_mg_q.get('total_cx', 0), 0))
+                puc2.metric('Custo no PDF',
+                            _fmt_moeda(_prev_mg_q['total_custo'])
+                            if _prev_mg_q.get('total_custo') is not None else '—')
+
+                _mes_detect_q = mg.mes_do_periodo_pdf(
+                    _prev_mg_q.get('periodo'), _prev_mg_q.get('emissao'))
+                _opcoes_mes_q = periodo_mod.listar_periodos('mensal', n=15)
+                if _mes_detect_q not in _opcoes_mes_q:
+                    _opcoes_mes_q = sorted(set(_opcoes_mes_q) | {_mes_detect_q}, reverse=True)
+                _mes_escolhido_q = st.selectbox(
+                    'Mês de referência (Meta Geral)', _opcoes_mes_q,
+                    index=_opcoes_mes_q.index(_mes_detect_q),
+                    format_func=lambda r: periodo_mod.rotulo('mensal', r), key='mg_q_mes_sel',
+                    help=f"Detectado pelo período do PDF "
+                         f"({_prev_mg_q.get('periodo') or _prev_mg_q.get('emissao') or '?'}). "
+                         f"Corrija aqui se necessário.",
+                )
+                if st.button('📊 Processar e publicar na Meta Geral', key='mg_q_btn'):
+                    with st.spinner('Publicando...'):
+                        try:
+                            _reg_mg_q = mg.publicar_quebra_pdf(
+                                _mes_escolhido_q, io.BytesIO(_raw_mg_q),
+                                usuario=st.session_state.get('usuario_nome'))
+                            _erro_mg_q = _reg_mg_q.get('_erro_persistencia_remota') if _reg_mg_q else None
+                            if _erro_mg_q:
+                                st.warning(
+                                    f'Publicado localmente, mas houve um problema ao salvar de '
+                                    f'forma permanente: {_erro_mg_q}')
+                            else:
+                                st.success(
+                                    f"✅ Publicado na Meta Geral -- "
+                                    f"{periodo_mod.rotulo('mensal', _mes_escolhido_q)}.")
+                            acesso.redirecionar_pos_upload()
+                        except Exception as _e_pub_q:
+                            st.error(f'Erro ao publicar: {_e_pub_q}')
 
 with tab_comp:
     _render_comparativo()
