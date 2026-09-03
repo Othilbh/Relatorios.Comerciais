@@ -2037,13 +2037,28 @@ def _badge_indicador_simples(status, titulo, valor_txt, detalhe=None):
     que acompanhe o track de margem" / "algum indicador que vá indicando a
     relação quebra vs faturamento". Mesmas cores de status do resto da
     tela (_GER_STATUS_CORES bg/fg), sem os detalhes extras (projeção,
-    histórico etc.) que os cards anteriores tinham -- só o essencial."""
+    histórico etc.) que os cards anteriores tinham -- só o essencial.
+
+    Mostra o rótulo do OnTrack (🟢 On Track / 🟡 Atenção / 🔴 Fora do Track /
+    ⚪ Sem meta) junto com a % da meta -- pedido explícito da Ingrid,
+    03/09/2026: "Eu quero ontrack, alem da porcentagem, lembra?". Desde
+    31/08/2026 o badge já usava a COR do status (_GER_STATUS_CORES) pra
+    indicar isso, mas só a cor -- sem o texto do rótulo em lugar nenhum da
+    tela, então não dava pra saber (e nem apontar num print/relatório) qual
+    dos 4 estados era só olhando. `status` já é sempre uma das constantes
+    de on_track.py (STATUS_VERDE/ATENCAO/FORA/SEM_META) em todo chamador
+    desta função -- tanto quando vem direto de on_track.calcular() quanto
+    de mg.status_quebra() (que reusa o mesmo EMOJI/LABEL internamente) --
+    por isso dá pra buscar o rótulo aqui dentro, sem mudar nenhum
+    chamador."""
     cores = _GER_STATUS_CORES[status]
+    rotulo_ot = f'{on_track.EMOJI[status]} {on_track.LABEL[status]}'
     st.markdown(
         f'<div style="background:{cores["bg"]}; color:{cores["fg"]}; border-radius:8px; '
         f'padding:10px 14px; margin-bottom:0.2rem;">'
         f'<div style="font-size:0.8rem; font-weight:600; opacity:0.85;">{titulo}</div>'
-        f'<div style="font-size:1.35rem; font-weight:700;">{valor_txt}</div></div>',
+        f'<div style="font-size:1.35rem; font-weight:700;">{valor_txt}</div>'
+        f'<div style="font-size:0.85rem; font-weight:700; margin-top:2px;">{rotulo_ot}</div></div>',
         unsafe_allow_html=True,
     )
     if detalhe:
