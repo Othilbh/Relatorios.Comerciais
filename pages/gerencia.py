@@ -4,7 +4,6 @@ import os
 import re
 import datetime
 import tempfile
-import io
 
 import streamlit as st
 import streamlit.components.v1 as components
@@ -2055,8 +2054,9 @@ def _render_metas_gerais():
     st.header('🌐 Meta Geral')
     st.caption(
         'Painel consolidado — Faturamento, Volume, Margem e Quebra da empresa inteira. '
-        'Independente das Metas Semanais. O "Realizado" é somado automaticamente a partir '
-        'dos módulos Vendedor-Cliente e Quebras (não precisa digitar de novo aqui).'
+        'Independente das Metas Semanais. O "Realizado" é publicado nos módulos '
+        '**Vendedor-Cliente** (Faturamento/Volume/Margem, seção "Publicar Realizado da Meta '
+        'Geral") e **Quebras** (Quebra, aba Mensal) -- upload sempre lá, resultado só aqui.'
     )
 
     tipos_mg = [t for t in periodo_mod.TIPOS_PERIODO if t != 'semanal']
@@ -2344,116 +2344,17 @@ def _render_metas_gerais():
         # Ingrid em 26/08/2026 ("remover completamente"), pra deixar a tela
         # mais compacta.
 
-        # ── Publicar Realizado do Período (PDF) ──────────────────────────────
-        # Pedido explícito da Ingrid, 29/08/2026: "não quero que seja a soma a
-        # partir do módulo vendedor cliente, quero que tenha espaço pra eu
-        # adicionar os PDFs e ele calcular -- o mesmo para a quebra". Publica
-        # DIRETO aqui (mg.MOD_MG_VENDAS / mg.MOD_MG_QUEBRA), independente do
-        # que estiver ou não publicado em Vendedor-Cliente/Quebra -- só
-        # reaproveita os mesmos parsers que aquelas páginas já usam
-        # (parsers_vendedor.parse_totais_vendedor / parser_quebra.parse_quebra).
-        # Só faz sentido por mês (cada PDF é de um período fechado
-        # específico), por isso só fica ativo com Tipo de período = Mensal --
-        # mesmo padrão já usado no OnTrack Semanal logo abaixo.
-        #
-        # BUG REAL corrigido (31/08/2026, achado pela Ingrid: subiu os PDFs de
-        # Vendas E de Quebra juntos, publicou a Vendas, e o botão "Processar e
-        # publicar Quebra" simplesmente sumiu da tela): os dois uploaders
-        # ficam na mesma tela, e assim que um deles publica -- o que chama
-        # st.rerun() em seguida -- o Streamlit recarrega o script inteiro. Nesse
-        # recarregamento automático, o OUTRO st.file_uploader (o que ainda não
-        # tinha sido processado) perde o arquivo que já estava selecionado
-        # (reproduzido isolado com streamlit.testing.v1.AppTest antes de
-        # corrigir -- não é impressão, é um comportamento real do Streamlit
-        # nessa versão). Como a condição era `pdf_quebra_mg is not None and
-        # st.button(...)`, com pdf_quebra_mg virando None nesse rerun o
-        # st.button(...) nunca chegava a ser chamado, e o botão simplesmente
-        # desaparecia sem nenhum erro. Fix: assim que um arquivo é
-        # selecionado, seu conteúdo (bytes) é guardado em st.session_state --
-        # que SOBREVIVE a st.rerun(), diferente do valor ao vivo do uploader
-        # -- e é essa cópia que decide se o botão aparece e o que é
-        # publicado. As mensagens de sucesso também passam a ser persistidas
-        # em session_state (mesmo padrão já usado em _render_ontrack_publicado
-        # / _render_fechamentos_semanais), porque um st.success() seguido de
-        # st.rerun() nunca chega a aparecer na tela.
-        _msg_mg_v = st.session_state.pop('_mg_msg_vendas', None)
-        if _msg_mg_v:
-            (st.success if _msg_mg_v[0] == 'success' else st.warning)(_msg_mg_v[1])
-        _msg_mg_q = st.session_state.pop('_mg_msg_quebra', None)
-        if _msg_mg_q:
-            (st.success if _msg_mg_q[0] == 'success' else st.warning)(_msg_mg_q[1])
-
-        with st.expander(f'📤 Publicar Realizado — {periodo_mod.rotulo(tipo_mg, ref_mg)}'):
-            if tipo_mg != 'mensal':
-                st.caption('Publicação é sempre por mês -- mude "Tipo de período" acima pra '
-                           '**Mensal** e selecione o mês do PDF pra publicar.')
-            else:
-                st.caption('Sobe o PDF do relatório e o app calcula sozinho -- não depende do '
-                           'que foi (ou não) publicado nas páginas Vendedor-Cliente / Quebra.')
-                col_pub_v, col_pub_q = st.columns(2)
-                with col_pub_v:
-                    st.markdown('**💰 Faturamento / Volume / Margem**')
-                    pdf_vendas_mg = st.file_uploader(
-                        'PDF Lucratividade por Vendedor', type='pdf', key='mg_pdf_vendas')
-                    if pdf_vendas_mg is not None:
-                        st.session_state['_mg_bytes_vendas'] = (pdf_vendas_mg.name, pdf_vendas_mg.getvalue())
-                    _cache_v = st.session_state.get('_mg_bytes_vendas')
-                    if _cache_v is not None and st.button(
-                            '📊 Processar e publicar Vendas', key='mg_btn_pub_vendas'):
-                        with st.spinner('Lendo PDF...'):
-                            try:
-                                _reg_v = mg.publicar_vendas_pdf(
-                                    ref_mg, io.BytesIO(_cache_v[1]),
-                                    usuario=st.session_state.get('usuario_nome'))
-                                _erro_v = _reg_v.get('_erro_persistencia_remota') if _reg_v else None
-                                _tg = (_reg_v.get('valores') or {}).get('total_geral') or {}
-                                if _erro_v:
-                                    st.session_state['_mg_msg_vendas'] = (
-                                        'warning',
-                                        f'Processado, mas houve um problema ao salvar de '
-                                        f'forma permanente: {_erro_v}')
-                                else:
-                                    st.session_state['_mg_msg_vendas'] = (
-                                        'success',
-                                        f"✅ Publicado: R$ {_num_vc(_tg.get('fat', 0), 2)} de "
-                                        f"faturamento, {_num_vc(_tg.get('vol', 0), 0)} cx, "
-                                        f"{_tg.get('resultado_real', 0):.2f}% de margem.")
-                                st.session_state.pop('_mg_bytes_vendas', None)
-                                st.rerun()
-                            except Exception as _e_pub_v:
-                                st.error(f'Erro ao processar o PDF: {_e_pub_v}')
-                with col_pub_q:
-                    st.markdown('**📦 Quebra**')
-                    pdf_quebra_mg = st.file_uploader(
-                        'PDF Resumo do Estoque (Quebra)', type='pdf', key='mg_pdf_quebra')
-                    if pdf_quebra_mg is not None:
-                        st.session_state['_mg_bytes_quebra'] = (pdf_quebra_mg.name, pdf_quebra_mg.getvalue())
-                    _cache_q = st.session_state.get('_mg_bytes_quebra')
-                    if _cache_q is not None and st.button(
-                            '📊 Processar e publicar Quebra', key='mg_btn_pub_quebra'):
-                        with st.spinner('Lendo PDF...'):
-                            try:
-                                _reg_q = mg.publicar_quebra_pdf(
-                                    ref_mg, io.BytesIO(_cache_q[1]),
-                                    usuario=st.session_state.get('usuario_nome'))
-                                _erro_q = _reg_q.get('_erro_persistencia_remota') if _reg_q else None
-                                _vq = (_reg_q.get('valores') or {}) if _reg_q else {}
-                                if _erro_q:
-                                    st.session_state['_mg_msg_quebra'] = (
-                                        'warning',
-                                        f'Processado, mas houve um problema ao salvar de '
-                                        f'forma permanente: {_erro_q}')
-                                else:
-                                    _custo_txt = (f", R$ {_num_vc(_vq.get('total_custo'), 2)}"
-                                                  if _vq.get('total_custo') is not None else '')
-                                    st.session_state['_mg_msg_quebra'] = (
-                                        'success',
-                                        f"✅ Publicado: {_num_vc(_vq.get('total_cx', 0), 0)} cx "
-                                        f"quebradas{_custo_txt}.")
-                                st.session_state.pop('_mg_bytes_quebra', None)
-                                st.rerun()
-                            except Exception as _e_pub_q:
-                                st.error(f'Erro ao processar o PDF: {_e_pub_q}')
+        # O upload de PDFs pra publicar o Realizado (Vendas/Quebra) que
+        # ficava aqui foi movido em 03/09/2026, pedido da Ingrid: "na
+        # gerência não é para ficar upload de nada, apenas os resultados --
+        # upload são todos nos módulos". Agora fica em
+        # pages/3_Vendedor_Cliente_OTHIL.py (seção "📤 Publicar Realizado da
+        # Meta Geral", Faturamento/Volume/Margem) e pages/4_Quebra_OTHIL.py
+        # (mesma seção, aba Mensal) -- mesma publicação INDEPENDENTE de
+        # sempre (mg.MOD_MG_VENDAS / mg.MOD_MG_QUEBRA, mg.publicar_vendas_pdf
+        # / mg.publicar_quebra_pdf, sem nenhuma mudança de comportamento),
+        # só a TELA de upload que mudou de lugar. O resultado publicado lá
+        # continua aparecendo só aqui.
 
         # ── Evolução ──────────────────────────────────────────────────────────
         # Faturamento, Volume e Margem já existiam (Quebra tinha sido removida
