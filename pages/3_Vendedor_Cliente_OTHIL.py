@@ -425,6 +425,71 @@ with tab_rel:
                     import traceback
                     st.code(traceback.format_exc())
 
+    st.divider()
+
+    # ── Meta Geral — Realizado (Faturamento/Volume/Margem) ──────────────────
+    # Publica DIRETO no painel "🌐 Meta Geral" da Gerência -- pedido explícito
+    # da Ingrid, 29/08/2026 ("não quero que seja a soma a partir do módulo
+    # vendedor cliente, quero que tenha espaço pra eu adicionar os PDFs e ele
+    # calcular"): mesmo tipo de PDF do relatório acima, mas publicação
+    # INDEPENDENTE (metas_gerais.MOD_MG_VENDAS -- não depende de ter gerado o
+    # Excel nem de nada mais nesta página, e o envio acima não alimenta isto).
+    # Movido pra cá em 03/09/2026, pedido da Ingrid: "na gerência não é para
+    # ficar upload de nada, apenas os resultados -- upload são todos nos
+    # módulos" (antes ficava dentro da própria Gerência). O resultado
+    # publicado aqui só aparece na aba "🌐 Meta Geral" da Gerência, nunca
+    # nesta página -- mesma política de acesso de 27/08/2026 (ver acesso.py).
+    with st.expander('📤 Publicar Realizado da Meta Geral (Faturamento/Volume/Margem)'):
+        st.caption(
+            'Sobe o mesmo tipo de PDF "Lucratividade por Vendedor" de cima, mas publica '
+            'DIRETO na Meta Geral (Gerência) -- independente do relatório semanal acima.'
+        )
+        pdf_mg_v = st.file_uploader('PDF Lucratividade por Vendedor', type='pdf', key='mg_v_upload')
+        if pdf_mg_v is not None:
+            _raw_mg_v = pdf_mg_v.getvalue()
+            try:
+                _prev_mg_v = parse_totais_vendedor(io.BytesIO(_raw_mg_v))
+            except Exception as _e_prev_v:
+                st.error(f'Não foi possível ler este PDF: {_e_prev_v}')
+                _prev_mg_v = None
+            if _prev_mg_v is not None:
+                _tg_prev_v = _prev_mg_v.get('total_geral') or {}
+                puc1, puc2 = st.columns(2)
+                puc1.metric('Faturamento no PDF', _brl(_tg_prev_v.get('fat', 0)))
+                puc2.metric('Vendedores reconhecidos', len(_prev_mg_v.get('vendedores') or {}))
+
+                _mes_detect_v = mg.mes_do_periodo_pdf(
+                    _prev_mg_v.get('periodo'), _prev_mg_v.get('data_emissao'))
+                _opcoes_mes_v = periodo.listar_periodos('mensal', n=15)
+                if _mes_detect_v not in _opcoes_mes_v:
+                    _opcoes_mes_v = sorted(set(_opcoes_mes_v) | {_mes_detect_v}, reverse=True)
+                _mes_escolhido_v = st.selectbox(
+                    'Mês de referência (Meta Geral)', _opcoes_mes_v,
+                    index=_opcoes_mes_v.index(_mes_detect_v),
+                    format_func=lambda r: periodo.rotulo('mensal', r), key='mg_v_mes_sel',
+                    help=f"Detectado pelo período do PDF "
+                         f"({_prev_mg_v.get('periodo') or _prev_mg_v.get('data_emissao') or '?'}). "
+                         f"Corrija aqui se necessário.",
+                )
+                if st.button('📊 Processar e publicar na Meta Geral', key='mg_v_btn'):
+                    with st.spinner('Publicando...'):
+                        try:
+                            _reg_mg_v = mg.publicar_vendas_pdf(
+                                _mes_escolhido_v, io.BytesIO(_raw_mg_v),
+                                usuario=st.session_state.get('usuario_nome'))
+                            _erro_mg_v = _reg_mg_v.get('_erro_persistencia_remota') if _reg_mg_v else None
+                            if _erro_mg_v:
+                                st.warning(
+                                    f'Publicado localmente, mas houve um problema ao salvar de '
+                                    f'forma permanente: {_erro_mg_v}')
+                            else:
+                                st.success(
+                                    f"✅ Publicado na Meta Geral -- "
+                                    f"{periodo.rotulo('mensal', _mes_escolhido_v)}.")
+                            acesso.redirecionar_pos_upload()
+                        except Exception as _e_pub_v:
+                            st.error(f'Erro ao publicar: {_e_pub_v}')
+
 
 # =============================================================================
 # TAB 2 — On Track por Cliente
