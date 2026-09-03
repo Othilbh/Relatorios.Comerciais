@@ -345,6 +345,25 @@ with tab_rel:
         st.warning(f"Faltando: {', '.join(faltando)}")
     else:
         if st.button('Gerar Excel Vendedor-Cliente', type='primary', use_container_width=True):
+            # BUG REAL corrigido 03/09/2026, reportado pela Ingrid ("Vendedor
+            # cliente, não carrega", print mostrando o spinner "Processando e
+            # montando planilha..." preso na tela junto com o resultado já
+            # pronto embaixo dele). Causa raiz: acesso.redirecionar_pos_upload()
+            # (que faz st.stop()) era chamado AINDA DENTRO do `with
+            # st.spinner(...)`. Reproduzido isolado com Playwright antes de
+            # corrigir: st.stop() disparado de dentro de um st.spinner() ainda
+            # aberto interrompe o script sem o `with` chegar a fechar
+            # normalmente -- e é só ao fechar normalmente que o Streamlit
+            # remove o ícone/texto do spinner da tela. Resultado: o spinner
+            # fica preso pra sempre, mesmo com o resto do conteúdo (sucesso,
+            # botão de baixar, link pra Gerência) já renderizado embaixo dele.
+            # Fix: `with st.spinner(...)` passa a envolver SÓ o processamento
+            # (nada que possa disparar st.stop()) -- sucesso/botão de baixar/
+            # redirecionamento só são montados DEPOIS que o spinner já fechou
+            # normalmente, mesmo padrão já usado em 1_Relatorio_Diario_OTHIL.py.
+            erro_geracao = None
+            erro_traceback = None
+            resultado_geracao = None
             with st.spinner('Processando e montando planilha...'):
                 try:
                     historico   = (
@@ -369,6 +388,7 @@ with tab_rel:
                     # novo na mesma semana/mês não apaga a versão anterior,
                     # e os dados continuam disponíveis mesmo depois de um
                     # restart do app (antes só existiam em session_state).
+                    aviso_persistencia = None
                     try:
                         clientes_data = parse_e_agregar(
                             [io.BytesIO(b) for b in clientes_bytes]
@@ -398,32 +418,44 @@ with tab_rel:
                             usuario=st.session_state.get('usuario_nome'),
                         )
                     except Exception as _e_persist:
-                        st.warning(
+                        aviso_persistencia = (
                             f'Relatório gerado, mas houve um problema ao salvar de forma '
                             f'permanente para a aba On Track: {_e_persist}'
                         )
 
                     fname = f"Vendedor_Cliente_{MESES_ABR[mes-1]}{ano}_OTHIL.xlsx"
-                    st.success(f'Planilha gerada: {fname}')
-                    st.download_button(
-                        label='Baixar Excel',
-                        data=xlsx_bytes,
-                        file_name=fname,
-                        mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-                        use_container_width=True,
-                        type='secondary',
-                    )
-                    if totais_res.get('periodo'):
-                        st.caption(f"Periodo do PDF de totais: {totais_res['periodo']}")
-                    # Fluxo Upload -> Gerência (pedido da Ingrid, 27/08/2026):
-                    # nunca fica numa tela de Dashboard depois de enviar o PDF
-                    # (o botão de baixar o Excel acima continua disponível).
-                    acesso.redirecionar_pos_upload()
-
+                    resultado_geracao = {
+                        'xlsx_bytes': xlsx_bytes,
+                        'fname': fname,
+                        'periodo_totais': totais_res.get('periodo'),
+                        'aviso_persistencia': aviso_persistencia,
+                    }
                 except Exception as exc:
-                    st.error(f'Erro ao gerar Excel: {exc}')
                     import traceback
-                    st.code(traceback.format_exc())
+                    erro_geracao = exc
+                    erro_traceback = traceback.format_exc()
+
+            if erro_geracao is not None:
+                st.error(f'Erro ao gerar Excel: {erro_geracao}')
+                st.code(erro_traceback)
+            else:
+                if resultado_geracao['aviso_persistencia']:
+                    st.warning(resultado_geracao['aviso_persistencia'])
+                st.success(f"Planilha gerada: {resultado_geracao['fname']}")
+                st.download_button(
+                    label='Baixar Excel',
+                    data=resultado_geracao['xlsx_bytes'],
+                    file_name=resultado_geracao['fname'],
+                    mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                    use_container_width=True,
+                    type='secondary',
+                )
+                if resultado_geracao['periodo_totais']:
+                    st.caption(f"Periodo do PDF de totais: {resultado_geracao['periodo_totais']}")
+                # Fluxo Upload -> Gerência (pedido da Ingrid, 27/08/2026):
+                # nunca fica numa tela de Dashboard depois de enviar o PDF
+                # (o botão de baixar o Excel acima continua disponível).
+                acesso.redirecionar_pos_upload()
 
     st.divider()
 
@@ -472,23 +504,35 @@ with tab_rel:
                          f"Corrija aqui se necessário.",
                 )
                 if st.button('📊 Processar e publicar na Meta Geral', key='mg_v_btn'):
+                    # Mesma correção de 03/09/2026 aplicada acima em "Gerar
+                    # Excel Vendedor-Cliente" (ver comentário lá): o spinner
+                    # não pode conter a chamada de redirecionar_pos_upload()
+                    # (st.stop()) -- senão fica preso na tela.
+                    _erro_pub_v = None
+                    _sucesso_pub_v = None
                     with st.spinner('Publicando...'):
                         try:
                             _reg_mg_v = mg.publicar_vendas_pdf(
                                 _mes_escolhido_v, io.BytesIO(_raw_mg_v),
                                 usuario=st.session_state.get('usuario_nome'))
-                            _erro_mg_v = _reg_mg_v.get('_erro_persistencia_remota') if _reg_mg_v else None
-                            if _erro_mg_v:
-                                st.warning(
+                            _erro_persist_v = _reg_mg_v.get('_erro_persistencia_remota') if _reg_mg_v else None
+                            if _erro_persist_v:
+                                _sucesso_pub_v = (
+                                    'warning',
                                     f'Publicado localmente, mas houve um problema ao salvar de '
-                                    f'forma permanente: {_erro_mg_v}')
+                                    f'forma permanente: {_erro_persist_v}')
                             else:
-                                st.success(
+                                _sucesso_pub_v = (
+                                    'success',
                                     f"✅ Publicado na Meta Geral -- "
                                     f"{periodo.rotulo('mensal', _mes_escolhido_v)}.")
-                            acesso.redirecionar_pos_upload()
                         except Exception as _e_pub_v:
-                            st.error(f'Erro ao publicar: {_e_pub_v}')
+                            _erro_pub_v = _e_pub_v
+                    if _erro_pub_v is not None:
+                        st.error(f'Erro ao publicar: {_erro_pub_v}')
+                    else:
+                        (st.success if _sucesso_pub_v[0] == 'success' else st.warning)(_sucesso_pub_v[1])
+                        acesso.redirecionar_pos_upload()
 
 
 # =============================================================================
