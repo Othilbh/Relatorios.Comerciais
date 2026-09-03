@@ -1,0 +1,181 @@
+{
+  "current": {
+    "id": "3c25c2b5-b204-4310-8bf7-988e47840a65",
+    "modulo_origem": "metas_gerais_quebra",
+    "tipo_periodo": "mensal",
+    "periodo_ref": "2026-09",
+    "data_referencia": "2026-09-03",
+    "criado_em": "2026-09-03T15:11:24+00:00",
+    "atualizado_em": "2026-09-03T15:11:24+00:00",
+    "usuario": "Ingrid",
+    "versao": 1,
+    "valores": {
+      "periodo": "01/09/2026 a 03/09/2026",
+      "emissao": "",
+      "total_cx": 143.0,
+      "total_custo": 10285.779999999999,
+      "grupos": [
+        {
+          "grupo": "FUJI 0702",
+          "codigo": "1.1.02.02.001.002",
+          "categoria": "Maçã Fuji",
+          "cx": 69.0,
+          "custo": 4633.69
+        },
+        {
+          "grupo": "MAMAO 4601",
+          "codigo": "1.1.04.01.004",
+          "categoria": "Mamão",
+          "cx": 27.0,
+          "custo": 1397.25
+        },
+        {
+          "grupo": "MELAO 3102",
+          "codigo": "1.1.04.02.002.001",
+          "categoria": "Melão",
+          "cx": 12.0,
+          "custo": 843.83
+        },
+        {
+          "grupo": "TANGERINA",
+          "codigo": "1.1.04.02.010.006",
+          "categoria": "Citros",
+          "cx": 11.0,
+          "custo": 826.74
+        },
+        {
+          "grupo": "PERA IMP 1/2 PORT 0205",
+          "codigo": "1.1.01.01.002.005",
+          "categoria": "Outros",
+          "cx": 7.0,
+          "custo": 796.43
+        },
+        {
+          "grupo": "AMEIXA IMPORTADA 2501",
+          "codigo": "1.1.04.01.002.001",
+          "categoria": "Caroço",
+          "cx": 3.0,
+          "custo": 421.45
+        },
+        {
+          "grupo": "PERA IMP PACK 0102",
+          "codigo": "1.1.01.01.001.002",
+          "categoria": "Outros",
+          "cx": 2.0,
+          "custo": 256.29
+        },
+        {
+          "grupo": "GALA 0701",
+          "codigo": "1.1.02.02.001.001",
+          "categoria": "Maçã Gala",
+          "cx": 2.0,
+          "custo": 110.83
+        },
+        {
+          "grupo": "CAQUI JUND",
+          "codigo": "1.1.03.04.002.001",
+          "categoria": "Caqui",
+          "cx": 2.0,
+          "custo": 90.81
+        },
+        {
+          "grupo": "NECTARINA IMPORTADA 2601",
+          "codigo": "1.1.04.01.003.001",
+          "categoria": "Caroço",
+          "cx": 2.0,
+          "custo": 252.0
+        },
+        {
+          "grupo": "UVAS JUND 5KG 8101",
+          "codigo": "1.1.03.04.001.001",
+          "categoria": "Outros",
+          "cx": 1.0,
+          "custo": 65.64
+        },
+        {
+          "grupo": "UVAS PETRO 8KG 8302",
+          "codigo": "1.1.03.06.001.002",
+          "categoria": "Outros",
+          "cx": 1.0,
+          "custo": 71.06
+        },
+        {
+          "grupo": "PESSEGO IMPORTADO 2401",
+          "codigo": "1.1.04.01.001.001",
+          "categoria": "Caroço",
+          "cx": 1.0,
+          "custo": 154.44
+        },
+        {
+          "grupo": "KIWI IMPORTADO 3801",
+          "codigo": "1.1.04.02.009.001",
+          "categoria": "Kiwi",
+          "cx": 1.0,
+          "custo": 141.74
+        },
+        {
+          "grupo": "MIXIRICA NACIONAL 3904",
+          "codigo": "1.1.04.02.010.004",
+          "categoria": "Outros",
+          "cx": 1.0,
+          "custo": 52.69
+        },
+        {
+          "grupo": "PRODUTOS EXOTICOS",
+          "codigo": "1.1.04.06",
+          "categoria": "Outros",
+          "cx": 1.0,
+          "custo": 170.89
+        }
+      ],
+      "categorias": [
+        {
+          "categoria": "Maçã Fuji",
+          "cx": 69.0,
+          "custo": 4633.69
+        },
+        {
+          "categoria": "Mamão",
+          "cx": 27.0,
+          "custo": 1397.25
+        },
+        {
+          "categoria": "Outros",
+          "cx": 13.0,
+          "custo": 1413.0
+        },
+        {
+          "categoria": "Melão",
+          "cx": 12.0,
+          "custo": 843.83
+        },
+        {
+          "categoria": "Citros",
+          "cx": 11.0,
+          "custo": 826.74
+        },
+        {
+          "categoria": "Caroço",
+          "cx": 6.0,
+          "custo": 827.89
+        },
+        {
+          "categoria": "Maçã Gala",
+          "cx": 2.0,
+          "custo": 110.83
+        },
+        {
+          "categoria": "Caqui",
+          "cx": 2.0,
+          "custo": 90.81
+        },
+        {
+          "categoria": "Kiwi",
+          "cx": 1.0,
+          "custo": 141.74
+        }
+      ]
+    }
+  },
+  "history": []
+}
