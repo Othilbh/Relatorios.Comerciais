@@ -2031,34 +2031,78 @@ def _render_prevperdas_secao(tipo, titulo):
 
 # ── Metas Gerais ────────────────────────────────────────────────────────────
 
-def _badge_indicador_simples(status, titulo, valor_txt, detalhe=None):
-    """Indicador simplificado (badge colorido, 1 número em destaque) --
-    pedido explícito da Ingrid, 28/08/2026: "algum indicador simplificado
-    que acompanhe o track de margem" / "algum indicador que vá indicando a
-    relação quebra vs faturamento". Mesmas cores de status do resto da
-    tela (_GER_STATUS_CORES bg/fg), sem os detalhes extras (projeção,
-    histórico etc.) que os cards anteriores tinham -- só o essencial.
+def _badge_indicador_simples(status, titulo, valor_txt, detalhe=None,
+                              pct_atingido=None, pct_esperado=None):
+    """Indicador em formato de BARRA DE PROGRESSO que cresce em direção à
+    meta -- pedido explícito da Ingrid, 03/09/2026 (com print de referência
+    em anexo, estilo barra de progresso/data bar): "Quero como se fosse uma
+    barra que vai crescendo à medida que chega perto da meta." Antes (desde
+    28/08/2026) era um cartão colorido "chapado" (badge, só cor de fundo +
+    número), sem crescer visualmente com o progresso -- ela esclareceu que
+    não era isso que queria. Reaproveita o MESMO estilo de barra já usado
+    em outros lugares da Gerência (Ranking de Vendedores, OnTrack por
+    Cliente -- ver por ex. as barras logo acima de "🏆 Ranking de
+    Vendedores"), não inventado do zero: fundo cinza claro, preenchimento
+    sólido na cor do status, com o traço vertical de "ritmo esperado".
 
-    Mostra o rótulo do OnTrack (🟢 On Track / 🟡 Atenção / 🔴 Fora do Track /
-    ⚪ Sem meta) junto com a % da meta -- pedido explícito da Ingrid,
-    03/09/2026: "Eu quero ontrack, alem da porcentagem, lembra?". Desde
-    31/08/2026 o badge já usava a COR do status (_GER_STATUS_CORES) pra
-    indicar isso, mas só a cor -- sem o texto do rótulo em lugar nenhum da
-    tela, então não dava pra saber (e nem apontar num print/relatório) qual
-    dos 4 estados era só olhando. `status` já é sempre uma das constantes
-    de on_track.py (STATUS_VERDE/ATENCAO/FORA/SEM_META) em todo chamador
-    desta função -- tanto quando vem direto de on_track.calcular() quanto
-    de mg.status_quebra() (que reusa o mesmo EMOJI/LABEL internamente) --
-    por isso dá pra buscar o rótulo aqui dentro, sem mudar nenhum
-    chamador."""
+    O rótulo do OnTrack (🟢 On Track / 🟡 Atenção / 🔴 Fora do Track / ⚪ Sem
+    meta), pedido também em 03/09/2026 ("Eu quero ontrack, alem da
+    porcentagem, lembra?"), continua aparecendo -- agora acima da barra.
+
+    pct_atingido: fração (pode passar de 1.0) do quanto já foi atingido da
+    meta -- define o preenchimento da barra (capado visualmente em 100%,
+    mesmo quando o valor real ultrapassa isso). None = sem meta/dado ainda
+    (barra vazia, mesmo caso de sempre tratado pelos chamadores via '—' em
+    valor_txt).
+    pct_esperado: fração (0.0-1.0) de quanto já era esperado ter sido
+    atingido até agora (ex.: tempo decorrido do período) -- desenha o
+    traço de ritmo esperado, igual às barras do Ranking/OnTrack por
+    Cliente. Opcional: nem todo indicador tem essa referência calculada
+    (ex.: Quebra com teto em % do faturamento, onde o "esperado" não é
+    proporcional ao tempo, e sim ao faturamento realizado -- nesse caso
+    fica sem o traço, só a barra)."""
     cores = _GER_STATUS_CORES[status]
     rotulo_ot = f'{on_track.EMOJI[status]} {on_track.LABEL[status]}'
+    prog_w = min(max(pct_atingido, 0.0), 1.0) * 100 if pct_atingido is not None else 0.0
+
+    marcador_html = ''
+    if pct_esperado is not None:
+        exp_w = min(max(pct_esperado, 0.0), 1.0) * 100
+        marcador_html = (
+            f'<div style="position:absolute; top:0; left:{exp_w:.1f}%; width:2px; '
+            f'height:28px; background:#333; opacity:.45;" '
+            f'title="Ritmo esperado: {exp_w:.0f}%"></div>'
+        )
+
+    # Com a barra ainda estreita, o número não cabe dentro dela sem cortar
+    # -- abaixo de ~12% de preenchimento o valor sai pra fora, à direita,
+    # em vez de espremido dentro do trecho colorido.
+    if prog_w >= 12:
+        barra_interior = (
+            f'<div style="background:{cores["cor"]}; width:{prog_w:.1f}%; height:28px; '
+            f'border-radius:8px; display:flex; align-items:center; justify-content:flex-end; '
+            f'padding-right:8px;"><span style="color:white; font-weight:700; font-size:13px; '
+            f'white-space:nowrap;">{valor_txt}</span></div>'
+        )
+        valor_fora_html = ''
+    else:
+        barra_interior = (
+            f'<div style="background:{cores["cor"]}; width:{prog_w:.1f}%; height:28px; '
+            f'border-radius:8px;"></div>'
+        )
+        valor_fora_html = (
+            f'<span style="position:absolute; top:0; left:calc({prog_w:.1f}% + 6px); '
+            f'line-height:28px; color:{cores["cor"]}; font-weight:700; font-size:13px; '
+            f'white-space:nowrap;">{valor_txt}</span>'
+        )
+
     st.markdown(
-        f'<div style="background:{cores["bg"]}; color:{cores["fg"]}; border-radius:8px; '
-        f'padding:10px 14px; margin-bottom:0.2rem;">'
-        f'<div style="font-size:0.8rem; font-weight:600; opacity:0.85;">{titulo}</div>'
-        f'<div style="font-size:1.35rem; font-weight:700;">{valor_txt}</div>'
-        f'<div style="font-size:0.85rem; font-weight:700; margin-top:2px;">{rotulo_ot}</div></div>',
+        f'<div style="margin-bottom:0.2rem;">'
+        f'<div style="font-size:0.8rem; font-weight:600; color:#333;">{titulo}</div>'
+        f'<div style="font-size:0.8rem; font-weight:700; color:{cores["cor"]}; margin:1px 0 4px;">{rotulo_ot}</div>'
+        f'<div style="background:#e8e8e8; border-radius:8px; height:28px; position:relative;">'
+        f'{barra_interior}{marcador_html}{valor_fora_html}'
+        f'</div></div>',
         unsafe_allow_html=True,
     )
     if detalhe:
@@ -2181,7 +2225,8 @@ def _render_metas_gerais():
                 _fat_det = f"R$ {_num_vc(rv['faturamento'], 0)} de R$ {_num_vc(meta_atual['faturamento'], 0)}"
             else:
                 _fat_det = 'Faturamento ainda não publicado'
-            _badge_indicador_simples(ot_fat['status'], '💰 Faturamento', _fat_pct_txt, _fat_det)
+            _badge_indicador_simples(ot_fat['status'], '💰 Faturamento', _fat_pct_txt, _fat_det,
+                                      pct_atingido=ot_fat['pct_atingido'], pct_esperado=ot_fat['pct_esperado'])
         with _col_marg:
             _marg_pct_txt = (f"{ot_marg['pct_atingido'] * 100:.0f}% da meta"
                               if ot_marg['pct_atingido'] is not None else '—')
@@ -2194,7 +2239,8 @@ def _render_metas_gerais():
                 _marg_det = f"{rv['margem_pct']:.1f}% de {meta_atual['margem_pct']:.1f}% de meta"
             else:
                 _marg_det = 'Margem ainda não publicada'
-            _badge_indicador_simples(ot_marg['status'], '📊 Margem', _marg_pct_txt, _marg_det)
+            _badge_indicador_simples(ot_marg['status'], '📊 Margem', _marg_pct_txt, _marg_det,
+                                      pct_atingido=ot_marg['pct_atingido'], pct_esperado=ot_marg['pct_esperado'])
         with _col_qbr:
             # Mesma prioridade R$ > cx de sempre: usa custo real (R$) quando
             # já extraído do PDF e o Teto em R$ (calculado a partir do % ou
@@ -2256,7 +2302,8 @@ def _render_metas_gerais():
             if _qbr_pct_atingido is None and rq.get('erro_leitura'):
                 _qbr_det = (f'🔴 Não deu pra confirmar -- consulta ao GitHub falhou. '
                             f'Detalhe técnico: {rq["erro_leitura"]}')
-            _badge_indicador_simples(_ot_qbr['status'], '📦 Quebra', _qbr_pct_txt, _qbr_det)
+            _badge_indicador_simples(_ot_qbr['status'], '📦 Quebra', _qbr_pct_txt, _qbr_det,
+                                      pct_atingido=_qbr_pct_atingido)
 
         st.divider()
 
@@ -2407,18 +2454,27 @@ def _render_metas_gerais():
             # Fevereiro, Janeiro...) mesmo com df_evol já montado na ordem
             # cronológica certa (via hist_refs acima). sort=False desliga essa
             # ordenação automática e preserva a ordem das linhas do DataFrame.
-            ev1, ev2, ev3 = st.columns(3)
-            with ev1:
+            # Layout 2x2 (2 gráficos em cima, 2 embaixo) -- pedido explícito
+            # da Ingrid, 03/09/2026: antes eram 3 colunas lado a lado
+            # (Faturamento/Volume/Margem) e a Quebra sozinha, ocupando a
+            # largura inteira, numa linha por baixo -- ela achou que ficava
+            # "se encontrando"/apertado visualmente com 3 gráficos espremidos
+            # numa linha só. Mesmos 4 gráficos, mesmos dados/cores/período,
+            # só a distribuição em colunas que mudou.
+            ev_r1c1, ev_r1c2 = st.columns(2)
+            with ev_r1c1:
                 st.caption('Faturamento (R$)')
                 st.bar_chart(df_evol[['Faturamento']], color='#2D6A4F', sort=False)
-            with ev2:
+            with ev_r1c2:
                 st.caption('Volume (CX)')
                 st.bar_chart(df_evol[['Volume (CX)']], color='#7C6FAD', sort=False)
-            with ev3:
+            ev_r2c1, ev_r2c2 = st.columns(2)
+            with ev_r2c1:
                 st.caption('Margem (%)')
                 st.bar_chart(df_evol[['Margem (%)']], color='#2A6F97', sort=False)
-            st.caption('Quebra (R$ — ou cx, quando o custo real ainda não foi extraído do PDF)')
-            st.bar_chart(df_evol[['Quebra (R$)']], color='#BC4749', sort=False)
+            with ev_r2c2:
+                st.caption('Quebra (R$ — ou cx, quando o custo real ainda não foi extraído do PDF)')
+                st.bar_chart(df_evol[['Quebra (R$)']], color='#BC4749', sort=False)
 
         # ── OnTrack Semanal — quebra da meta MENSAL fixa (Faturamento) ──────
         # Só faz sentido pra 'mensal' (não dá pra quebrar um trimestre/ano em
@@ -2589,7 +2645,9 @@ def _render_metas_gerais():
                 else:
                     _fat_sel_det = 'Meta individual de Faturamento não definida'
                 _badge_indicador_simples(_ot_fat_sel['status'], '💰 Faturamento (On Track)',
-                                          _fat_sel_txt, _fat_sel_det)
+                                          _fat_sel_txt, _fat_sel_det,
+                                          pct_atingido=_ot_fat_sel['pct_atingido'],
+                                          pct_esperado=_ot_fat_sel['pct_esperado'])
             with _dcol_marg_sel:
                 _marg_sel_txt = (f"{_ot_marg_sel['pct_atingido'] * 100:.0f}% da meta"
                                   if _ot_marg_sel['pct_atingido'] is not None else '—')
@@ -2599,7 +2657,9 @@ def _render_metas_gerais():
                 else:
                     _marg_sel_det = 'Meta de Margem da empresa não definida'
                 _badge_indicador_simples(_ot_marg_sel['status'], '📊 Margem (On Track)',
-                                          _marg_sel_txt, _marg_sel_det)
+                                          _marg_sel_txt, _marg_sel_det,
+                                          pct_atingido=_ot_marg_sel['pct_atingido'],
+                                          pct_esperado=_ot_marg_sel['pct_esperado'])
 
         # ── OnTrack Semanal por Vendedor — quebra da meta MENSAL fixa dele ──
         # Fica FORA do if/else acima de propósito: precisa estar disponível
