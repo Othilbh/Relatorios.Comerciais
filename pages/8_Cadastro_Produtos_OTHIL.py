@@ -187,7 +187,9 @@ st.divider()
 st.header('2. Marcas cadastradas')
 st.caption(
     'Edite direto na tabela: clique numa célula pra alterar, use o "+" no fim da tabela pra '
-    'adicionar uma marca nova, ou selecione uma linha e aperte a lixeira pra remover. '
+    'adicionar uma marca nova, ou clique na linha pra selecioná-la (fica destacada) e aperte '
+    'Delete ou Backspace no teclado pra remover -- não existe ícone de lixeira, a tabela usa o '
+    'teclado pra apagar linha. '
     f'Produto que não bater com nenhuma marca cadastrada usa {mp.PADRAO_PCT:g}% (padrão) no '
     'dashboard Margem Real, e fica sinalizado lá até você adicionar a marca aqui.'
 )
