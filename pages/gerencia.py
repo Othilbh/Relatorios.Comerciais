@@ -22,7 +22,6 @@ import data_store as ds
 import metas_gerais as mg
 import calc
 import rentabilidade as rent
-import produtos as prod
 import resumo_matriz
 import marcas_fornecedor as mf
 from xlsx_vendedor_cliente import VENDOR_TAB, _normalize
@@ -2890,108 +2889,12 @@ def _render_rentabilidade_resumo():
             st.caption(f'+ {len(alertas) - 5} outro(s) ponto(s) de atenção. Veja o módulo completo para a lista inteira.')
 
 
-def _render_produtos_resumo():
-    st.header('📦 Relatórios de Produtos — Resumo')
-    st.caption('Visão consolidada para a Gerência (reaproveita o mesmo motor de cálculo do módulo '
-               'completo -- nenhuma lógica de faturamento/volume foi duplicada aqui).')
-    # O link que existia aqui pro "módulo completo" (filtros/rankings/
-    # matrizes/histórico) foi removido em 02/09/2026: aquele conteúdo em
-    # pages/7_Relatorios_Produtos_OTHIL.py nunca chegava a ficar visível
-    # (bloqueado por acesso.parar_se_upload(), política de upload de
-    # 27/08/2026) e foi removido junto com a renomeação daquela página pra
-    # "Resultado de Produtos" (pedido da Ingrid -- ver marcas_fornecedor.py
-    # e a aba "🏷️ Marca/Fornecedor" logo abaixo, que é o que passou a viver
-    # ali). Este resumo aqui é independente disso e continua igual.
-
-    itens_base, avisos = prod.carregar_base_consolidada()
-    if not itens_base:
-        st.info('Ainda não há dados suficientes. Faça upload de pelo menos um Relatório Diário, '
-                'Semanal ou Mensal.')
-        return
-    if avisos:
-        st.caption(f'ℹ️ {len(avisos)} registro(s) não incluído(s) no histórico consolidado (evita duplicidade).')
-
-    col_tipo, col_periodo = st.columns([1, 2])
-    with col_tipo:
-        tipo_p = st.selectbox('Período', periodo_mod.TIPOS_PERIODO, format_func=periodo_mod.rotulo_tipo,
-                               index=1, key='ger_prod_tipo')
-    opcoes_p = prod.periodos_disponiveis(itens_base, tipo_p)
-    if not opcoes_p:
-        st.warning('Nenhum dado disponível para esse tipo de período.')
-        return
-    with col_periodo:
-        ref_p = st.selectbox('Referência', opcoes_p, format_func=lambda r: periodo_mod.rotulo(tipo_p, r),
-                              key='ger_prod_periodo')
-
-    itens_p = prod.filtrar_periodo(itens_base, tipo_p, ref_p)
-    if not itens_p:
-        st.info('Sem dados para este período.')
-        return
-    kpi = prod.kpis_produto(itens_p)
-    ref_ant = periodo_mod.periodo_anterior(tipo_p, ref_p)
-    itens_ant = prod.filtrar_periodo(itens_base, tipo_p, ref_ant)
-    kpi_ant = prod.kpis_produto(itens_ant) if itens_ant else None
-
-    def _c(chave):
-        return comparativo.calcular(kpi.get(chave), kpi_ant.get(chave)) if kpi_ant else None
-
-    c1, c2, c3, c4 = st.columns(4)
-    c1.metric('Produtos Trabalhados', kpi.get('skus', 0),
-              delta=comparativo.formatar_variacao(_c('skus')) if kpi_ant else None)
-    c2.metric('Faturamento', f"R$ {_num_vc(kpi['faturamento'], 2)}",
-              delta=comparativo.formatar_variacao(_c('faturamento')) if kpi_ant else None)
-    c3.metric('Volume (cx)', f"{_num_vc(kpi['volume'], 3)}",
-              delta=comparativo.formatar_variacao(_c('volume')) if kpi_ant else None)
-    c4.metric('Margem de Contribuição', f"R$ {_num_vc(kpi['margem_rs'], 2)}",
-              delta=comparativo.formatar_variacao(_c('margem_rs')) if kpi_ant else None)
-
-    c5, c6, c7 = st.columns(3)
-    margem_pp_ger = (kpi['margem_pct'] - kpi_ant['margem_pct']) if kpi_ant else None
-    c5.metric('Margem %', f"{kpi['margem_pct']:.2f}%",
-              delta=(f"{'+' if margem_pp_ger >= 0 else ''}{margem_pp_ger:.2f} p.p."
-                     if margem_pp_ger is not None else None))
-    c6.metric('Grupo Líder', kpi.get('grupo_lider') or '-')
-    c7.metric('Produto Líder', kpi.get('produto_lider') or '-')
-
-    ranking_ger = prod.ranking_com_crescimento(itens_p, itens_ant or None)
-    contagem_ger = prod.contagem_crescimento_queda(ranking_ger)
-    dest = prod.destaques(itens_p, itens_ant)
-    if dest:
-        rcol1, rcol2 = st.columns(2)
-        with rcol1:
-            if dest.get('maior_crescimento'):
-                mc = dest['maior_crescimento']
-                st.markdown(f"**📈 Maior crescimento:** {mc['chave']} ({mc['crescimento_pct']:.2f}%) "
-                            f"— {contagem_ger['crescimento']} produto(s) em crescimento no total.")
-            else:
-                st.markdown('**📈 Maior crescimento:** nenhum produto cresceu neste recorte.')
-        with rcol2:
-            if dest.get('maior_queda'):
-                mq = dest['maior_queda']
-                st.markdown(f"**📉 Maior queda:** {mq['chave']} ({mq['crescimento_pct']:.2f}%) "
-                            f"— {contagem_ger['queda']} produto(s) em queda no total.")
-            else:
-                st.markdown('**📉 Maior queda:** nenhum produto caiu neste recorte.')
-
-    st.markdown('**🏆 Top 5 Produtos (Faturamento)**')
-    top_p = sorted(prod.por_produto(itens_p), key=lambda l: l['faturamento'], reverse=True)[:5]
-    st.dataframe(pd.DataFrame([{'Produto': p['chave'], 'Faturamento R$': p['faturamento'],
-                                 'Margem R$': p['margem_rs'], 'Volume (cx)': p['volume']} for p in top_p]),
-                 use_container_width=True, hide_index=True)
-
-    alertas = prod.alertas_produtos(itens_p, itens_ant or None)
-    st.markdown('**🚨 Pontos de Atenção**')
-    if not alertas:
-        st.success('Nenhum ponto de atenção identificado.')
-    else:
-        for a in alertas[:5]:
-            icone = '🔴' if a['severidade'] == 'critico' else '🟡'
-            st.markdown(f"{icone} **{a['tipo']}** — {a['detalhe']}")
-        if len(alertas) > 5:
-            st.caption(f'+ {len(alertas) - 5} outro(s) ponto(s) de atenção. Veja o módulo completo para a lista inteira.')
-
-
-# ── Marca/Fornecedor ─────────────────────────────────────────────────────────
+# ── Marca/Fornecedor (exibida como "Resultado de Produtos") ─────────────────
+# A antiga aba "📦 Produtos" (_render_produtos_resumo(), base consolidada de
+# Relatório Diário/Semanal/Mensal via produtos.carregar_base_consolidada())
+# foi removida em 03/09/2026, pedido da Ingrid -- a base em produtos.py
+# continua intacta (módulo compartilhado, outras páginas podem usá-la), só
+# deixou de ser chamada aqui.
 # Pedido da Ingrid, 02/09/2026: reunião comercial do 1º sábado do mês pra
 # discutir fornecedores. Upload dos PDFs mensais ("Resumo do Estoque",
 # Vendas+Bonificação e Quebra) é feito em Resultado de Produtos, NUNCA
@@ -3004,9 +2907,17 @@ def _render_produtos_resumo():
 # app que lidam com meses sem dado.
 
 def _render_marca_fornecedor():
-    st.header('🏷️ Resultado por Marca/Fornecedor')
+    st.header('📦 Resultado de Produtos')
     st.caption('Base: PDFs "Resumo do Estoque" (Vendas+Bonificação e Quebra) enviados mensalmente em '
                '**Resultado de Produtos**. Margem com o mesmo ajuste de +15pp usado no resto do app.')
+
+    # Mensagem da correção/exclusão de mês (ver "🗑️ Apagar os dados deste
+    # mês" abaixo) -- mesmo padrão de session_state já usado em
+    # _render_ontrack_publicado/_render_fechamentos_semanais, porque um
+    # st.success() seguido de st.rerun() nunca chega a aparecer na tela.
+    _msg_mf_del = st.session_state.pop('_mf_del_msg', None)
+    if _msg_mf_del:
+        (st.success if _msg_mf_del[0] == 'success' else st.warning)(_msg_mf_del[1])
 
     meses = mf.meses_disponiveis()
     if not meses:
@@ -3026,6 +2937,46 @@ def _render_marca_fornecedor():
                    'até o PDF de Vendas+Bonificação ser enviado.')
     elif not itens_q:
         st.caption('Quebra ainda não enviada neste mês.')
+
+    # Apagar dados de um mês (03/09/2026, pedido da Ingrid: um PDF emitido
+    # nos primeiros dias do mês seguinte pode ter sido publicado no mês
+    # errado antes de existir o seletor de mês em Resultado de Produtos).
+    # AÇÃO IRREVERSÍVEL -- mesmo padrão já usado em "🔧 Corrigir a semana"
+    # (_render_ontrack_publicado/_render_fechamentos_semanais): só habilita
+    # o botão depois de marcar a confirmação, nunca automático.
+    with st.expander(f'🗑️ Apagar os dados de {periodo_mod.rotulo("mensal", mes_sel)} (irreversível)'):
+        st.caption(
+            'Apaga PERMANENTEMENTE o(s) PDF(s) publicado(s) para este mês (Vendas+Bonificação '
+            'e/ou Quebra) -- não dá pra desfazer. Use só quando o mês foi identificado errado '
+            '(ex.: PDF emitido já no mês seguinte); depois reenvie os PDFs em **Resultado de '
+            'Produtos**, escolhendo o mês correto.'
+        )
+        confirma_del_mf = st.checkbox(
+            'Confirmo que quero apagar os dados deste mês permanentemente',
+            key=f'mf_del_conf_{mes_sel}',
+        )
+        if st.button('🗑️ Apagar definitivamente', key=f'mf_del_btn_{mes_sel}',
+                      disabled=not confirma_del_mf):
+            erros_del_mf = []
+            if itens_v:
+                ok_v_mf, err_v_mf = ds.delete_record(mf.MOD_VENDAS, 'mensal', mes_sel)
+                if not ok_v_mf:
+                    erros_del_mf.append(f'Vendas: {err_v_mf}')
+            if itens_q:
+                ok_q_mf, err_q_mf = ds.delete_record(mf.MOD_QUEBRA, 'mensal', mes_sel)
+                if not ok_q_mf:
+                    erros_del_mf.append(f'Quebra: {err_q_mf}')
+            # Limpa o key do selectbox de mês -- mesmo motivo já documentado
+            # em "🔧 Corrigir a semana": depois que um widget com key já
+            # rodou, o Streamlit ignora index= em reruns seguintes.
+            st.session_state.pop('mf_mes_sel', None)
+            if erros_del_mf:
+                st.session_state['_mf_del_msg'] = (
+                    'warning', 'Não deu pra apagar tudo: ' + '; '.join(erros_del_mf))
+            else:
+                st.session_state['_mf_del_msg'] = (
+                    'success', f'🗑️ Dados de {periodo_mod.rotulo("mensal", mes_sel)} apagados.')
+            st.rerun()
 
     marcas_cad = mp.carregar_marcas()
     resultado = mf.agregar_por_marca(itens_v, itens_q, marcas_cad)
@@ -3309,10 +3260,9 @@ with grp_top_dashboards:
 
 # ══ GRUPO: RESULTADOS ═════════════════════════════════════════════════════════
 with grp_top_resultados:
-    grp_rentabilidade, grp_produtos, grp_marca_fornecedor, grp_recorrencia = st.tabs([
+    grp_rentabilidade, grp_marca_fornecedor, grp_recorrencia = st.tabs([
         '💰 Rentabilidade',
-        '📦 Produtos',
-        '🏷️ Marca/Fornecedor',
+        '📦 Resultado de Produtos',
         '🔄 Recorrência',
     ])
 
@@ -3320,11 +3270,13 @@ with grp_top_resultados:
     with grp_rentabilidade:
         _render_rentabilidade_resumo()
 
-    # ── PRODUTOS ──────────────────────────────────────────────────────────────
-    with grp_produtos:
-        _render_produtos_resumo()
-
-    # ── MARCA/FORNECEDOR ─────────────────────────────────────────────────────
+    # ── RESULTADO DE PRODUTOS (Marca/Fornecedor) ────────────────────────────
+    # A antiga aba "📦 Produtos" (_render_produtos_resumo(), base consolidada
+    # de Relatório Diário/Semanal/Mensal) foi removida em 03/09/2026 -- pedido
+    # da Ingrid ("apague a aba de Produtos, deixe somente a de Marca/
+    # Fornecedor, porém mude a nomenclatura para Resultado de Produtos"). A
+    # base por trás dela (produtos.carregar_base_consolidada() e o resto de
+    # produtos.py) não foi apagada -- só deixou de ser chamada aqui.
     with grp_marca_fornecedor:
         _render_marca_fornecedor()
 
