@@ -2714,10 +2714,12 @@ def _render_metas_gerais():
             with st.expander('👥 Vendedores ativos (adicionar / remover)'):
                 st.caption(
                     'Edite direto na tabela: clique numa célula pra corrigir o nome, use o "+" '
-                    'no fim da tabela pra adicionar um vendedor novo, ou selecione uma linha e '
-                    'aperte a lixeira pra remover quem não faz mais parte da equipe. Remover '
-                    'aqui não apaga a meta antiga já salva dele -- só faz ele sumir do '
-                    'formulário abaixo na próxima vez que as metas forem salvas.'
+                    'no fim da tabela pra adicionar um vendedor novo, ou clique na linha pra '
+                    'selecioná-la (fica destacada) e aperte Delete ou Backspace no teclado pra '
+                    'remover quem não faz mais parte da equipe -- não existe ícone de lixeira, '
+                    'a tabela usa o teclado pra apagar linha. Remover aqui não apaga a meta '
+                    'antiga já salva dele -- só faz ele sumir do formulário abaixo na próxima '
+                    'vez que as metas forem salvas.'
                 )
                 if 'mg_vend_ativos_df' not in st.session_state:
                     st.session_state['mg_vend_ativos_df'] = pd.DataFrame(
