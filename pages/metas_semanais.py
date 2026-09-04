@@ -17,7 +17,7 @@ from parsers import parse_estoque, parse_vendas, normalize_codigo
 from parsers_diario import parse_vendas_pdftotext
 from parsers_vendedor import parse_totais_vendedor
 from calc import (compute_metas, VENDEDORES_PADRAO, parse_codigos_input, map_vendedor,
-                   codigo_matches, soma_falta, sugestao_codigo_por_nome,
+                   codigo_matches, soma_falta, sugestao_codigo_por_nome, round_up,
                    slug_semana as _slug_semana, label_semana as _label_semana,
                    dia_semana_atual as _dia_semana_atual)
 from pdfgen import generate_relatorio_vendedor, generate_dashboard, generate_resumo_geral
@@ -793,6 +793,41 @@ with tab_cfg:
                     if st.button('🗑️', key=f'del_{i}'):
                         remover_idx = i
 
+                # Meta fixa por vendedor (pedido da Ingrid, 04/09/2026): "Hoje
+                # a meta semanal é definida por porcentagens fixas. Preciso
+                # que eu consiga momentaneamente definir quantidades por
+                # alguns produtos". Por padrão (desligado) o produto continua
+                # 100% pelo percentual, igual sempre foi -- ligar aqui só
+                # afeta ESTE produto, e só os vendedores em que ela realmente
+                # digitar um número; reversível a qualquer momento (desligar
+                # volta pro percentual sem apagar os números já digitados).
+                p.setdefault('metas_fixas_ativo', False)
+                p.setdefault('metas_fixas', {})
+                p['metas_fixas_ativo'] = st.checkbox(
+                    '🔧 Definir meta fixa por vendedor neste produto (em vez de %)',
+                    value=p['metas_fixas_ativo'], key=f'metafixa_on_{i}',
+                )
+                if p['metas_fixas_ativo']:
+                    st.caption(
+                        'Com isso ligado, a meta de TODOS os vendedores neste produto passa a '
+                        'ser o número digitado abaixo (já sugerido a partir do % configurado, '
+                        'pra você só ajustar quem precisa mudar). Se o estoque deste produto '
+                        'mudar depois, os números aqui NÃO se atualizam sozinhos -- ajuste à '
+                        'mão ou desligue e ligue de novo pra puxar a sugestão atual.'
+                    )
+                    estoque_atual = int(p.get('estoque', 0) or 0)
+                    vend_cols = st.columns(len(cfg['vendedor_pcts']))
+                    for col, (vend, pct) in zip(vend_cols, cfg['vendedor_pcts'].items()):
+                        sugestao_pct = round_up(pct / 100 * estoque_atual)
+                        valor_atual = p['metas_fixas'].get(vend, sugestao_pct)
+                        with col:
+                            novo_valor = st.number_input(
+                                vend, min_value=0, step=1,
+                                value=int(valor_atual), key=f'metafixa_{i}_{vend}',
+                                help=f'Sugestão pelo % configurado ({pct}%): {sugestao_pct}cx',
+                            )
+                        p['metas_fixas'][vend] = novo_valor
+
         if remover_idx is not None:
             cfg['produtos'].pop(remover_idx)
             # Mesma causa raiz do bug já corrigido na importação de configuração
@@ -807,7 +842,7 @@ with tab_cfg:
             # cada widget reinicialize do zero com os dados corretos da lista já
             # atualizada.
             for _k in list(st.session_state.keys()):
-                if _k.startswith(('nome_', 'cod_', 'est_', 'prio_')):
+                if _k.startswith(('nome_', 'cod_', 'est_', 'prio_', 'metafixa_on_', 'metafixa_')):
                     del st.session_state[_k]
             st.rerun()
 
@@ -857,11 +892,21 @@ with tab_cfg:
                         if not isinstance(item, dict):
                             continue
                         prioridade = item.get('prioridade')
+                        metas_fixas_raw = item.get('metas_fixas')
+                        metas_fixas_importado = (
+                            {str(k): int(v or 0) for k, v in metas_fixas_raw.items()}
+                            if isinstance(metas_fixas_raw, dict) else {}
+                        )
                         produtos_importados.append({
                             'nome': str(item.get('nome', '')),
                             'codigos_texto': str(item.get('codigos_texto', '')),
                             'estoque': int(item.get('estoque') or 0),
                             'prioridade': prioridade if prioridade in _PRIORIDADES else 'Normal',
+                            # Meta fixa por vendedor (pedido da Ingrid, 04/09/2026)
+                            # -- preserva na importação igual já fazemos com os
+                            # outros campos, em vez de descartar silenciosamente.
+                            'metas_fixas_ativo': bool(item.get('metas_fixas_ativo', False)),
+                            'metas_fixas': metas_fixas_importado,
                         })
                     if not produtos_importados:
                         raise ValueError('nenhum produto válido encontrado no arquivo')
@@ -977,6 +1022,10 @@ with tab_cfg:
                             'codigos': parse_codigos_input(p['codigos_texto']),
                             'estoque': p.get('estoque', 0),
                             'prioridade': p.get('prioridade', 'Normal'),
+                            # Meta fixa por vendedor (pedido da Ingrid,
+                            # 04/09/2026) -- ver docstring de compute_metas().
+                            'metas_fixas_ativo': p.get('metas_fixas_ativo', False),
+                            'metas_fixas': p.get('metas_fixas', {}),
                         }
                         for p in cfg['produtos'] if p['nome'].strip()
                     ]
