@@ -333,6 +333,23 @@ with tab_rel:
             'PDF Lucratividade por Vendedor (totais reais)',
             type='pdf', key='pdf_totais')
 
+    # Comparativo com Set./Ago. (mesmo mês do ano anterior + mês anterior)
+    # -- pedido explícito da Ingrid, 04/09/2026: "hoje o modelo é esse
+    # [com Set./Ago.]... preciso que se torne [só Meta e Atual]... o
+    # primeiro modelo só preciso no começo do mês, quando for definir as
+    # metas, que aí preciso ver o comparativo." Ou seja: o padrão da
+    # geração SEMANAL passa a ser só Meta+Atual (desmarcado); ela marca
+    # esta caixa só quando estiver no início do mês definindo as metas e
+    # quiser ver o histórico ao lado pra decidir os números. Ver
+    # `incluir_comparativo` em xlsx_vendedor_cliente.gerar_xlsx.
+    incluir_comparativo_vc = st.checkbox(
+        '📊 Incluir comparativo com Set./Ago. (mesmo mês do ano anterior e mês anterior)',
+        value=False, key='vc_incluir_comparativo',
+        help='Deixe desmarcado nas gerações semanais normais (Excel só com Meta e Atual). '
+             'Marque só no início do mês, quando for definir as metas com base no histórico '
+             '-- aí o Excel sai com 4 grupos de colunas (Set./Ago., Meta e Atual).',
+    )
+
     faltando = []
     if hist_file is None and not historico_salvo:
         faltando.append('Historico JSON')
@@ -381,6 +398,7 @@ with tab_rel:
                         pdf_clientes_atual=[io.BytesIO(b) for b in clientes_bytes],
                         totais_atual=totais_dict,
                         ref_date=ref_date,
+                        incluir_comparativo=incluir_comparativo_vc,
                     )
 
                     # Salva dados para a aba On Track — e persiste de forma
