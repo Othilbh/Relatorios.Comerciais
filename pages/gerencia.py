@@ -2118,10 +2118,27 @@ def _render_metas_gerais():
         'Geral") e **Quebras** (Quebra, aba Mensal) -- upload sempre lá, resultado só aqui.'
     )
 
-    tipos_mg = [t for t in periodo_mod.TIPOS_PERIODO if t != 'semanal']
+    # "Semanal" incluído a pedido explícito da Ingrid, 03/09/2026: "no tipo
+    # de periodo adicionaremos semanal também, e quando selecionarmos o
+    # periodo semanal o ontrack atualiza de acordo com o que foi definido
+    # para a quebra da meta mensal". Semanal NÃO é um período com
+    # meta/realizado PRÓPRIOS (não existe "meta semanal" cadastrada em
+    # lugar nenhum) -- é uma LENTE sobre o mês: escolhida uma semana, os 3
+    # indicadores lá embaixo (Faturamento/Margem/Quebra) passam a comparar
+    # o realizado DAQUELA semana contra o pedaço esperado da meta MENSAL
+    # até ali (mg.quebra_semanal_meta -- a mesma quebra semanal já
+    # configurável em "📅 OnTrack Semanal", agora também disponível pra
+    # Margem e Quebra, não só Faturamento). Todo o resto da aba (Evolução,
+    # Ranking de Vendedores, formulário de meta, histórico) continua
+    # ancorado no MÊS que contém a semana escolhida e funciona exatamente
+    # igual ao modo "Mensal" -- por isso tipo_mg/ref_mg abaixo sempre
+    # acabam virando 'mensal'/<mês> mesmo quando "Semanal" foi selecionado,
+    # em vez de espalhar um tipo de período novo (que periodo.py não
+    # conhece) pelo resto da função.
+    tipos_mg = list(periodo_mod.TIPOS_PERIODO)
     col_tipo, col_periodo = st.columns([1, 2])
     with col_tipo:
-        tipo_mg = st.selectbox(
+        tipo_mg_sel = st.selectbox(
             'Tipo de período', tipos_mg,
             format_func=periodo_mod.rotulo_tipo, index=0, key='mg_tipo',
         )
@@ -2132,17 +2149,33 @@ def _render_metas_gerais():
         # (periodo_mod.listar_periodos), o que não alcançava períodos mais
         # antigos. Agora escolhe QUALQUER data no calendário e o app calcula
         # sozinho, via periodo_mod.periodo_ref(), o mês/trimestre/semestre/ano
-        # que contém essa data -- a mesma data escolhida também vale ao trocar
-        # o "Tipo de período" ao lado (ex.: escolheu 15/08/2026, troca pra
+        # (ou, em Semanal, a semana comercial de sábado a sexta) que contém
+        # essa data -- a mesma data escolhida também vale ao trocar o "Tipo
+        # de período" ao lado (ex.: escolheu 15/08/2026, troca pra
         # Trimestral, cai automaticamente no 3º trimestre/2026, sem precisar
         # reescolher a data).
         data_ref_mg = st.date_input(
             'Período', value=datetime.date.today(), format='DD/MM/YYYY', key='mg_data_ref',
             help='Escolhe qualquer data dentro do período que você quer ver -- '
-                 'o app calcula sozinho o mês/trimestre/semestre/ano que contém essa data.',
+                 'o app calcula sozinho o mês/trimestre/semestre/ano (ou, em '
+                 'Semanal, a semana comercial de sábado a sexta) que contém essa data.',
         )
-        ref_mg = periodo_mod.periodo_ref(tipo_mg, data_ref_mg)
-        st.caption(f'Período selecionado: **{periodo_mod.rotulo(tipo_mg, ref_mg)}**')
+        semana_sel = None
+        if tipo_mg_sel == 'semanal':
+            ref_mg = periodo_mod.periodo_ref('mensal', data_ref_mg)
+            tipo_mg = 'mensal'
+            _semanas_mes_sel = mg.semanas_comerciais_do_mes(ref_mg)
+            _idx_sem_sel = next(
+                (i for i, s in enumerate(_semanas_mes_sel) if s['ini'] <= data_ref_mg <= s['fim']),
+                len(_semanas_mes_sel) - 1,
+            )
+            semana_sel = _semanas_mes_sel[_idx_sem_sel]
+            st.caption(f"Período selecionado: **{semana_sel['label']}** "
+                       f"— dentro de {periodo_mod.rotulo('mensal', ref_mg)}.")
+        else:
+            tipo_mg = tipo_mg_sel
+            ref_mg = periodo_mod.periodo_ref(tipo_mg, data_ref_mg)
+            st.caption(f'Período selecionado: **{periodo_mod.rotulo(tipo_mg, ref_mg)}**')
 
     # ── Realizado (agregado automaticamente) ────────────────────────────────
     rv = mg.realizado_vendas(tipo_mg, ref_mg)
@@ -2207,38 +2240,86 @@ def _render_metas_gerais():
         # ⚪ Sem meta/dado). Convertendo para 0 aqui, o cálculo interpretava
         # como "0% atingido" e mostrava 🔴 Fora do Track incorretamente
         # assim que o período começava, mesmo sem nenhum dado publicado.
-        ot_fat = on_track.calcular(meta_atual.get('faturamento') or 0, rv.get('faturamento'),
-                                    tipo_mg, ref_mg, pct_tempo_decorrido=pct_tempo_mg)
-        ot_marg = on_track.calcular(meta_atual.get('margem_pct') or 0, rv.get('margem_pct'),
-                                     tipo_mg, ref_mg, pct_tempo_decorrido=pct_tempo_mg)
+        #
+        # Quando "Semanal" está selecionado, os 3 indicadores abaixo passam
+        # a seguir o RITMO SEMANAL configurado na quebra da meta mensal
+        # (pedido explícito da Ingrid, 04/09/2026: "quando selecionarmos o
+        # periodo semanal o ontrack atualiza de acordo como o que foi
+        # definido para a quebra da meta mensal") -- em vez do
+        # pct_tempo_decorrido calendário (dias corridos do mês), o
+        # "esperado" passa a ser o pct_acumulado configurado (soma dos %
+        # semanais até a semana escolhida -- ver
+        # mg.quebra_semanal_meta/mg.carregar_pcts_semanais) e o "realizado"
+        # passa a ser o acumulado até o FIM da semana escolhida (não o mês
+        # inteiro). A META continua sendo a meta MENSAL cheia -- pct_atingido
+        # = realizado-até-a-semana / meta do mês, exatamente como
+        # quebra_semanal_meta já expõe em 'atingimento'. O resto da aba
+        # (Evolução, Ranking de Vendedores, formulário de meta, histórico)
+        # continua mostrando o MÊS inteiro -- só estes 3 indicadores mudam.
+        if semana_sel is not None:
+            _idx_sem = semana_sel['semana'] - 1
+            _meta_fat_sem = meta_atual.get('faturamento') or 0
+            _linha_fat_sem = mg.quebra_semanal_meta(ref_mg, _meta_fat_sem, metrica='faturamento')[_idx_sem]
+            ot_fat = on_track.calcular(_meta_fat_sem, _linha_fat_sem['vendido_acumulado'], tipo_mg, ref_mg,
+                                        pct_tempo_decorrido=(_linha_fat_sem['pct_acumulado'] or 0) / 100)
+            _meta_marg_sem = meta_atual.get('margem_pct') or 0
+            _linha_marg_sem = mg.quebra_semanal_meta(ref_mg, _meta_marg_sem, metrica='margem')[_idx_sem]
+            ot_marg = on_track.calcular(_meta_marg_sem, _linha_marg_sem['vendido_acumulado'], tipo_mg, ref_mg,
+                                         pct_tempo_decorrido=(_linha_marg_sem['pct_acumulado'] or 0) / 100)
+        else:
+            _linha_fat_sem = _linha_marg_sem = None
+            ot_fat = on_track.calcular(meta_atual.get('faturamento') or 0, rv.get('faturamento'),
+                                        tipo_mg, ref_mg, pct_tempo_decorrido=pct_tempo_mg)
+            ot_marg = on_track.calcular(meta_atual.get('margem_pct') or 0, rv.get('margem_pct'),
+                                         tipo_mg, ref_mg, pct_tempo_decorrido=pct_tempo_mg)
 
         _col_fat, _col_marg, _col_qbr = st.columns(3)
         with _col_fat:
             _fat_pct_txt = (f"{ot_fat['pct_atingido'] * 100:.0f}% da meta"
                              if ot_fat['pct_atingido'] is not None else '—')
-            _fat_msg_completude = _completude_msgs.get(rv['completude'])
-            if _fat_msg_completude:
-                _fat_det = _fat_msg_completude
-            elif not meta_atual.get('faturamento'):
-                _fat_det = 'Meta de faturamento não definida'
-            elif rv.get('faturamento') is not None:
-                _fat_det = f"R$ {_num_vc(rv['faturamento'], 0)} de R$ {_num_vc(meta_atual['faturamento'], 0)}"
+            if semana_sel is not None:
+                if not meta_atual.get('faturamento'):
+                    _fat_det = 'Meta de faturamento não definida'
+                elif _linha_fat_sem['vendido_acumulado'] is not None:
+                    _fat_det = (f"R$ {_num_vc(_linha_fat_sem['vendido_acumulado'], 0)} de "
+                                f"R$ {_num_vc(meta_atual['faturamento'], 0)} -- acumulado até "
+                                f"{semana_sel['label']}")
+                else:
+                    _fat_det = f"Faturamento ainda não publicado até {semana_sel['label']}"
             else:
-                _fat_det = 'Faturamento ainda não publicado'
+                _fat_msg_completude = _completude_msgs.get(rv['completude'])
+                if _fat_msg_completude:
+                    _fat_det = _fat_msg_completude
+                elif not meta_atual.get('faturamento'):
+                    _fat_det = 'Meta de faturamento não definida'
+                elif rv.get('faturamento') is not None:
+                    _fat_det = f"R$ {_num_vc(rv['faturamento'], 0)} de R$ {_num_vc(meta_atual['faturamento'], 0)}"
+                else:
+                    _fat_det = 'Faturamento ainda não publicado'
             _badge_indicador_simples(ot_fat['status'], '💰 Faturamento', _fat_pct_txt, _fat_det,
                                       pct_atingido=ot_fat['pct_atingido'], pct_esperado=ot_fat['pct_esperado'])
         with _col_marg:
             _marg_pct_txt = (f"{ot_marg['pct_atingido'] * 100:.0f}% da meta"
                               if ot_marg['pct_atingido'] is not None else '—')
-            _marg_msg_completude = _completude_msgs.get(rv['completude'])
-            if _marg_msg_completude:
-                _marg_det = _marg_msg_completude
-            elif not meta_atual.get('margem_pct'):
-                _marg_det = 'Meta de margem não definida'
-            elif rv.get('margem_pct') is not None:
-                _marg_det = f"{rv['margem_pct']:.1f}% de {meta_atual['margem_pct']:.1f}% de meta"
+            if semana_sel is not None:
+                if not meta_atual.get('margem_pct'):
+                    _marg_det = 'Meta de margem não definida'
+                elif _linha_marg_sem['vendido_acumulado'] is not None:
+                    _marg_det = (f"{_linha_marg_sem['vendido_acumulado']:.1f}% de "
+                                 f"{meta_atual['margem_pct']:.1f}% de meta -- acumulado até "
+                                 f"{semana_sel['label']}")
+                else:
+                    _marg_det = f"Margem ainda não publicada até {semana_sel['label']}"
             else:
-                _marg_det = 'Margem ainda não publicada'
+                _marg_msg_completude = _completude_msgs.get(rv['completude'])
+                if _marg_msg_completude:
+                    _marg_det = _marg_msg_completude
+                elif not meta_atual.get('margem_pct'):
+                    _marg_det = 'Meta de margem não definida'
+                elif rv.get('margem_pct') is not None:
+                    _marg_det = f"{rv['margem_pct']:.1f}% de {meta_atual['margem_pct']:.1f}% de meta"
+                else:
+                    _marg_det = 'Margem ainda não publicada'
             _badge_indicador_simples(ot_marg['status'], '📊 Margem', _marg_pct_txt, _marg_det,
                                       pct_atingido=ot_marg['pct_atingido'], pct_esperado=ot_marg['pct_esperado'])
         with _col_qbr:
@@ -2249,23 +2330,45 @@ def _render_metas_gerais():
             _qbr_meta_pct = meta_atual.get('quebra_max_pct')
             _qbr_realizado_rs = rq.get('total_custo')
             _usa_rs_qbr = bool(_qbr_meta_rs) and _qbr_realizado_rs is not None
-            if _usa_rs_qbr:
-                # Pedido explícito da Ingrid, 31/08/2026: quando o Teto é em %
-                # do Faturamento, o "quanto já podia ter quebrado até agora"
-                # (usado no status Verde/Atenção/Fora) é esse % sobre o
-                # FATURAMENTO REALIZADO até agora -- não o teto total
-                # pro-rateado pelo tempo decorrido (comportamento padrão de
-                # status_quebra, mantido como fallback pra Teto em CX ou pra
-                # períodos antigos com Teto em R$ digitado manualmente, sem %).
-                _qbr_orcamento_ja = (
-                    _qbr_meta_pct / 100 * rv.get('faturamento')
-                    if (_qbr_meta_pct and rv.get('faturamento') is not None) else None
-                )
-                _ot_qbr = mg.status_quebra(_qbr_meta_rs, _qbr_realizado_rs, tipo_mg, ref_mg,
+            _qbr_meta_fixa = _qbr_meta_rs if _usa_rs_qbr else meta_atual.get('quebra_max_cx')
+            if semana_sel is not None:
+                _linha_qbr_sem = mg.quebra_semanal_meta(ref_mg, _qbr_meta_fixa or 0, metrica='quebra')[_idx_sem]
+                _qbr_realizado_disp = _linha_qbr_sem['vendido_acumulado']
+                _fat_realizado_disp = _linha_fat_sem['vendido_acumulado'] if _linha_fat_sem else None
+                # Mesma regra especial de sempre pro Teto em %: "quanto já
+                # podia ter quebrado até agora" = % do teto sobre o
+                # FATURAMENTO REALIZADO (não a meta pró-rateada) -- só que
+                # agora "até agora" quer dizer "até o fim da semana
+                # escolhida", usando o faturamento semanal acumulado em vez
+                # do mensal. Sem faturamento semanal disponível, cai pro
+                # esperado pró-rateado pelos % semanais configurados pra
+                # Quebra (fallback, mesma ideia de sempre pra Teto em CX).
+                if _usa_rs_qbr and _qbr_meta_pct and _fat_realizado_disp is not None:
+                    _qbr_orcamento_ja = _qbr_meta_pct / 100 * _fat_realizado_disp
+                else:
+                    _qbr_orcamento_ja = _linha_qbr_sem.get('esperado_acumulado')
+                _ot_qbr = mg.status_quebra(_qbr_meta_fixa, _qbr_realizado_disp, tipo_mg, ref_mg,
                                             orcamento_ate_agora=_qbr_orcamento_ja)
             else:
-                _ot_qbr = mg.status_quebra(meta_atual.get('quebra_max_cx'), rq.get('total_cx'),
-                                            tipo_mg, ref_mg)
+                _fat_realizado_disp = rv.get('faturamento')
+                if _usa_rs_qbr:
+                    # Pedido explícito da Ingrid, 31/08/2026: quando o Teto é em %
+                    # do Faturamento, o "quanto já podia ter quebrado até agora"
+                    # (usado no status Verde/Atenção/Fora) é esse % sobre o
+                    # FATURAMENTO REALIZADO até agora -- não o teto total
+                    # pro-rateado pelo tempo decorrido (comportamento padrão de
+                    # status_quebra, mantido como fallback pra Teto em CX ou pra
+                    # períodos antigos com Teto em R$ digitado manualmente, sem %).
+                    _qbr_orcamento_ja = (
+                        _qbr_meta_pct / 100 * rv.get('faturamento')
+                        if (_qbr_meta_pct and rv.get('faturamento') is not None) else None
+                    )
+                    _ot_qbr = mg.status_quebra(_qbr_meta_rs, _qbr_realizado_rs, tipo_mg, ref_mg,
+                                                orcamento_ate_agora=_qbr_orcamento_ja)
+                else:
+                    _ot_qbr = mg.status_quebra(meta_atual.get('quebra_max_cx'), rq.get('total_cx'),
+                                                tipo_mg, ref_mg)
+                _qbr_realizado_disp = _ot_qbr.get('realizado')
             # "% da meta" pra Quebra = % do TETO já consumido (_ot_qbr já
             # calcula isso -- 'pct_atingido' -- só não aparecia na tela
             # antes). Continua sendo a mesma badge/cor de status de sempre;
@@ -2278,21 +2381,26 @@ def _render_metas_gerais():
             # sobre REALIZADO (não meta sobre meta): quanto da quebra de
             # verdade já representa do faturamento de verdade até agora.
             # Continua calculada (some no detalhe), mesmo não sendo mais o
-            # número principal do badge.
-            _qbr_pct_real = mg.quebra_pct_faturamento(_qbr_realizado_rs, rv.get('faturamento'))
+            # número principal do badge. Só faz sentido em modo R$ (_usa_rs_qbr) --
+            # em modo cx não há como comparar quebra (cx) com faturamento (R$).
+            _qbr_pct_real = mg.quebra_pct_faturamento(
+                _qbr_realizado_disp if _usa_rs_qbr else None, _fat_realizado_disp)
+            _qbr_sufixo_sem = f" -- acumulado até {semana_sel['label']}" if semana_sel is not None else ''
             if _ot_qbr.get('meta') and _ot_qbr.get('realizado') is not None:
                 if _usa_rs_qbr:
                     _qbr_det = (f"R$ {_num_vc(_ot_qbr['realizado'], 2)} de "
-                                f"R$ {_num_vc(_ot_qbr['meta'], 2)} de teto")
+                                f"R$ {_num_vc(_ot_qbr['meta'], 2)} de teto{_qbr_sufixo_sem}")
                     if _qbr_meta_pct:
                         _qbr_det += f" (teto = {_qbr_meta_pct:.2f}% do faturamento)"
                     if _qbr_pct_real is not None:
                         _qbr_det += f" — quebra representa {_qbr_pct_real:.2f}% do faturamento realizado"
                 else:
                     _qbr_det = (f"{_num_vc(_ot_qbr['realizado'], 0)} cx de "
-                                f"{_num_vc(_ot_qbr['meta'], 0)} cx de teto")
+                                f"{_num_vc(_ot_qbr['meta'], 0)} cx de teto{_qbr_sufixo_sem}")
             elif not (_qbr_meta_rs or meta_atual.get('quebra_max_cx')):
                 _qbr_det = 'Teto de quebra não definido'
+            elif semana_sel is not None:
+                _qbr_det = f"Ainda sem realizado de Quebra publicado até {semana_sel['label']} pra comparar com o teto."
             else:
                 _qbr_det = 'Ainda sem realizado de Quebra publicado pra comparar com o teto.'
             # Mesma distinção "sem dado" vs "falha ao consultar" já aplicada
@@ -2476,66 +2584,101 @@ def _render_metas_gerais():
                 st.caption('Quebra (R$ — ou cx, quando o custo real ainda não foi extraído do PDF)')
                 st.bar_chart(df_evol[['Quebra (R$)']], color='#BC4749', sort=False)
 
-        # ── OnTrack Semanal — quebra da meta MENSAL fixa (Faturamento) ──────
+        # ── OnTrack Semanal — quebra da meta MENSAL fixa (Faturamento, Margem
+        # e Quebra) ──────────────────────────────────────────────────────
         # Só faz sentido pra 'mensal' (não dá pra quebrar um trimestre/ano em
-        # "semana 1 a 4"). A meta em si (meta_atual['faturamento'], já
-        # definida acima) NUNCA muda aqui -- só a expectativa acumulada por
-        # semana, calculada a partir dos percentuais configuráveis abaixo.
+        # semanas). As metas em si (definidas acima) NUNCA mudam aqui -- só a
+        # expectativa acumulada por semana, calculada a partir dos
+        # percentuais configuráveis abaixo. Generalizada em 04/09/2026 --
+        # pedido explícito da Ingrid ("Crie percentuais semanais
+        # configuraveis para margem e quebra tbm"): antes só existia pra
+        # Faturamento; agora os 3 indicadores (os mesmos de "Indicadores da
+        # Empresa" acima, inclusive o próprio seletor "Semanal" do topo da
+        # aba) têm sua própria quebra semanal configurável, reaproveitando
+        # 100% a mesma função central já usada ali
+        # (mg.quebra_semanal_meta/carregar_pcts_semanais/salvar_pcts_semanais,
+        # já generalizadas com o parâmetro `metrica`) numa única função
+        # auxiliar (_bloco_ontrack_semanal) em vez de triplicar a lógica.
         if tipo_mg == 'mensal':
             st.divider()
-            st.subheader('📅 OnTrack Semanal — Quebra da Meta Mensal (Faturamento)')
+            st.subheader('📅 OnTrack Semanal — Quebra da Meta Mensal')
             st.caption(
-                'A Meta de Faturamento definida acima nunca muda. Aqui se acompanha, semana '
-                'a semana, quanto dela já era esperado ter sido vendido (percentuais '
-                'incrementais -- podem somar mais ou menos que 100%, isso é normal) e o '
-                '**Atingimento**, que é sempre o vendido acumulado sobre a META TOTAL do mês '
-                '(não sobre o esperado daquela semana).'
+                'As metas definidas acima nunca mudam aqui. Por indicador, se acompanha, '
+                'semana a semana, quanto já era esperado (percentuais incrementais '
+                'configuráveis -- podem somar mais ou menos que 100%, isso é normal) e o '
+                '**Atingimento**, que é sempre o acumulado sobre a META TOTAL do mês (não '
+                'sobre o esperado daquela semana). As semanas são a semana comercial '
+                '(sábado a sexta) -- a Semana 01 pode começar no mês anterior, quando o dia 1 '
+                'do mês não cai num sábado.'
             )
-            with st.expander('⚙️ Configurar percentuais semanais'):
-                st.caption(
-                    f'Percentuais específicos de {periodo_mod.rotulo(tipo_mg, ref_mg)} -- cada '
-                    f'mês tem o seu próprio conjunto. As "semanas" aqui são 4 blocos '
-                    f'sequenciais de dias corridos a partir do dia 1 do mês (dias 1-7, 8-14, '
-                    f'15-21 e 22-fim) -- não são semanas ISO do calendário, por isso todo mês '
-                    f'sempre tem a mesma quantidade de semanas (4).'
-                )
-                _pcts_atuais = mg.carregar_pcts_semanais(ref_mg)
-                with st.form(key='mg_form_pcts_semanais'):
-                    _n_sem_cfg = st.number_input(
-                        'Quantidade de semanas configuradas', min_value=1, max_value=8,
-                        value=len(_pcts_atuais), step=1, key='mg_pcts_n',
-                    )
-                    _pcts_inputs = []
-                    _cols_pct = st.columns(int(_n_sem_cfg))
-                    for _i in range(int(_n_sem_cfg)):
-                        _valor_padrao = _pcts_atuais[_i] if _i < len(_pcts_atuais) else 0.0
-                        with _cols_pct[_i]:
-                            _pcts_inputs.append(st.number_input(
-                                f'Semana {_i + 1:02d} do mês (%)', min_value=0.0,
-                                value=float(_valor_padrao), step=1.0, key=f'mg_pct_sem_{_i}',
-                            ))
-                    _soma_pcts = sum(_pcts_inputs)
-                    st.caption(f'Soma dos percentuais: {_soma_pcts:.0f}% — pode ser diferente '
-                               f'de 100% (maior ou menor), isso é permitido de propósito.')
-                    if st.form_submit_button('💾 Salvar percentuais', type='primary'):
-                        mg.salvar_pcts_semanais(ref_mg, _pcts_inputs, usuario=st.session_state.get('usuario_nome'))
-                        st.success(f'Percentuais semanais de {periodo_mod.rotulo(tipo_mg, ref_mg)} salvos.')
-                        st.rerun()
 
-            _meta_fat_mg = meta_atual.get('faturamento')
-            if not _meta_fat_mg:
-                st.info('Defina a Meta de Faturamento acima pra ver a quebra semanal.')
+            def _bloco_ontrack_semanal(icone_titulo, titulo, metrica, meta_valor, fmt, key_prefix):
+                st.markdown(f'**{icone_titulo}**')
+                if not meta_valor:
+                    st.info(f'Defina a {titulo} acima pra ver a quebra semanal.')
+                    return
+                with st.expander(f'⚙️ Configurar percentuais semanais -- {titulo}'):
+                    st.caption(
+                        f'Percentuais específicos de {periodo_mod.rotulo(tipo_mg, ref_mg)} pra '
+                        f'{titulo} -- cada mês/indicador tem o seu próprio conjunto de '
+                        f'percentuais (configurar aqui não afeta os outros indicadores).'
+                    )
+                    _pcts_atuais = mg.carregar_pcts_semanais(ref_mg, metrica=metrica)
+                    with st.form(key=f'mg_form_pcts_{key_prefix}'):
+                        _n_sem_cfg = st.number_input(
+                            'Quantidade de semanas configuradas', min_value=1, max_value=8,
+                            value=len(_pcts_atuais), step=1, key=f'mg_pcts_n_{key_prefix}',
+                        )
+                        _pcts_inputs = []
+                        _cols_pct = st.columns(int(_n_sem_cfg))
+                        for _i in range(int(_n_sem_cfg)):
+                            _valor_padrao = _pcts_atuais[_i] if _i < len(_pcts_atuais) else 0.0
+                            with _cols_pct[_i]:
+                                _pcts_inputs.append(st.number_input(
+                                    f'Semana {_i + 1:02d} (%)', min_value=0.0,
+                                    value=float(_valor_padrao), step=1.0, key=f'mg_pct_{key_prefix}_{_i}',
+                                ))
+                        _soma_pcts = sum(_pcts_inputs)
+                        st.caption(f'Soma dos percentuais: {_soma_pcts:.0f}% — pode ser diferente '
+                                   f'de 100% (maior ou menor), isso é permitido de propósito.')
+                        if st.form_submit_button('💾 Salvar percentuais', type='primary',
+                                                  key=f'mg_pcts_salvar_{key_prefix}'):
+                            mg.salvar_pcts_semanais(ref_mg, _pcts_inputs, metrica=metrica,
+                                                     usuario=st.session_state.get('usuario_nome'))
+                            st.success(f'Percentuais semanais de {titulo} de '
+                                       f'{periodo_mod.rotulo(tipo_mg, ref_mg)} salvos.')
+                            st.rerun()
+
+                _linhas = mg.quebra_semanal_meta(ref_mg, meta_valor, metrica=metrica)
+                _rows = [{
+                    'Semana':              l['label'],
+                    'Meta fixa':           fmt(meta_valor),
+                    '% semanal':           f"{l['pct_semana']:.0f}%",
+                    'Esperado acumulado':  fmt(l['esperado_acumulado']),
+                    'Realizado acumulado': fmt(l['vendido_acumulado']) if l['vendido_acumulado'] is not None else '—',
+                    'Atingimento':         f"{l['atingimento']:.0f}%" if l['atingimento'] is not None else '—',
+                } for l in _linhas]
+                st.dataframe(pd.DataFrame(_rows), use_container_width=True, hide_index=True)
+
+            _bloco_ontrack_semanal('💰 Faturamento', 'Meta de Faturamento', 'faturamento',
+                                    meta_atual.get('faturamento'),
+                                    lambda v: f"R$ {_num_vc(v, 2)}", 'fat')
+            st.markdown('<div style="height:0.4rem;"></div>', unsafe_allow_html=True)
+            _bloco_ontrack_semanal('📊 Margem', 'Meta de Margem', 'margem',
+                                    meta_atual.get('margem_pct'),
+                                    lambda v: f"{v:.1f}%", 'marg')
+            st.markdown('<div style="height:0.4rem;"></div>', unsafe_allow_html=True)
+            # Quebra: mesma prioridade R$ > cx de sempre (ver "Indicadores da
+            # Empresa" acima) -- usa o Teto em R$ quando definido, senão cai
+            # pro Teto em cx.
+            _qbr_meta_rs_sem = meta_atual.get('quebra_max_rs')
+            _qbr_meta_cx_sem = meta_atual.get('quebra_max_cx')
+            if _qbr_meta_rs_sem:
+                _bloco_ontrack_semanal('📦 Quebra', 'Teto de Quebra', 'quebra', _qbr_meta_rs_sem,
+                                        lambda v: f"R$ {_num_vc(v, 2)}", 'qbr')
             else:
-                _quebra_emp = mg.quebra_semanal_meta(ref_mg, _meta_fat_mg)
-                _rows_quebra = [{
-                    'Semana':             l['label'],
-                    'Meta fixa (R$)':     f"R$ {_num_vc(_meta_fat_mg, 2)}",
-                    '% semanal':          f"{l['pct_semana']:.0f}%",
-                    'Esperado acumulado': f"R$ {_num_vc(l['esperado_acumulado'], 2)}",
-                    'Vendido acumulado':  f"R$ {_num_vc(l['vendido_acumulado'], 2)}" if l['vendido_acumulado'] is not None else '—',
-                    'Atingimento':        f"{l['atingimento']:.0f}%" if l['atingimento'] is not None else '—',
-                } for l in _quebra_emp]
-                st.dataframe(pd.DataFrame(_rows_quebra), use_container_width=True, hide_index=True)
+                _bloco_ontrack_semanal('📦 Quebra', 'Teto de Quebra', 'quebra', _qbr_meta_cx_sem,
+                                        lambda v: f"{_num_vc(v, 0)} cx", 'qbr')
 
     # =========================================================================
     # ABA VENDEDOR — ranking + detalhe individual (equivalente às abas por
