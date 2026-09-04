@@ -6,9 +6,9 @@
     "periodo_ref": "2026-W36",
     "data_referencia": "2026-09-04",
     "criado_em": "2026-09-04T12:30:26+00:00",
-    "atualizado_em": "2026-09-04T12:30:26+00:00",
+    "atualizado_em": "2026-09-04T12:31:06+00:00",
     "usuario": "Ingrid",
-    "versao": 1,
+    "versao": 2,
     "valores": {
       "periodo": "01/09/2026 a 04/09/2026",
       "emissao": "",
@@ -184,8 +184,197 @@
       ],
       "slug": "2026-W36",
       "tipo": "semanal",
-      "gerado_em": "2026-09-04T12:30:26.036550"
+      "gerado_em": "2026-09-04T12:31:06.805443"
     }
   },
-  "history": []
+  "history": [
+    {
+      "id": "8b540b38-8e62-4c4c-86e3-075f0d6b6ebe",
+      "modulo_origem": "quebra",
+      "tipo_periodo": "semanal",
+      "periodo_ref": "2026-W36",
+      "data_referencia": "2026-09-04",
+      "criado_em": "2026-09-04T12:30:26+00:00",
+      "atualizado_em": "2026-09-04T12:30:26+00:00",
+      "usuario": "Ingrid",
+      "versao": 1,
+      "valores": {
+        "periodo": "01/09/2026 a 04/09/2026",
+        "emissao": "",
+        "total_cx": 216.0,
+        "total_custo": 15135.279999999999,
+        "grupos": [
+          {
+            "grupo": "MAMAO 4601",
+            "codigo": "1.1.04.01.004",
+            "categoria": "Mamão",
+            "cx": 78.0,
+            "custo": 4329.75
+          },
+          {
+            "grupo": "FUJI 0702",
+            "codigo": "1.1.02.02.001.002",
+            "categoria": "Maçã Fuji",
+            "cx": 75.0,
+            "custo": 5094.4
+          },
+          {
+            "grupo": "TANGERINA",
+            "codigo": "1.1.04.02.010.006",
+            "categoria": "Citros",
+            "cx": 16.0,
+            "custo": 1226.81
+          },
+          {
+            "grupo": "MELAO 3102",
+            "codigo": "1.1.04.02.002.001",
+            "categoria": "Melão",
+            "cx": 12.0,
+            "custo": 843.83
+          },
+          {
+            "grupo": "PERA IMP 1/2 PORT 0205",
+            "codigo": "1.1.01.01.002.005",
+            "categoria": "Outros",
+            "cx": 7.0,
+            "custo": 796.43
+          },
+          {
+            "grupo": "MIXIRICA NACIONAL 3904",
+            "codigo": "1.1.04.02.010.004",
+            "categoria": "Outros",
+            "cx": 6.0,
+            "custo": 316.13
+          },
+          {
+            "grupo": "GALA 0701",
+            "codigo": "1.1.02.02.001.001",
+            "categoria": "Maçã Gala",
+            "cx": 5.0,
+            "custo": 563.49
+          },
+          {
+            "grupo": "AMEIXA IMPORTADA 2501",
+            "codigo": "1.1.04.01.002.001",
+            "categoria": "Caroço",
+            "cx": 3.0,
+            "custo": 392.51
+          },
+          {
+            "grupo": "UVAS PETRO 8KG 8302",
+            "codigo": "1.1.03.06.001.002",
+            "categoria": "Outros",
+            "cx": 3.0,
+            "custo": 396.36
+          },
+          {
+            "grupo": "CAQUI JUND",
+            "codigo": "1.1.03.04.002.001",
+            "categoria": "Caqui",
+            "cx": 2.0,
+            "custo": 90.81
+          },
+          {
+            "grupo": "NECTARINA IMPORTADA 2601",
+            "codigo": "1.1.04.01.003.001",
+            "categoria": "Caroço",
+            "cx": 2.0,
+            "custo": 252.0
+          },
+          {
+            "grupo": "PERA IMP PACK 0102",
+            "codigo": "1.1.01.01.001.002",
+            "categoria": "Outros",
+            "cx": 2.0,
+            "custo": 256.29
+          },
+          {
+            "grupo": "KIWI IMPORTADO 3801",
+            "codigo": "1.1.04.02.009.001",
+            "categoria": "Kiwi",
+            "cx": 1.0,
+            "custo": 141.31
+          },
+          {
+            "grupo": "PESSEGO IMPORTADO 2401",
+            "codigo": "1.1.04.01.001.001",
+            "categoria": "Caroço",
+            "cx": 1.0,
+            "custo": 154.44
+          },
+          {
+            "grupo": "PRODUTOS EXOTICOS",
+            "codigo": "1.1.04.06",
+            "categoria": "Outros",
+            "cx": 1.0,
+            "custo": 170.89
+          },
+          {
+            "grupo": "UVAS JUND 5KG 8101",
+            "codigo": "1.1.03.04.001.001",
+            "categoria": "Outros",
+            "cx": 1.0,
+            "custo": 65.64
+          },
+          {
+            "grupo": "UVAS PETRO 5KG 8301",
+            "codigo": "1.1.03.06.001.001",
+            "categoria": "Outros",
+            "cx": 1.0,
+            "custo": 44.19
+          }
+        ],
+        "categorias": [
+          {
+            "categoria": "Mamão",
+            "cx": 78.0,
+            "custo": 4329.75
+          },
+          {
+            "categoria": "Maçã Fuji",
+            "cx": 75.0,
+            "custo": 5094.4
+          },
+          {
+            "categoria": "Outros",
+            "cx": 21.0,
+            "custo": 2045.9299999999998
+          },
+          {
+            "categoria": "Citros",
+            "cx": 16.0,
+            "custo": 1226.81
+          },
+          {
+            "categoria": "Melão",
+            "cx": 12.0,
+            "custo": 843.83
+          },
+          {
+            "categoria": "Caroço",
+            "cx": 6.0,
+            "custo": 798.95
+          },
+          {
+            "categoria": "Maçã Gala",
+            "cx": 5.0,
+            "custo": 563.49
+          },
+          {
+            "categoria": "Caqui",
+            "cx": 2.0,
+            "custo": 90.81
+          },
+          {
+            "categoria": "Kiwi",
+            "cx": 1.0,
+            "custo": 141.31
+          }
+        ],
+        "slug": "2026-W36",
+        "tipo": "semanal",
+        "gerado_em": "2026-09-04T12:30:26.036550"
+      }
+    }
+  ]
 }
