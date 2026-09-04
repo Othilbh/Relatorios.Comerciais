@@ -5,8 +5,10 @@ Gera KPIs por grupo de produto e categoria, com histórico navegável.
 import io
 import os
 import json
+import tempfile
 import datetime
 import streamlit as st
+import streamlit.components.v1 as components
 import pandas as pd
 
 from parser_quebra import parse_quebra
@@ -15,6 +17,7 @@ import comparativo
 import data_store as ds
 import metas_gerais as mg
 import periodo as periodo_mod
+import dashboard_quebra as dbq
 
 def _fmt_num(v, casas=0):
     return f"{v:,.{casas}f}".replace(',', 'X').replace('.', ',').replace('X', '.')
@@ -195,6 +198,28 @@ def _render_dashboard(dados: dict, tipo: str, slug: str, dados_ant: dict = None,
             mime='application/json',
             key=f'dl_{tipo}_{slug}',
         )
+
+        # Opção de imprimir (pedido da Ingrid, 04/09/2026: "A quebra não tem
+        # a opção de imprimir") -- reaproveita o MESMO padrão de dashboard
+        # HTML imprimível (botão flutuante + layout @media print) já usado
+        # no Relatório Diário e na Margem Real da Gerência, só que com o
+        # conteúdo de Quebras (dashboard_quebra.py). Reflete o filtro de
+        # categoria aplicado acima, igual ao download JSON logo acima.
+        with tempfile.NamedTemporaryFile(suffix='.html', delete=False,
+                                         mode='w', encoding='utf-8') as tmp:
+            pass
+        dbq.gerar_dashboard(dados_export, tmp.name)
+        html_quebra = open(tmp.name, 'r', encoding='utf-8').read()
+        os.remove(tmp.name)
+        st.download_button(
+            f'🖨️ Baixar versão para impressão ({_label_slug(slug, tipo)})',
+            data=html_quebra.encode('utf-8'),
+            file_name=f'quebra_{tipo}_{slug}_OTHIL.html',
+            mime='text/html',
+            key=f'dl_html_{tipo}_{slug}',
+        )
+        with st.expander('🖨️ Pré-visualizar / imprimir'):
+            components.html(html_quebra, height=900, scrolling=True)
 
 
 # ── Tab ───────────────────────────────────────────────────────────────────────
