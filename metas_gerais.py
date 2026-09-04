@@ -219,20 +219,35 @@ def carregar_metas_vendedores(tipo_periodo: str, periodo_ref: str) -> dict:
 # reaproveitada em todos os meses até a Ingrid decidir mudar.
 # ---------------------------------------------------------------------------
 
-def carregar_pcts_semanais(mes_ref: str) -> list:
-    """Percentuais semanais configurados para ESSE mês especificamente
-    (cada mês tem seu próprio conjunto -- meses diferentes tocam
-    quantidades diferentes de semanas ISO, então não faz sentido usar um
-    único conjunto global pra todos). Se a Ingrid ainda não configurou
-    nada pra esse mês, cai no padrão de 4 semanas (30/28/25/25)."""
-    reg = ds.load_current(MODULO_PCTS_SEMANAIS, 'mensal', mes_ref)
+def _ref_pcts_semanais(mes_ref: str, metrica: str) -> str:
+    """Chave de armazenamento dos percentuais semanais desse mês+métrica.
+    'faturamento' usa a chave ORIGINAL (só mes_ref, sem sufixo) -- é a
+    única métrica que existia antes de 03/09/2026, então qualquer
+    configuração que a Ingrid já tenha salvo continua sendo lida
+    normalmente, sem precisar migrar nada. margem/quebra (novas, pedido
+    da Ingrid 03/09/2026: "crie percentuais semanais configuraveis para
+    margem e quebra tbm") usam uma chave derivada, pra não colidir com a
+    de faturamento nem entre si."""
+    return mes_ref if metrica == 'faturamento' else f'{mes_ref}--{metrica}'
+
+
+def carregar_pcts_semanais(mes_ref: str, metrica: str = 'faturamento') -> list:
+    """Percentuais semanais configurados para ESSE mês e ESSA métrica
+    ('faturamento' | 'margem' | 'quebra') especificamente -- cada mês (e
+    cada métrica dentro dele) tem seu próprio conjunto, já que o ritmo de
+    venda, de margem e de quebra ao longo do mês não precisam ser iguais.
+    Se a Ingrid ainda não configurou nada pra esse mês/métrica, cai no
+    padrão de 4 semanas (30/28/25/25)."""
+    reg = ds.load_current(MODULO_PCTS_SEMANAIS, 'mensal', _ref_pcts_semanais(mes_ref, metrica))
     valores = reg['valores'].get('percentuais') if reg else None
     return list(valores) if valores else list(PCTS_SEMANAIS_PADRAO)
 
 
-def salvar_pcts_semanais(mes_ref: str, percentuais: list, usuario: str = None) -> dict:
+def salvar_pcts_semanais(mes_ref: str, percentuais: list, usuario: str = None,
+                          metrica: str = 'faturamento') -> dict:
     return ds.save_record(
-        modulo=MODULO_PCTS_SEMANAIS, tipo_periodo='mensal', periodo_ref=mes_ref,
+        modulo=MODULO_PCTS_SEMANAIS, tipo_periodo='mensal',
+        periodo_ref=_ref_pcts_semanais(mes_ref, metrica),
         valores={'percentuais': percentuais}, usuario=usuario,
     )
 
@@ -241,16 +256,21 @@ def salvar_pcts_semanais(mes_ref: str, percentuais: list, usuario: str = None) -
 # OnTrack Semanal — quebra da meta MENSAL fixa (Faturamento) por semana
 # ---------------------------------------------------------------------------
 
-def _vendido_acumulado_ate(mes_ref: str, data_limite: date) -> dict:
-    """vendedores (por vendedor: fat/vol/custo) do Realizado de Vendas
-    publicado direto na Meta Geral (MOD_MG_VENDAS) pra esse mês, na versão
-    mais recente cujo timestamp seja <= data_limite -- ou seja, 'o que já
-    estava vendido' até aquele momento, reconstruído a partir dos PDFs
-    realmente publicados aqui (cada publicação via publicar_vendas_pdf()
-    gera uma versão nova via data_store). Não inventa nem interpola nenhum
-    número; se não houver nenhuma versão até essa data, devolve {} (sem
-    dado ainda naquele momento)."""
-    versoes = ds.load_all_versions(MOD_MG_VENDAS, 'mensal', mes_ref)
+def _realizado_ate(modulo: str, mes_ref: str, data_limite: date, extrator) -> object:
+    """Reconstrói 'o que já era conhecido' até uma data, a partir das
+    versões publicadas de `modulo` pra esse mês (cada publicação via
+    publicar_vendas_pdf()/publicar_quebra_pdf() gera uma versão nova via
+    data_store, e o PDF publicado é sempre um acumulado do mês até aquele
+    momento -- mesma lógica de sempre, agora generalizada pra qualquer um
+    dos indicadores da Meta Geral que publica por PDF cumulativo do mês:
+    antes só existia pra Faturamento, sob o nome `_vendido_acumulado_ate`;
+    pedido da Ingrid 03/09/2026 de ter a mesma quebra semanal pra Margem e
+    Quebra reaproveita esta mesma técnica). Usa a versão mais recente cujo
+    timestamp seja <= data_limite; não inventa nem interpola nenhum
+    número -- se não houver nenhuma versão até essa data, devolve None
+    (sem dado ainda naquele momento). `extrator(valores) -> valor|None`
+    extrai o número relevante do dict 'valores' salvo em cada versão."""
+    versoes = ds.load_all_versions(modulo, 'mensal', mes_ref)
     melhor = None
     for v in versoes:
         ts = (v.get('atualizado_em') or v.get('criado_em') or '')[:10]
@@ -263,28 +283,67 @@ def _vendido_acumulado_ate(mes_ref: str, data_limite: date) -> dict:
         if data_v <= data_limite and (melhor is None or data_v >= melhor[0]):
             melhor = (data_v, v)
     if melhor is None:
-        return {}
-    return (melhor[1].get('valores') or {}).get('vendedores', {}) or {}
+        return None
+    return extrator(melhor[1].get('valores') or {})
+
+
+def _extrair_vendedores_fat(valores: dict) -> dict:
+    """Extrator de `_realizado_ate` pra MOD_MG_VENDAS: devolve o dict cru
+    de vendedores (fat/vol/custo por nome) -- usado tanto pro total da
+    empresa (soma de todos) quanto pro individual de um vendedor."""
+    return valores.get('vendedores') or {}
+
+
+def _extrair_margem(valores: dict):
+    """Extrator de `_realizado_ate` pra MOD_MG_VENDAS: margem % da empresa
+    (resultado_real = mc_pct + 15pp, mesma base ajustada usada em todo o
+    resto do app -- ver realizado_vendas() abaixo)."""
+    tg = valores.get('total_geral') or {}
+    return tg.get('resultado_real')
+
+
+def _extrair_quebra(valores: dict):
+    """Extrator de `_realizado_ate` pra MOD_MG_QUEBRA: mesma prioridade
+    R$ > cx de sempre (custo real quando o PDF trouxe, senão caixas)."""
+    if valores.get('total_custo') is not None:
+        return valores['total_custo']
+    return valores.get('total_cx')
+
+
+# metrica -> (módulo onde é publicado, extrator do valor pra _realizado_ate)
+_METRICAS_SEMANAIS = {
+    'faturamento': (MOD_MG_VENDAS, _extrair_vendedores_fat),
+    'margem':      (MOD_MG_VENDAS, _extrair_margem),
+    'quebra':      (MOD_MG_QUEBRA, _extrair_quebra),
+}
 
 
 def _blocos_semanais_do_mes(mes_ref: str, n_semanas: int = 4) -> list:
-    """Divide o mês em `n_semanas` blocos SEQUENCIAIS de dias corridos a
-    partir do dia 1 (NÃO são semanas ISO -- não dependem de qual dia da
-    semana cai o dia 1). Os primeiros n_semanas-1 blocos têm 7 dias cada;
-    o último absorve os dias restantes até o fim do mês (pode ter mais ou
-    menos que 7 dias, dependendo do tamanho do mês).
+    """Divide o mês em `n_semanas` blocos de 7 dias alinhados à semana
+    COMERCIAL de sábado a sexta -- pedido explícito da Ingrid, 03/09/2026
+    ("a semana vai de sábado a sexta"), condizente com o fechamento real
+    da empresa (o PDF semanal de Vendedor-Cliente/Quebra é enviado toda
+    sexta-feira -- ver docstring de pages/3_Vendedor_Cliente_OTHIL.py).
+    'Semana 01' começa no sábado igual ou anterior ao dia 1 do mês (pode
+    cair no mês anterior, se o dia 1 não for um sábado -- é a semana
+    comercial de verdade que contém o início do mês, não uma semana
+    artificial que sempre começa exatamente no dia 1). Os primeiros
+    n_semanas-1 blocos têm sempre 7 dias (sáb-sex); o último absorve os
+    dias restantes até o fim do mês (pode ter mais ou menos que 7 dias).
 
-    Isso é de propósito diferente de `_semanas_do_mes` (que usa semanas
-    ISO reais e é usado por `_quebra_mes` pra somar relatórios semanais
-    publicados por semana ISO -- não pode mudar). Aqui o objetivo é outro:
-    dividir o mês em N pedaços de acompanhamento simples e sempre com a
-    MESMA quantidade (4, por padrão) independente de como o calendário se
-    alinha -- ex.: agosto/2026 tem 4 semanas "completas" nesse sentido
-    (dias 1-7, 8-14, 15-21, 22-31), não 6 como semanas ISO reais dariam
-    (a semana ISO 31 começa em julho e a 36 termina em setembro)."""
+    ANTES de 03/09/2026 os blocos eram "dia 1 a dia 7, dia 8 a dia 14..."
+    sequenciais, sem se importar com o dia da semana -- mudado a pedido
+    dela. Isso é, de qualquer forma, DIFERENTE da semana ISO (segunda a
+    domingo, usada em periodo.py e por Vendedor-Cliente/Quebra semanais --
+    NÃO MUDA, mudar isso quebraria essas outras telas) e também diferente
+    de `_semanas_do_mes` (usado por `_quebra_mes` pra somar relatórios
+    semanais publicados por semana ISO -- idem, não muda)."""
     ini, fim = periodo.intervalo_datas('mensal', mes_ref)
+    # weekday(): segunda=0 ... sábado=5, domingo=6. Quantos dias faltam
+    # andar PRA TRÁS a partir de `ini` até cair num sábado:
+    dias_ate_sabado_anterior = (ini.weekday() - 5) % 7
+    inicio_bloco = ini - timedelta(days=dias_ate_sabado_anterior)
     blocos = []
-    inicio_bloco = ini
     for i in range(n_semanas):
         if i == n_semanas - 1:
             fim_bloco = fim  # último bloco absorve o resto do mês
@@ -297,36 +356,78 @@ def _blocos_semanais_do_mes(mes_ref: str, n_semanas: int = 4) -> list:
     return blocos
 
 
+def semanas_comerciais_do_mes(mes_ref: str, n_semanas: int = None) -> list:
+    """Lista as semanas comerciais (sábado a sexta, ver
+    `_blocos_semanais_do_mes`) desse mês, pra uso em telas -- ex.: o
+    seletor de período "Semanal" da Meta Geral (pedido da Ingrid,
+    03/09/2026). Cada item: {'semana' (1-based), 'label', 'ini', 'fim'}.
+    `n_semanas` usa por padrão a mesma quantidade configurada pra
+    Faturamento (carregar_pcts_semanais) -- é só a base de contagem de
+    semanas do mês, as 3 métricas sempre têm a MESMA quantidade de
+    semanas nesse sentido (só o peso/percentual de cada uma varia)."""
+    if n_semanas is None:
+        n_semanas = len(carregar_pcts_semanais(mes_ref, metrica='faturamento'))
+    blocos = _blocos_semanais_do_mes(mes_ref, n_semanas)
+    mes_num = int(mes_ref.split('-')[1])
+    return [
+        {
+            'semana': i + 1,
+            'label': f'Semana {i + 1:02d} do mês {mes_num:02d} ({ini:%d/%m} a {fim:%d/%m})',
+            'ini': ini, 'fim': fim,
+        }
+        for i, (ini, fim) in enumerate(blocos)
+    ]
+
+
 def quebra_semanal_meta(mes_ref: str, meta_fixa, pcts_semanais: list = None,
-                         hoje: date = None, vendedor: str = None) -> list:
-    """Quebra a meta MENSAL fixa (Faturamento, R$) em checkpoints semanais.
+                         hoje: date = None, vendedor: str = None,
+                         metrica: str = 'faturamento') -> list:
+    """Quebra a meta MENSAL fixa em checkpoints semanais.
+
+    metrica: 'faturamento' (padrão, comportamento idêntico a antes de
+    03/09/2026) | 'margem' | 'quebra' -- pedido explícito da Ingrid,
+    03/09/2026 ("crie percentuais semanais configuraveis para margem e
+    quebra tbm"), generaliza o que só existia pra Faturamento. Cada
+    métrica lê os percentuais semanais e o realizado-por-data do módulo
+    onde é publicada (ver `_METRICAS_SEMANAIS`): Faturamento/Margem vêm de
+    MOD_MG_VENDAS (publicar_vendas_pdf), Quebra vem de MOD_MG_QUEBRA
+    (publicar_quebra_pdf) -- os mesmos PDFs cumulativos do mês de sempre,
+    nenhum dado novo é digitado aqui.
 
     A meta fixa NUNCA muda -- é sempre a referência de 100%. Os percentuais
     semanais são incrementais e são ACUMULADOS pra saber quanto da meta fixa
     já era esperado até cada semana (podem somar mais ou menos que 100%; o
     acumulado e o atingimento NUNCA são limitados a 100%).
 
-    vendedor=None -> total da empresa (soma de todos os vendedores no
-    Vendedor-Cliente). vendedor='Nome' -> só aquele vendedor -- nesse caso
-    `meta_fixa` deve ser a meta fixa DELE (não a da empresa).
+    vendedor=None -> total da empresa. vendedor='Nome' -> só aquele
+    vendedor -- nesse caso `meta_fixa` deve ser a meta fixa DELE (não a da
+    empresa). Só se aplica a metrica='faturamento' (não existe detalhe por
+    vendedor pra Margem/Quebra na Meta Geral); com outra métrica o
+    parâmetro é ignorado.
 
     Retorna uma linha por semana do mês:
       {'semana', 'periodo_ref', 'label', 'pct_semana', 'pct_acumulado',
        'esperado_acumulado', 'vendido_acumulado' (None se a semana ainda
-       não começou), 'atingimento' (None se não dá pra calcular)}.
+       não começou -- o nome do campo é histórico, de quando só existia
+       Faturamento; pra Margem/Quebra guarda o REALIZADO daquela métrica,
+       não literalmente "vendido"), 'atingimento' (None se não dá pra
+       calcular)}.
     'atingimento' = vendido_acumulado ÷ meta_fixa (a meta TOTAL do mês, não
     o esperado daquela semana) -- ex.: meta 18.000.000, vendido acumulado
     12.963.383,34 -> 72%. É simplesmente "quanto da meta já foi batido até
     agora", sem ajustar pelo ritmo esperado da semana.
 
     O 'label' é a posição da semana DENTRO do mês (ex.: "Semana 01 do mês
-    08"). As semanas em si NÃO são semanas ISO -- são blocos sequenciais
-    de 7 dias a partir do dia 1 do mês (ver `_blocos_semanais_do_mes`),
-    então todo mês sempre tem a mesma quantidade de semanas (4 por
-    padrão), em vez de variar conforme o alinhamento do calendário.
+    08"). As semanas em si NÃO são semanas ISO -- são a semana COMERCIAL
+    de sábado a sexta (ver `_blocos_semanais_do_mes`), então todo mês
+    sempre tem a mesma quantidade de semanas (4 por padrão), em vez de
+    variar conforme o alinhamento do calendário.
     """
+    if metrica not in _METRICAS_SEMANAIS:
+        raise ValueError(f"metrica inválida: {metrica!r} (use 'faturamento', 'margem' ou 'quebra')")
+    modulo_metrica, extrator = _METRICAS_SEMANAIS[metrica]
     if pcts_semanais is None:
-        pcts_semanais = carregar_pcts_semanais(mes_ref)
+        pcts_semanais = carregar_pcts_semanais(mes_ref, metrica=metrica)
     meta_fixa = meta_fixa or 0
     hoje = hoje or date.today()
     n_semanas = len(pcts_semanais) or 4
@@ -343,17 +444,28 @@ def quebra_semanal_meta(mes_ref: str, meta_fixa, pcts_semanais: list = None,
         if hoje < inicio_sem:
             vendido = None  # semana ainda não começou -- não há como ter dado
         else:
-            totais = _vendido_acumulado_ate(mes_ref, min(fim_sem, hoje))
-            # totais vazio cobre tanto "nenhuma publicação ainda" quanto
-            # "publicação existe mas sem vendedores" -- não dá pra distinguir
-            # dos dois "vendeu 0", então trata como sem dado (None) em vez de
-            # mostrar um 0 enganoso.
-            if not totais:
-                vendido = None
-            elif vendedor is None:
-                vendido = sum(v.get('fat', 0) or 0 for v in totais.values())
+            valor_ate = _realizado_ate(modulo_metrica, mes_ref, min(fim_sem, hoje), extrator)
+            if metrica == 'faturamento':
+                # `valor_ate` aqui é o dict cru de vendedores (ver
+                # _extrair_vendedores_fat) -- soma tudo, ou filtra por um
+                # vendedor específico, exatamente como antes de 03/09/2026.
+                totais = valor_ate or {}
+                if not totais:
+                    # totais vazio cobre tanto "nenhuma publicação ainda"
+                    # quanto "publicação existe mas sem vendedores" -- não
+                    # dá pra distinguir os dois "vendeu 0", então trata
+                    # como sem dado (None) em vez de mostrar um 0 enganoso.
+                    vendido = None
+                elif vendedor is None:
+                    vendido = sum(v.get('fat', 0) or 0 for v in totais.values())
+                else:
+                    vendido = (totais.get(vendedor) or {}).get('fat')
             else:
-                vendido = (totais.get(vendedor) or {}).get('fat')
+                # Margem/Quebra: `valor_ate` já é o número final (extraído
+                # por _extrair_margem/_extrair_quebra), sem soma por
+                # vendedor -- None continua significando "sem publicação
+                # até essa data".
+                vendido = valor_ate
 
         # Atingimento = % da META TOTAL do mês (não da expectativa daquela
         # semana) -- decisão explícita da Ingrid em 25/08/2026: "a
