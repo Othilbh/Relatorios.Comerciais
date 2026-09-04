@@ -285,6 +285,18 @@ def compute_metas(vendas_rows, produtos_config, vendedor_pcts, estoque_rows=None
       digitada manualmente pela Ingrid no app.
     'codigos' continua sendo usado apenas para casar as vendas (Vendido)
       no relatório de Lucratividade por Vendedor.
+    'metas_fixas_ativo' (bool, opcional) + 'metas_fixas' (dict opcional,
+      {nome_vendedor: quantidade}): pedido da Ingrid (04/09/2026) --
+      "Hoje a meta semanal é definida por porcentagens fixas. Preciso que eu
+      consiga momentaneamente definir quantidades por alguns produtos" --
+      quando 'metas_fixas_ativo' é True, a Meta de um vendedor QUE TENHA
+      entrada em 'metas_fixas' nesse produto usa esse número diretamente, em
+      vez de calcular por percentual sobre o estoque; vendedores sem entrada
+      em 'metas_fixas' (ou quando 'metas_fixas_ativo' é False/ausente)
+      continuam pelo cálculo por percentual de sempre, produto por produto,
+      sem afetar os demais. Guardar os dois campos separados (valores vs.
+      "ligado") permite desligar e religar sem perder os números já digitados
+      -- por isso "momentâneo": reversível a qualquer momento, sem apagar nada.
     vendedor_pcts: dict {nome_vendedor: percentual (0-100)}
     estoque_rows: lista OPCIONAL de linhas do PDF "Estoque Físico"
       (parsers.parse_estoque), cada uma com pelo menos 'codigo', 'qtde_vendida',
@@ -353,9 +365,21 @@ def compute_metas(vendas_rows, produtos_config, vendedor_pcts, estoque_rows=None
         media_rs_cx = (soma_rs_ponderada / soma_peso) if soma_peso else None
         media_custo_cx = (soma_custo_ponderada / soma_peso_custo) if soma_peso_custo else None
 
+        metas_fixas = produto.get('metas_fixas') or {}
+        metas_fixas_ativo = bool(produto.get('metas_fixas_ativo'))
+
         linhas = []
         for vend, pct in vendedor_pcts.items():
-            meta = round_up(pct / 100 * estoque_total)
+            # Meta fixa por vendedor (ver docstring acima) -- só entra em
+            # vigor pra quem TEM um número digitado nesse produto E com o
+            # botão ligado; os demais vendedores desse mesmo produto (e todo
+            # produto sem meta fixa nenhuma) seguem 100% pelo percentual, sem
+            # nenhuma mudança de comportamento.
+            usa_meta_fixa = metas_fixas_ativo and vend in metas_fixas
+            if usa_meta_fixa:
+                meta = int(metas_fixas[vend])
+            else:
+                meta = round_up(pct / 100 * estoque_total)
             vendido = vendido_por_vendedor.get(vend, 0.0)
             # 'Falta' nunca é negativo -- quando o vendido já ultrapassou a
             # meta não "falta" nada, então trava em 0 em vez de mostrar um
@@ -366,6 +390,7 @@ def compute_metas(vendas_rows, produtos_config, vendedor_pcts, estoque_rows=None
                 'vendedor': vend,
                 'pct': pct,
                 'meta': meta,
+                'meta_fixa': usa_meta_fixa,
                 'vendido': vendido,
                 'falta': falta,
                 'atingido': atingido,
