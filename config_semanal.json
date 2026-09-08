@@ -61,20 +61,38 @@
       "codigos_texto": "390600160\n",
       "estoque": 77,
       "prioridade": "🚨 Grande Urgência",
-      "metas_fixas_ativo": false,
-      "metas_fixas": {}
+      "metas_fixas_ativo": true,
+      "metas_fixas": {
+        "Farley": 26,
+        "Dora": 26,
+        "Afanais": 0,
+        "Roni": 26,
+        "Reginaldo": 0,
+        "Luciano": 0,
+        "Juliana": 0,
+        "Luca": 0
+      }
     },
     {
       "nome": "TANGERINA COMPOSOL",
       "codigos_texto": "390600180\n",
       "estoque": 63,
       "prioridade": "🚨 Grande Urgência",
-      "metas_fixas_ativo": false,
-      "metas_fixas": {}
+      "metas_fixas_ativo": true,
+      "metas_fixas": {
+        "Farley": 0,
+        "Dora": 0,
+        "Afanais": 21,
+        "Roni": 0,
+        "Reginaldo": 21,
+        "Luciano": 0,
+        "Juliana": 21,
+        "Luca": 0
+      }
     },
     {
-      "nome": "PACKHAMS",
-      "codigos_texto": "010207*",
+      "nome": "PACK PROFESSOR|BONA TERRA| TRAFUL",
+      "codigos_texto": "0102074\n0102075\n0102076",
       "estoque": 329,
       "prioridade": "🔥 Alta Prioridade",
       "metas_fixas_ativo": false,
