@@ -178,6 +178,23 @@ def _build_relatorio_vendedor(vendedor: str, data_emissao: str,
                             section_style))
     mheader = ['Produto', 'Meta (cx)', 'Vendido (cx)', 'Falta (cx)', '%']
     mdata = [mheader]
+    # 08/09/2026 -- Ingrid reportou nomes de produto "ultrapassando"/sobrepondo
+    # os numeros ao lado (ex.: prioridade + nome longo virando algo tipo
+    # "...GRANGCRAPE" colado no numero da Meta). Causa: essa celula ia como
+    # string simples (sem quebra de linha) numa coluna de so 7cm -- reportlab
+    # NAO quebra string simples que estoura a largura da coluna, ela
+    # transborda e fica desenhada por cima da coluna seguinte. A tabela de
+    # "Produtos Criticos" do Dashboard (mais abaixo, _build_dashboard) ja
+    # tinha essa correcao (comentario original: "usa Paragraph no nome para
+    # evitar overflow") -- essa tabela do Relatorio por Vendedor nunca tinha
+    # recebido a mesma correcao. Usa Paragraph (quebra automatica dentro da
+    # coluna) e o texto limpo de prioridade (_PRIO_LABEL_TXT, sem emoji --
+    # o emoji cru nao tem glifo nas fontes do reportlab e some virando um
+    # quadrado preto, o "■" que a Ingrid tambem viu no print).
+    prod_meta_style = ParagraphStyle('pm_vend', parent=STYLES['Normal'],
+                                      fontSize=level['meta_font'],
+                                      leading=level['meta_font'] * 1.15,
+                                      wordWrap='LTR')
     meta_t = vendido_t = falta_t = 0.0
     for r in metas_results:
         linha = next((l for l in r['linhas'] if l['vendedor'] == vendedor), None)
@@ -187,8 +204,9 @@ def _build_relatorio_vendedor(vendedor: str, data_emissao: str,
         vendido_t += linha['vendido']
         falta_t += linha['falta']
         prio = r.get('prioridade', 'Normal')
-        nome_prod = f"{prio} {r['produto']}" if prio != 'Normal' else r['produto']
-        mdata.append([nome_prod, f"{linha['meta']:.0f}", f"{linha['vendido']:.1f}",
+        prio_txt = _PRIO_LABEL_TXT.get(prio, '')
+        nome_prod = f"{prio_txt} {r['produto']}".strip() if prio_txt else r['produto']
+        mdata.append([Paragraph(nome_prod, prod_meta_style), f"{linha['meta']:.0f}", f"{linha['vendido']:.1f}",
                       f"{linha['falta']:.1f}", _fmt_pct(linha['atingido'])])
     pct_t = (vendido_t / meta_t) if meta_t else 0.0
     mdata.append(['TOTAL', f"{meta_t:.0f}", f"{vendido_t:.1f}", f"{falta_t:.1f}", _fmt_pct(pct_t)])
@@ -204,6 +222,7 @@ def _build_relatorio_vendedor(vendedor: str, data_emissao: str,
         ('FONTNAME', (0, -1), (-1, -1), 'Helvetica-Bold'),
         ('BACKGROUND', (0, -1), (-1, -1), colors.HexColor('#dfe6e9')),
         ('ROWBACKGROUNDS', (0, 1), (-1, -2), [colors.white, LIGHT_BG]),
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
     ]))
     elems.append(mt)
     elems.append(Spacer(1, level['spacer1']))
