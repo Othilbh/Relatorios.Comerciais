@@ -92,7 +92,7 @@
     },
     {
       "nome": "PACK PROFESSOR|BONA TERRA| TRAFUL",
-      "codigos_texto": "010207470\n010207480\n010207490\n0102075\n0102076\n0102074",
+      "codigos_texto": "0102074*\n0102075*\n0102076*",
       "estoque": 329,
       "prioridade": "🔥 Alta Prioridade",
       "metas_fixas_ativo": false,
@@ -127,6 +127,14 @@
       "codigos_texto": "830101522\n",
       "estoque": 629,
       "prioridade": "🔥 Alta Prioridade",
+      "metas_fixas_ativo": false,
+      "metas_fixas": {}
+    },
+    {
+      "nome": "NUBIA/JUBILEE",
+      "codigos_texto": "830201514\n830201902\n",
+      "estoque": 742,
+      "prioridade": "🚨 Grande Urgência",
       "metas_fixas_ativo": false,
       "metas_fixas": {}
     }
