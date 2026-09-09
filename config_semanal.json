@@ -92,7 +92,7 @@
     },
     {
       "nome": "PACK PROFESSOR|BONA TERRA| TRAFUL",
-      "codigos_texto": "0102074*\n0102075*\n0102076*",
+      "codigos_texto": "010207470\n010207480\n010207490\n0102075\n0102076\n0102074",
       "estoque": 329,
       "prioridade": "🔥 Alta Prioridade",
       "metas_fixas_ativo": false,
