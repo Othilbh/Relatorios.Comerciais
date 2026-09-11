@@ -39,13 +39,17 @@ from parsers_diario import map_vendedor
 # Percentuais fixos (mas editáveis na UI) de cada vendedor sobre o estoque
 # atual de cada produto. Não somam 100% — cada vendedor tem uma meta
 # independente sobre o estoque total do produto.
+# 11/09/2026: 'Luciano' removido a pedido da Ingrid (não está mais na
+# empresa) -- só tirado daqui (lista de seleção/meta), o reconhecimento
+# do nome dele nos PDFs (parsers_diario.py:VENDOR_ALIASES e outros mapas de
+# alias) continua intocado de propósito, pra não perder nenhum valor caso
+# ainda apareça alguma linha residual em nome dele num PDF de origem.
 VENDEDORES_PADRAO = {
     'Farley': 17,
     'Dora': 17,
     'Afanais': 25,
     'Roni': 25,
     'Reginaldo': 22,
-    'Luciano': 7,
     'Juliana': 7,
     'Claudia': 7,
 }
