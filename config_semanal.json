@@ -3,7 +3,7 @@
     {
       "nome": "PINK LADY 1/2",
       "codigos_texto": "050201332\n",
-      "estoque": 18,
+      "estoque": 13,
       "prioridade": "🚨 Grande Urgência",
       "metas_fixas_ativo": false,
       "metas_fixas": {}
@@ -11,7 +11,7 @@
     {
       "nome": "WILLIANS DOLE PONTO AZUL",
       "codigos_texto": "01011001*",
-      "estoque": 726,
+      "estoque": 270,
       "prioridade": "🚨 Grande Urgência",
       "metas_fixas_ativo": false,
       "metas_fixas": {}
@@ -19,7 +19,7 @@
     {
       "nome": "MELAO DINO",
       "codigos_texto": "87038*",
-      "estoque": 264,
+      "estoque": 163,
       "prioridade": "🚨 Grande Urgência",
       "metas_fixas_ativo": false,
       "metas_fixas": {}
@@ -27,7 +27,7 @@
     {
       "nome": "CUMB THOMPSON FRUTIBRAS",
       "codigos_texto": "830100820\n",
-      "estoque": 350,
+      "estoque": 222,
       "prioridade": "🚨 Grande Urgência",
       "metas_fixas_ativo": false,
       "metas_fixas": {}
@@ -35,7 +35,7 @@
     {
       "nome": "BENITAKA",
       "codigos_texto": "830200306\n",
-      "estoque": 69,
+      "estoque": 42,
       "prioridade": "🚨 Grande Urgência",
       "metas_fixas_ativo": false,
       "metas_fixas": {}
@@ -43,7 +43,7 @@
     {
       "nome": "PIMENTÃO",
       "codigos_texto": "87071*",
-      "estoque": 163,
+      "estoque": 109,
       "prioridade": "🚨 Grande Urgência",
       "metas_fixas_ativo": false,
       "metas_fixas": {}
@@ -51,49 +51,15 @@
     {
       "nome": "CUMB CRINSON CHERRY GRANGRAPE",
       "codigos_texto": "830100623\n\n",
-      "estoque": 221,
+      "estoque": 176,
       "prioridade": "🚨 Grande Urgência",
       "metas_fixas_ativo": false,
       "metas_fixas": {}
     },
     {
-      "nome": "URUGOLD",
-      "codigos_texto": "390600160\n",
-      "estoque": 77,
-      "prioridade": "🚨 Grande Urgência",
-      "metas_fixas_ativo": true,
-      "metas_fixas": {
-        "Farley": 26,
-        "Dora": 26,
-        "Afanais": 0,
-        "Roni": 26,
-        "Reginaldo": 0,
-        "Luciano": 0,
-        "Juliana": 0,
-        "Luca": 0
-      }
-    },
-    {
-      "nome": "TANGERINA COMPOSOL",
-      "codigos_texto": "390600180\n",
-      "estoque": 63,
-      "prioridade": "🚨 Grande Urgência",
-      "metas_fixas_ativo": true,
-      "metas_fixas": {
-        "Farley": 0,
-        "Dora": 0,
-        "Afanais": 21,
-        "Roni": 0,
-        "Reginaldo": 21,
-        "Luciano": 0,
-        "Juliana": 21,
-        "Luca": 0
-      }
-    },
-    {
-      "nome": "PACK PROFESSOR|BONA TERRA| TRAFUL",
-      "codigos_texto": "0102074*\n0102075*\n0102076*",
-      "estoque": 329,
+      "nome": "PACK PROFESSOR E BONA TERRA",
+      "codigos_texto": "010207470\n010207480\n010207570.1\n010207570\n010207580",
+      "estoque": 218,
       "prioridade": "🔥 Alta Prioridade",
       "metas_fixas_ativo": false,
       "metas_fixas": {}
@@ -101,40 +67,64 @@
     {
       "nome": "BERGAMOTA",
       "codigos_texto": "390600137",
-      "estoque": 1300,
+      "estoque": 834,
       "prioridade": "🔥 Alta Prioridade",
       "metas_fixas_ativo": false,
       "metas_fixas": {}
     },
     {
-      "nome": "FUJI DOM FRUTO 90/100",
-      "codigos_texto": "702141100\n702141090\n",
-      "estoque": 227,
+      "nome": "FUJI DOM FRUTO",
+      "codigos_texto": "702141*",
+      "estoque": 19,
       "prioridade": "🔥 Alta Prioridade",
       "metas_fixas_ativo": false,
       "metas_fixas": {}
     },
     {
       "nome": "ROMA",
-      "codigos_texto": "870471*",
+      "codigos_texto": "87047*",
       "estoque": 300,
       "prioridade": "🔥 Alta Prioridade",
       "metas_fixas_ativo": false,
       "metas_fixas": {}
     },
     {
-      "nome": "ISIS LINA",
-      "codigos_texto": "830101522\n",
-      "estoque": 629,
+      "nome": "ISIS LINA E SPECIALE",
+      "codigos_texto": "830101522\n830101513",
+      "estoque": 684,
       "prioridade": "🔥 Alta Prioridade",
       "metas_fixas_ativo": false,
       "metas_fixas": {}
     },
     {
-      "nome": "NUBIA/JUBILEE",
-      "codigos_texto": "830201514\n830201902\n",
-      "estoque": 742,
-      "prioridade": "🚨 Grande Urgência",
+      "nome": "LARANJA NEDEL",
+      "codigos_texto": "390100105\n390100104",
+      "estoque": 1300,
+      "prioridade": "🔥 Alta Prioridade",
+      "metas_fixas_ativo": false,
+      "metas_fixas": {}
+    },
+    {
+      "nome": "MELAO PELE DE SAPO",
+      "codigos_texto": "3102010004\n02011009.1\n02011006.1",
+      "estoque": 411,
+      "prioridade": "🔥 Alta Prioridade",
+      "metas_fixas_ativo": false,
+      "metas_fixas": {}
+    },
+    {
+      "nome": "NUBIA/JUBILEE CAPELLARO",
+      "codigos_texto": "830100715",
+      "estoque": 57,
+      "prioridade": "🔥 Alta Prioridade",
+      "metas_fixas_ativo": false,
+      "metas_fixas": {}
+    },
+    {
+      "nome": "THOMPSON PURO NECTAR 8KG",
+      "codigos_texto": "830200703",
+      "estoque": 63,
+      "prioridade": "🔥 Alta Prioridade",
       "metas_fixas_ativo": false,
       "metas_fixas": {}
     }
