@@ -127,6 +127,14 @@
       "prioridade": "🔥 Alta Prioridade",
       "metas_fixas_ativo": false,
       "metas_fixas": {}
+    },
+    {
+      "nome": "NUBIA/JUBILEE SPECIALE",
+      "codigos_texto": "830201514\n830201902",
+      "estoque": 714,
+      "prioridade": "🚨 Grande Urgência",
+      "metas_fixas_ativo": false,
+      "metas_fixas": {}
     }
   ],
   "vendedor_pcts": {
