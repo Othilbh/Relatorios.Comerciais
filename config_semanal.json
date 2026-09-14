@@ -135,6 +135,22 @@
       "prioridade": "🚨 Grande Urgência",
       "metas_fixas_ativo": false,
       "metas_fixas": {}
+    },
+    {
+      "nome": "AMEIXA",
+      "codigos_texto": "250103701.1",
+      "estoque": 70,
+      "prioridade": "🚨 Grande Urgência",
+      "metas_fixas_ativo": false,
+      "metas_fixas": {}
+    },
+    {
+      "nome": "THOMPSON COTTON CANDY",
+      "codigos_texto": "8301008*",
+      "estoque": 156,
+      "prioridade": "🚨 Grande Urgência",
+      "metas_fixas_ativo": false,
+      "metas_fixas": {}
     }
   ],
   "vendedor_pcts": {
