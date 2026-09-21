@@ -127,7 +127,7 @@
     },
     {
       "nome": "MELAO PELE SAPO",
-      "codigos_texto": "3102010004\n3102010005\n102011009.1\n102011006.1",
+      "codigos_texto": "3102010004\n3102010005\n3102011009.1\n3102011006.1",
       "estoque": 467,
       "prioridade": "🚨 Grande Urgência",
       "metas_fixas_ativo": true,
