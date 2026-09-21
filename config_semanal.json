@@ -2,7 +2,7 @@
   "produtos": [
     {
       "nome": "NUBIA 8KG SPECIALE / CX ROXA",
-      "codigos_texto": "830201514\n830201902\n",
+      "codigos_texto": "830201514\n830201902",
       "estoque": 460,
       "prioridade": "🚨 Grande Urgência",
       "metas_fixas_ativo": false,
@@ -10,7 +10,7 @@
     },
     {
       "nome": "NUBIA CUMB RCA/SPECIALE/CAPPELARO",
-      "codigos_texto": "830100703\n830100716\n830100715",
+      "codigos_texto": "830100703\n830201902\n830100715",
       "estoque": 770,
       "prioridade": "🚨 Grande Urgência",
       "metas_fixas_ativo": true,
@@ -102,7 +102,7 @@
     },
     {
       "nome": "THOMPSON 8 KG",
-      "codigos_texto": "830200705\n830200703\n",
+      "codigos_texto": "830200703\n",
       "estoque": 50,
       "prioridade": "🚨 Grande Urgência",
       "metas_fixas_ativo": true,
@@ -160,7 +160,7 @@
     },
     {
       "nome": "FUJI DOM FRUTO ",
-      "codigos_texto": "702141*",
+      "codigos_texto": "0702141*",
       "estoque": 382,
       "prioridade": "🔥 Alta Prioridade",
       "metas_fixas_ativo": false,
