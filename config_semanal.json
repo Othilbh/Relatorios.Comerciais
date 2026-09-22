@@ -153,7 +153,7 @@
     {
       "nome": "PERA WILLIANS 1/2",
       "codigos_texto": "02010183\n02010181",
-      "estoque": 500,
+      "estoque": 1000,
       "prioridade": "🔥 Alta Prioridade",
       "metas_fixas_ativo": false,
       "metas_fixas": {}
