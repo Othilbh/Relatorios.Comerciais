@@ -224,6 +224,44 @@ def _diagnostico_codigos(vendas_rows: list, produtos_config: list) -> list:
     ]
 
 
+def _aplicar_edicoes_vendido(resultados: list) -> None:
+    """Aplica, em 'resultados', as correções manuais de 'Vendido' que a
+    Ingrid já tenha feito nesta mesma sessão via st.data_editor (chave
+    'vendido_editor_{i}', uma por produto -- ver loop 'Detalhe por
+    vendedor' mais abaixo). Precisa rodar ANTES da tabela-resumo
+    'Resultado por produto' ser montada, senão ela mostraria o valor
+    antigo por um render (o data_editor só é chamado de novo, mais
+    abaixo no código, depois da tabela-resumo).
+
+    Só mexe no Vendido/Falta/% Atingido calculados para ESTA semana (que
+    ficam em st.session_state['resultados'], recriado do zero a cada novo
+    cálculo) -- nunca em produtos_config nem nos percentuais/metas fixas,
+    que continuam sendo a configuração reaproveitada toda semana (pedido
+    explícito da Ingrid, 22/09/2026: a correção vale só pra semana que
+    está sendo calculada agora, não deve 'travar' as semanas seguintes
+    como a meta fixa trava)."""
+    for i, r in enumerate(resultados):
+        estado = st.session_state.get(f'vendido_editor_{i}')
+        if not isinstance(estado, dict):
+            continue
+        for idx_str, mudancas in estado.get('edited_rows', {}).items():
+            if 'Vendido (cx)' not in mudancas:
+                continue
+            try:
+                idx = int(idx_str)
+                novo_vendido = float(mudancas['Vendido (cx)'])
+            except (TypeError, ValueError):
+                continue
+            if idx >= len(r['linhas']):
+                continue
+            linha = r['linhas'][idx]
+            linha['vendido'] = novo_vendido
+            linha['vendido_editado'] = True
+            meta_linha = linha.get('meta', 0)
+            linha['falta'] = max(meta_linha - novo_vendido, 0.0)
+            linha['atingido'] = (novo_vendido / meta_linha) if meta_linha else 0.0
+
+
 def _diagnostico_vendedores_excluidos(vendas_rows: list, produtos_config: list,
                                        vendedor_pcts: dict) -> list:
     """Retorna vendedores que o relatório RECONHECE (têm alias mapeado em
@@ -1055,6 +1093,10 @@ with tab_cfg:
             vendas_rows_diag = st.session_state.get('vendas_rows', [])
             produtos_config_diag = st.session_state.get('produtos_config', [])
 
+            # Aplica correções manuais de Vendido feitas no data_editor mais
+            # abaixo (precisa ser antes da tabela-resumo, ver docstring).
+            _aplicar_edicoes_vendido(resultados)
+
             # Diagnóstico de códigos não reconhecidos
             nao_rec = _diagnostico_codigos(vendas_rows_diag, produtos_config_diag)
             if nao_rec:
@@ -1209,8 +1251,9 @@ with tab_cfg:
                 p_atg  = p_vend / p_meta * 100 if p_meta else 0
                 p_falt = max(p_meta - p_vend, 0)
                 p_media = r.get('media_rs_cx')
+                _tem_edicao = any(l.get('vendido_editado') for l in r['linhas'])
                 resumo_rows.append({
-                    'Produto':      r['produto'],
+                    'Produto':      ('✏️ ' + r['produto']) if _tem_edicao else r['produto'],
                     'Prioridade':   r.get('prioridade', 'Normal'),
                     'Meta (cx)':    f"{p_meta:.0f}",
                     'Vendido (cx)': f"{p_vend:.0f}",
@@ -1228,9 +1271,18 @@ with tab_cfg:
                     'correto mesmo assim.'
                 )
 
-            # Detalhe por vendedor (colapsado)
-            st.caption('Clique em um produto para ver o detalhe por vendedor:')
-            for r in resultados:
+            # Detalhe por vendedor (colapsado) -- 'Vendido (cx)' é editável:
+            # correção pontual da Ingrid pra essa semana (22/09/2026, pedido
+            # dela -- só essa semana, sem travar as seguintes; ver
+            # _aplicar_edicoes_vendido acima). As demais colunas ficam
+            # travadas (% Meta/Meta vêm da configuração; Falta/% Atingido
+            # são recalculadas a partir do Vendido editado).
+            st.caption(
+                'Clique em um produto para ver o detalhe por vendedor. '
+                'A coluna "Vendido (cx)" pode ser corrigida na hora, se precisar '
+                '(ex.: erro de leitura do PDF) -- a correção vale só para esta semana.'
+            )
+            for i, r in enumerate(resultados):
                 p_meta = r.get('estoque_total', 0)
                 p_vend = sum(l['vendido'] for l in r['linhas'])
                 p_atg  = p_vend / p_meta * 100 if p_meta else 0
@@ -1240,13 +1292,37 @@ with tab_cfg:
                     f"{r['produto']}{badge}  |  Meta {p_meta:.0f} cx — Vendido {p_vend:.0f} cx ({p_atg:.1f}%)",
                     expanded=False,
                 ):
-                    st.dataframe(
-                        [{'Vendedor': l['vendedor'], '% Meta': f"{l['pct']:.0f}%",
-                          'Meta (cx)': l['meta'], 'Vendido (cx)': l['vendido'],
-                          'Falta (cx)': l['falta'], '% Atingido': f"{l['atingido']*100:.1f}%"}
-                         for l in r['linhas']],
+                    df_linhas = pd.DataFrame([
+                        {'Vendedor': l['vendedor'], '% Meta': f"{l['pct']:.0f}%",
+                         'Meta (cx)': l['meta'], 'Vendido (cx)': l['vendido'],
+                         'Falta (cx)': l['falta'], '% Atingido': f"{l['atingido']*100:.1f}%"}
+                        for l in r['linhas']
+                    ])
+                    df_editado = st.data_editor(
+                        df_linhas,
                         use_container_width=True, hide_index=True,
+                        num_rows='fixed',
+                        disabled=['Vendedor', '% Meta', 'Meta (cx)', 'Falta (cx)', '% Atingido'],
+                        column_config={
+                            'Vendido (cx)': st.column_config.NumberColumn(
+                                'Vendido (cx)', min_value=0.0, step=1.0, format='%.1f',
+                            ),
+                        },
+                        key=f'vendido_editor_{i}',
                     )
+                    for idx, linha in enumerate(r['linhas']):
+                        try:
+                            novo_vendido = float(df_editado.iloc[idx]['Vendido (cx)'])
+                        except (TypeError, ValueError, IndexError):
+                            continue
+                        if novo_vendido != linha['vendido']:
+                            linha['vendido'] = novo_vendido
+                            linha['vendido_editado'] = True
+                            meta_linha = linha.get('meta', 0)
+                            linha['falta'] = max(meta_linha - novo_vendido, 0.0)
+                            linha['atingido'] = (novo_vendido / meta_linha) if meta_linha else 0.0
+                    if any(l.get('vendido_editado') for l in r['linhas']):
+                        st.caption('✏️ Vendido corrigido manualmente nesta semana para pelo menos um vendedor.')
 
     with sub_publish:
         if 'resultados' not in st.session_state:
