@@ -1,203 +1,129 @@
 {
   "produtos": [
     {
-      "nome": "Ameixa Prime Time",
-      "codigos_texto": "",
-      "estoque": 39,
-      "prioridade": "🚨 Grande Urgência",
-      "metas_fixas_ativo": false,
-      "metas_fixas": {
-        "Farley": 0,
-        "Dora": 0,
-        "Afanais": 0,
-        "Roni": 0,
-        "Reginaldo": 45,
-        "Luciano": 0,
-        "Juliana": 0,
-        "Luca": 0
-      }
-    },
-    {
-      "nome": "Melao Dino Cepi",
-      "codigos_texto": "87038*",
-      "estoque": 1100,
-      "prioridade": "🚨 Grande Urgência",
-      "metas_fixas_ativo": false,
-      "metas_fixas": {
-        "Farley": 0,
-        "Dora": 0,
-        "Afanais": 0,
-        "Roni": 0,
-        "Reginaldo": 45,
-        "Luciano": 0,
-        "Juliana": 0,
-        "Luca": 0
-      }
-    },
-    {
-      "nome": "Benitaka 8 kg",
-      "codigos_texto": "830200306",
-      "estoque": 43,
-      "prioridade": "🚨 Grande Urgência",
-      "metas_fixas_ativo": false,
-      "metas_fixas": {}
-    },
-    {
-      "nome": "Pessego 4 kg",
-      "codigos_texto": "240100101",
-      "estoque": 123,
-      "prioridade": "🚨 Grande Urgência",
-      "metas_fixas_ativo": false,
-      "metas_fixas": {}
-    },
-    {
-      "nome": "Kiwi 30/33/36",
-      "codigos_texto": "380102230\n380102230.1\n380102233",
-      "estoque": 832,
-      "prioridade": "🚨 Grande Urgência",
-      "metas_fixas_ativo": false,
-      "metas_fixas": {}
-    },
-    {
-      "nome": "Kiwi Cumb Mono Azul",
-      "codigos_texto": "38010951",
-      "estoque": 136,
-      "prioridade": "🚨 Grande Urgência",
-      "metas_fixas_ativo": false,
-      "metas_fixas": {}
-    },
-    {
-      "nome": "Laranja Nedel / PVC",
-      "codigos_texto": "390100105\n390100104",
-      "estoque": 590,
-      "prioridade": "🚨 Grande Urgência",
-      "metas_fixas_ativo": false,
-      "metas_fixas": {}
-    },
-    {
-      "nome": "Mirtilo",
-      "codigos_texto": "870059*",
-      "estoque": 752,
-      "prioridade": "🚨 Grande Urgência",
-      "metas_fixas_ativo": false,
-      "metas_fixas": {}
-    },
-    {
-      "nome": "Pimentao Vermelho",
-      "codigos_texto": "8707112",
-      "estoque": 21,
-      "prioridade": "🚨 Grande Urgência",
-      "metas_fixas_ativo": false,
-      "metas_fixas": {}
-    },
-    {
-      "nome": "Thompson Autum 8 kg",
-      "codigos_texto": "830200705",
-      "estoque": 26,
-      "prioridade": "🚨 Grande Urgência",
-      "metas_fixas_ativo": false,
-      "metas_fixas": {}
-    },
-    {
-      "nome": "Pele Sapo Cepi",
-      "codigos_texto": "3102011009.1\n3102011006.1",
-      "estoque": 159,
-      "prioridade": "🚨 Grande Urgência",
-      "metas_fixas_ativo": false,
-      "metas_fixas": {}
-    },
-    {
-      "nome": "Nubia 8kg Speciale | Delicat | cx Roxa",
-      "codigos_texto": "830201905\n830201902\n830201514\n",
-      "estoque": 226,
-      "prioridade": "🚨 Grande Urgência",
-      "metas_fixas_ativo": false,
-      "metas_fixas": {}
-    },
-    {
-      "nome": "Isis Lina | Specialle",
-      "codigos_texto": "830101522\n830101513\n",
-      "estoque": 97,
-      "prioridade": "🚨 Grande Urgência",
-      "metas_fixas_ativo": false,
-      "metas_fixas": {}
-    },
-    {
-      "nome": "Nubia Cumbuca",
-      "codigos_texto": "8301007*",
-      "estoque": 739,
-      "prioridade": "🚨 Grande Urgência",
-      "metas_fixas_ativo": false,
-      "metas_fixas": {}
-    },
-    {
-      "nome": "Bergamota",
-      "codigos_texto": "390600158\n390600137",
-      "estoque": 2000,
-      "prioridade": "🚨 Grande Urgência",
-      "metas_fixas_ativo": false,
-      "metas_fixas": {}
-    },
-    {
-      "nome": "Romã Pomica",
-      "codigos_texto": "8704714",
-      "estoque": 300,
-      "prioridade": "🔥 Alta Prioridade",
-      "metas_fixas_ativo": false,
-      "metas_fixas": {}
-    },
-    {
-      "nome": "Kiwi Cumb Dom Fruto",
-      "codigos_texto": "38010115",
-      "estoque": 747,
-      "prioridade": "🔥 Alta Prioridade",
-      "metas_fixas_ativo": false,
-      "metas_fixas": {}
-    },
-    {
-      "nome": "Laranja Rio Blanco",
-      "codigos_texto": "3907001167",
-      "estoque": 26,
-      "prioridade": "🔥 Alta Prioridade",
-      "metas_fixas_ativo": false,
-      "metas_fixas": {}
-    },
-    {
-      "nome": "Gala Valentino cx Parda",
-      "codigos_texto": "701052165.4",
-      "estoque": 142,
-      "prioridade": "🔥 Alta Prioridade",
-      "metas_fixas_ativo": false,
-      "metas_fixas": {}
-    },
-    {
-      "nome": "Fuji Hoshi Solta",
-      "codigos_texto": "702173SPP",
-      "estoque": 140,
-      "prioridade": "🔥 Alta Prioridade",
-      "metas_fixas_ativo": false,
-      "metas_fixas": {}
-    },
-    {
-      "nome": "Pera Williams 60/65",
-      "codigos_texto": "02010183",
-      "estoque": 448,
-      "prioridade": "🔥 Alta Prioridade",
-      "metas_fixas_ativo": false,
-      "metas_fixas": {}
-    },
-    {
-      "nome": "Red Globe 8 kg",
-      "codigos_texto": "830200510\n830200516\n",
-      "estoque": 231,
-      "prioridade": "🔥 Alta Prioridade",
-      "metas_fixas_ativo": false,
-      "metas_fixas": {}
-    },
-    {
       "nome": "Red Globe Cumb",
       "codigos_texto": "830100515",
-      "estoque": 173,
+      "estoque": 141,
+      "prioridade": "🚨 Grande Urgência",
+      "metas_fixas_ativo": false,
+      "metas_fixas": {}
+    },
+    {
+      "nome": "Vitoria Speciale | RCA",
+      "codigos_texto": "830100931\n830100909",
+      "estoque": 992,
+      "prioridade": "🚨 Grande Urgência",
+      "metas_fixas_ativo": false,
+      "metas_fixas": {}
+    },
+    {
+      "nome": "Isis Lina | Speciale",
+      "codigos_texto": "830101522\n830101513",
+      "estoque": 24,
+      "prioridade": "🚨 Grande Urgência",
+      "metas_fixas_ativo": false,
+      "metas_fixas": {}
+    },
+    {
+      "nome": "Núbia 8kg",
+      "codigos_texto": "830201*",
+      "estoque": 131,
+      "prioridade": "🚨 Grande Urgência",
+      "metas_fixas_ativo": false,
+      "metas_fixas": {}
+    },
+    {
+      "nome": "Thompson Puro Nectar 8kg",
+      "codigos_texto": "830200703",
+      "estoque": 14,
+      "prioridade": "🚨 Grande Urgência",
+      "metas_fixas_ativo": false,
+      "metas_fixas": {}
+    },
+    {
+      "nome": "Pessego Tany 4 kg",
+      "codigos_texto": "240100101",
+      "estoque": 89,
+      "prioridade": "🚨 Grande Urgência",
+      "metas_fixas_ativo": false,
+      "metas_fixas": {}
+    },
+    {
+      "nome": "Kiwi Mono Azul",
+      "codigos_texto": "38010951",
+      "estoque": 106,
+      "prioridade": "🚨 Grande Urgência",
+      "metas_fixas_ativo": false,
+      "metas_fixas": {}
+    },
+    {
+      "nome": "Laranja Nedel",
+      "codigos_texto": "390100105\n390100104",
+      "estoque": 410,
+      "prioridade": "🚨 Grande Urgência",
+      "metas_fixas_ativo": false,
+      "metas_fixas": {}
+    },
+    {
+      "nome": "Bergamota 15 kg",
+      "codigos_texto": "390600137",
+      "estoque": 329,
+      "prioridade": "🚨 Grande Urgência",
+      "metas_fixas_ativo": false,
+      "metas_fixas": {}
+    },
+    {
+      "nome": "Mirtilo Othil cx parda",
+      "codigos_texto": "87005903",
+      "estoque": 322,
+      "prioridade": "🚨 Grande Urgência",
+      "metas_fixas_ativo": false,
+      "metas_fixas": {}
+    },
+    {
+      "nome": "Roma Pomica",
+      "codigos_texto": "8704714",
+      "estoque": 415,
+      "prioridade": "🚨 Grande Urgência",
+      "metas_fixas_ativo": false,
+      "metas_fixas": {}
+    },
+    {
+      "nome": "Isis Vermelha Doce Cappelaro",
+      "codigos_texto": "830100201",
+      "estoque": 228,
+      "prioridade": "🔥 Alta Prioridade",
+      "metas_fixas_ativo": false,
+      "metas_fixas": {}
+    },
+    {
+      "nome": "Ameixa 55/60",
+      "codigos_texto": "250100103",
+      "estoque": 466,
+      "prioridade": "🔥 Alta Prioridade",
+      "metas_fixas_ativo": false,
+      "metas_fixas": {}
+    },
+    {
+      "nome": "Kiwi Dom Fruto",
+      "codigos_texto": "38010115",
+      "estoque": 729,
+      "prioridade": "🔥 Alta Prioridade",
+      "metas_fixas_ativo": false,
+      "metas_fixas": {}
+    },
+    {
+      "nome": "Tangerina Urugold Cx Aberta",
+      "codigos_texto": "390600160",
+      "estoque": 89,
+      "prioridade": "🔥 Alta Prioridade",
+      "metas_fixas_ativo": false,
+      "metas_fixas": {}
+    },
+    {
+      "nome": "Goiaba",
+      "codigos_texto": "300200208\n300200203",
+      "estoque": 248,
       "prioridade": "🔥 Alta Prioridade",
       "metas_fixas_ativo": false,
       "metas_fixas": {}
@@ -213,5 +139,5 @@
     "Juliana": 15,
     "Luca": 17
   },
-  "periodo": "26/09/2026 a 02/10/2026"
+  "periodo": "03/10/2026 a "
 }
