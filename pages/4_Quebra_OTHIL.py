@@ -2,30 +2,15 @@
 Upload semanal/mensal do PDF de Quebra (Resumo do Estoque filtrado por QUEBRA).
 Gera KPIs por grupo de produto e categoria, com histórico navegável.
 """
-import io
 import os
 import json
-import tempfile
 import datetime
 import streamlit as st
-import streamlit.components.v1 as components
 import pandas as pd
 
 from parser_quebra import parse_quebra
-import acesso
 import comparativo
 import data_store as ds
-import metas_gerais as mg
-import periodo as periodo_mod
-import dashboard_quebra as dbq
-
-def _fmt_num(v, casas=0):
-    return f"{v:,.{casas}f}".replace(',', 'X').replace('.', ',').replace('X', '.')
-
-
-def _fmt_moeda(v):
-    return f"R$ {_fmt_num(v, 2)}"
-
 
 MODULO = 'quebra'
 
@@ -120,106 +105,75 @@ def _render_dashboard(dados: dict, tipo: str, slug: str, dados_ant: dict = None,
 
     # KPI principal
     col1, col2 = st.columns(2)
-    col1.metric('Total CX Quebradas', f"{_fmt_num(total, 0)} cx")
+    col1.metric('Total CX Quebradas', f"{total:,.0f} cx")
     categorias = dados.get('categorias', [])
     if categorias:
         top_cat = categorias[0]
         col2.metric(
             f'Maior Categoria: {top_cat["categoria"]}',
-            f"{_fmt_num(top_cat['cx'], 0)} cx"
+            f"{top_cat['cx']:,.0f} cx"
         )
 
     # ── Comparativo automático vs período anterior salvo (menor é melhor)
     if dados_ant is not None:
-        st.divider()
         total_ant = dados_ant.get('total_cx', 0)
         comp_auto = comparativo.calcular(total, total_ant, menor_e_melhor=True)
         st.metric(
             f'📊 vs período anterior ({label_ant})',
-            f"{_fmt_num(total, 0)} cx",
+            f"{total:,.0f} cx",
             delta=comparativo.formatar_variacao(comp_auto, casas=1),
             delta_color='inverse',
         )
 
-    st.divider()
+    # Filtro por categoria
+    grupos = dados.get('grupos', [])
+    categorias_disponiveis = sorted({g['categoria'] for g in grupos})
 
-    # Filtro + gráfico + tabela + download agrupados visualmente: o filtro
-    # de categoria abaixo controla tudo dentro deste container.
-    with st.container(border=True):
-        grupos = dados.get('grupos', [])
-        categorias_disponiveis = sorted({g['categoria'] for g in grupos})
+    cats_sel = st.multiselect(
+        '🔍 Filtrar por categoria:',
+        options=categorias_disponiveis,
+        default=categorias_disponiveis,
+        key=f'qbr_cat_filter_{slug}',
+    )
 
-        cats_sel = st.multiselect(
-            '🔍 Filtrar por categoria:',
-            options=categorias_disponiveis,
-            default=categorias_disponiveis,
-            key=f'qbr_cat_filter_{slug}',
-        )
+    grupos_filtrados = [g for g in grupos if g['categoria'] in cats_sel] if cats_sel else []
 
-        grupos_filtrados = [g for g in grupos if g['categoria'] in cats_sel] if cats_sel else []
+    # Recalcula categorias com base no filtro
+    cat_dict: dict[str, float] = {}
+    for g in grupos_filtrados:
+        cat_dict[g['categoria']] = cat_dict.get(g['categoria'], 0.0) + g['cx']
+    categorias_filtradas = sorted(cat_dict.items(), key=lambda x: -x[1])
 
-        # Recalcula categorias com base no filtro
-        cat_dict: dict[str, float] = {}
-        for g in grupos_filtrados:
-            cat_dict[g['categoria']] = cat_dict.get(g['categoria'], 0.0) + g['cx']
-        categorias_filtradas = sorted(cat_dict.items(), key=lambda x: -x[1])
+    # Gráfico por categoria
+    if categorias_filtradas:
+        st.subheader('Por Categoria de Produto')
+        df_cat = pd.DataFrame(categorias_filtradas, columns=['categoria', 'cx']).set_index('categoria')
+        st.bar_chart(df_cat['cx'], color='#2D6A4F')
 
-        st.divider()
+    # Tabela por grupo
+    if grupos_filtrados:
+        st.subheader('Por Grupo de Produto')
+        df_g = pd.DataFrame(grupos_filtrados)[['grupo', 'categoria', 'cx']]
+        df_g.columns = ['Grupo', 'Categoria', 'CX Quebradas']
+        st.dataframe(df_g, use_container_width=True, hide_index=True)
+    elif cats_sel:
+        st.info('Nenhum grupo encontrado para a seleção.')
 
-        # Gráfico por categoria
-        if categorias_filtradas:
-            st.subheader('Por Categoria de Produto')
-            df_cat = pd.DataFrame(categorias_filtradas, columns=['categoria', 'cx']).set_index('categoria')
-            st.bar_chart(df_cat['cx'], color='#2D6A4F')
-
-        st.divider()
-
-        # Tabela por grupo
-        if grupos_filtrados:
-            st.subheader('Por Grupo de Produto')
-            df_g = pd.DataFrame(grupos_filtrados)[['grupo', 'categoria', 'cx']]
-            df_g.columns = ['Grupo', 'Categoria', 'CX Quebradas']
-            st.dataframe(df_g, use_container_width=True, hide_index=True)
-        elif cats_sel:
-            st.info('Nenhum grupo encontrado para a seleção.')
-
-        # Download JSON — respeita o filtro de categoria aplicado na tela (antes
-        # a exportação sempre baixava os dados completos, ignorando o filtro)
-        dados_export = dict(dados)
-        dados_export['grupos'] = grupos_filtrados
-        dados_export['categorias'] = [{'categoria': c, 'cx': v} for c, v in categorias_filtradas]
-        dados_export['total_cx'] = sum(g['cx'] for g in grupos_filtrados)
-        dados_export['filtro_categorias_aplicado'] = cats_sel
-        dados_export['gerado_em_exportacao'] = datetime.datetime.now().isoformat(timespec='seconds')
-        st.download_button(
-            f'⬇️ Baixar dados filtrados ({_label_slug(slug, tipo)})',
-            data=json.dumps(dados_export, ensure_ascii=False, indent=2).encode('utf-8'),
-            file_name=f'quebra_{tipo}_{slug}_OTHIL.json',
-            mime='application/json',
-            key=f'dl_{tipo}_{slug}',
-        )
-
-        # Opção de imprimir (pedido da Ingrid, 04/09/2026: "A quebra não tem
-        # a opção de imprimir") -- reaproveita o MESMO padrão de dashboard
-        # HTML imprimível (botão flutuante + layout @media print) já usado
-        # no Relatório Diário e na Margem Real da Gerência, só que com o
-        # conteúdo de Quebras (dashboard_quebra.py). Reflete o filtro de
-        # categoria aplicado acima, igual ao download JSON logo acima.
-        with tempfile.NamedTemporaryFile(suffix='.html', delete=False,
-                                         mode='w', encoding='utf-8') as tmp:
-            pass
-        dbq.gerar_dashboard(dados_export, tmp.name)
-        html_quebra = open(tmp.name, 'r', encoding='utf-8').read()
-        os.remove(tmp.name)
-        st.download_button(
-            f'🖨️ Baixar versão para impressão ({_label_slug(slug, tipo)})',
-            data=html_quebra.encode('utf-8'),
-            file_name=f'quebra_{tipo}_{slug}_OTHIL.html',
-            mime='text/html',
-            key=f'dl_html_{tipo}_{slug}',
-        )
-        with st.expander('🖨️ Pré-visualizar / imprimir'):
-            components.html(html_quebra, height=900, scrolling=True)
+    # Download JSON — respeita o filtro de categoria aplicado na tela (antes
+    # a exportação sempre baixava os dados completos, ignorando o filtro)
+    dados_export = dict(dados)
+    dados_export['grupos'] = grupos_filtrados
+    dados_export['categorias'] = [{'categoria': c, 'cx': v} for c, v in categorias_filtradas]
+    dados_export['total_cx'] = sum(g['cx'] for g in grupos_filtrados)
+    dados_export['filtro_categorias_aplicado'] = cats_sel
+    dados_export['gerado_em_exportacao'] = datetime.datetime.now().isoformat(timespec='seconds')
+    st.download_button(
+        f'⬇️ Baixar dados filtrados ({_label_slug(slug, tipo)})',
+        data=json.dumps(dados_export, ensure_ascii=False, indent=2).encode('utf-8'),
+        file_name=f'quebra_{tipo}_{slug}_OTHIL.json',
+        mime='application/json',
+        key=f'dl_{tipo}_{slug}',
+    )
 
 
 # ── Tab ───────────────────────────────────────────────────────────────────────
@@ -227,108 +181,77 @@ def _render_dashboard(dados: dict, tipo: str, slug: str, dados_ant: dict = None,
 def _render_tab(tipo: str, label_tipo: str):
     st.header(f'📋 {label_tipo}')
 
-    st.subheader('📤 Enviar novo relatório')
-    st.caption('PDF de Quebra (Resumo do Estoque, classificação QUEBRA).')
-    pdf_up = st.file_uploader(
-        'PDF de Quebra (Resumo do Estoque)',
-        type='pdf',
-        key=f'qbr_{tipo}_pdf',
-    )
-    data_ref = st.date_input(
-        'Data de referência (qualquer dia do período)',
-        value=datetime.date.today(),
-        key=f'qbr_{tipo}_data',
-    )
-    if pdf_up:
-        if st.button('📊 Processar e Salvar', key=f'qbr_{tipo}_btn', type='primary'):
-            # BUG REAL corrigido 03/09/2026 (mesma causa raiz encontrada e
-            # corrigida em 3_Vendedor_Cliente_OTHIL.py nesta mesma data --
-            # reportada pela Ingrid como "Vendedor cliente, não carrega",
-            # print mostrando o spinner preso na tela junto com o resultado
-            # já pronto embaixo): acesso.redirecionar_pos_upload() (que faz
-            # st.stop()) não pode ser chamado enquanto o `with st.spinner()`
-            # ainda está aberto -- o Streamlit só remove o spinner da tela
-            # quando o bloco `with` fecha normalmente, e o st.stop() impede
-            # isso. Fix: o spinner passa a envolver só o processamento; o
-            # sucesso/redirecionamento é montado depois que ele já fechou.
-            _erro_qbr = None
-            _msg_qbr_ok = None
-            with st.spinner('Processando PDF...'):
-                try:
-                    dados = parse_quebra(pdf_up)
-                    slug = _slug_semanal(data_ref) if tipo == 'semanal' else _slug_mensal(data_ref)
-                    _salvar(dados, tipo, slug, usuario=st.session_state.get('usuario_nome'))
-                    _msg_qbr_ok = (
-                        f"✅ Salvo! {_label_slug(slug, tipo)} — "
-                        f"{_fmt_num(dados['total_cx'], 0)} CX quebradas  |  "
-                        f"Período: {dados.get('periodo', '-')}"
-                    )
-                except Exception as e:
-                    _erro_qbr = e
-            if _erro_qbr is not None:
-                st.error(f'Erro ao processar PDF: {_erro_qbr}')
-            else:
-                st.success(_msg_qbr_ok)
-                st.session_state[f'qbr_{tipo}_idx'] = 0
-                # Fluxo Upload -> Gerência (pedido da Ingrid, 27/08/2026):
-                # nunca fica numa tela de Dashboard depois de enviar o PDF.
-                acesso.redirecionar_pos_upload()
+    with st.expander('📤 Enviar novo relatório', expanded=True):
+        pdf_up = st.file_uploader(
+            'PDF de Quebra (Resumo do Estoque)',
+            type='pdf',
+            key=f'qbr_{tipo}_pdf',
+        )
+        data_ref = st.date_input(
+            'Data de referência (qualquer dia do período)',
+            value=datetime.date.today(),
+            key=f'qbr_{tipo}_data',
+        )
+        if pdf_up:
+            if st.button('📊 Processar e Salvar', key=f'qbr_{tipo}_btn', type='primary'):
+                with st.spinner('Processando PDF...'):
+                    try:
+                        dados = parse_quebra(pdf_up)
+                        slug = _slug_semanal(data_ref) if tipo == 'semanal' else _slug_mensal(data_ref)
+                        _salvar(dados, tipo, slug, usuario=st.session_state.get('usuario_nome'))
+                        st.success(
+                            f"✅ Salvo! {_label_slug(slug, tipo)} — "
+                            f"{dados['total_cx']:,.0f} CX quebradas  |  "
+                            f"Período: {dados.get('periodo', '-')}"
+                        )
+                        st.session_state[f'qbr_{tipo}_idx'] = 0
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f'Erro ao processar PDF: {e}')
 
-    # Perfil de upload (27/08/2026, pedido da Ingrid): nunca vê o
-    # histórico/dashboard de Quebra aqui -- só na Gerência. SEMPRE
-    # bloqueado, independente de já ter processado um PDF ou não nesta
-    # sessão.
-    #
-    # Usa deve_esconder_apos_upload() em vez de parar_se_upload() aqui --
-    # mesmo bug real encontrado em 29/08/2026 (e corrigido do mesmo jeito
-    # em 1_Relatorio_Diario_OTHIL.py): esta página tem 3 abas
-    # (Semanal/Mensal/Comparativo), e _render_tab() é compartilhada pelas
-    # duas primeiras. parar_se_upload() usa st.stop(), que mata o script
-    # INTEIRO -- ao rodar a aba Semanal (que vem antes das outras no
-    # código), o st.stop() impedia as abas Mensal e Comparativo de sequer
-    # aparecerem (nem o uploader delas).
-    if not acesso.deve_esconder_apos_upload():
-        st.divider()
+    st.divider()
 
-        # Histórico
-        historico = _listar(tipo)
-        if not historico:
-            st.info('Nenhum relatório salvo ainda. Envie um PDF acima.')
-            return
+    # Histórico
+    historico = _listar(tipo)
+    if not historico:
+        st.info('Nenhum relatório salvo ainda. Envie um PDF acima.')
+        return
 
-        slugs  = [s for s, _ in historico]
-        labels = [
-            f"{_label_slug(s, tipo)}  —  {m.get('periodo', '-')}"
-            for s, m in historico
-        ]
+    slugs  = [s for s, _ in historico]
+    labels = [
+        f"{_label_slug(s, tipo)}  —  {m.get('periodo', '-')}"
+        for s, m in historico
+    ]
 
-        idx_key = f'qbr_{tipo}_idx'
-        if idx_key not in st.session_state:
-            st.session_state[idx_key] = 0
+    idx_key = f'qbr_{tipo}_idx'
+    if idx_key not in st.session_state:
+        st.session_state[idx_key] = 0
 
-        col_prev, col_sel, col_next = st.columns([1, 6, 1], vertical_alignment='bottom')
-        with col_prev:
-            if st.button('◀', key=f'qbr_prev_{tipo}', help='Período anterior'):
-                st.session_state[idx_key] = min(st.session_state[idx_key] + 1, len(slugs) - 1)
-        with col_next:
-            if st.button('▶', key=f'qbr_next_{tipo}', help='Próximo período'):
-                st.session_state[idx_key] = max(st.session_state[idx_key] - 1, 0)
-        with col_sel:
-            escolha = st.selectbox(
-                f'{len(historico)} período(s) salvo(s):',
-                labels,
-                index=min(st.session_state[idx_key], len(labels) - 1),
-                key=f'qbr_sel_{tipo}',
-            )
-            st.session_state[idx_key] = labels.index(escolha)
+    col_prev, col_sel, col_next = st.columns([1, 6, 1])
+    with col_prev:
+        st.write('')
+        if st.button('◀', key=f'qbr_prev_{tipo}', help='Período anterior'):
+            st.session_state[idx_key] = min(st.session_state[idx_key] + 1, len(slugs) - 1)
+    with col_next:
+        st.write('')
+        if st.button('▶', key=f'qbr_next_{tipo}', help='Próximo período'):
+            st.session_state[idx_key] = max(st.session_state[idx_key] - 1, 0)
+    with col_sel:
+        escolha = st.selectbox(
+            f'{len(historico)} período(s) salvo(s):',
+            labels,
+            index=min(st.session_state[idx_key], len(labels) - 1),
+            key=f'qbr_sel_{tipo}',
+        )
+        st.session_state[idx_key] = labels.index(escolha)
 
-        idx = st.session_state[idx_key]
-        slug_sel = slugs[idx]
-        dados_sel = historico[idx][1]
-        dados_ant = historico[idx + 1][1] if idx + 1 < len(historico) else None
-        label_ant = _label_slug(slugs[idx + 1], tipo) if idx + 1 < len(historico) else None
+    idx = st.session_state[idx_key]
+    slug_sel = slugs[idx]
+    dados_sel = historico[idx][1]
+    dados_ant = historico[idx + 1][1] if idx + 1 < len(historico) else None
+    label_ant = _label_slug(slugs[idx + 1], tipo) if idx + 1 < len(historico) else None
 
-        _render_dashboard(dados_sel, tipo, slug_sel, dados_ant=dados_ant, label_ant=label_ant)
+    _render_dashboard(dados_sel, tipo, slug_sel, dados_ant=dados_ant, label_ant=label_ant)
 
 
 # ── Comparativo ───────────────────────────────────────────────────────────────
@@ -380,11 +303,11 @@ def _render_comparativo():
     comp = comparativo.calcular(total_b, total_a, menor_e_melhor=True)
 
     c1, c2, c3 = st.columns(3)
-    c1.metric(f'Total CX — {label_a}', f"{_fmt_num(total_a, 0)} cx")
-    c2.metric(f'Total CX — {label_b}', f"{_fmt_num(total_b, 0)} cx")
+    c1.metric(f'Total CX — {label_a}', f"{total_a:,.0f} cx")
+    c2.metric(f'Total CX — {label_b}', f"{total_b:,.0f} cx")
     c3.metric(
         'Variação (B − A)',
-        f"{'+' if comp['diferenca_absoluta'] >= 0 else ''}{_fmt_num(comp['diferenca_absoluta'], 0)} cx",
+        f"{comp['diferenca_absoluta']:+,.0f} cx",
         delta=comparativo.formatar_variacao(comp, casas=1),
         delta_color='inverse',   # vermelho = mais quebra = ruim
     )
@@ -413,20 +336,15 @@ def _render_comparativo():
         axis=1,
     )
     df_cat_tbl = df_cat_tbl.reset_index().rename(columns={'index': 'Categoria'})
-    df_cat_tbl[label_a]      = df_cat_tbl[label_a].map(lambda x: _fmt_num(x, 0))
-    df_cat_tbl[label_b]      = df_cat_tbl[label_b].map(lambda x: _fmt_num(x, 0))
-    df_cat_tbl['Δ (B − A)']  = df_cat_tbl['Δ (B − A)'].map(
-        lambda x: f"{'+' if x >= 0 else ''}{_fmt_num(x, 0)}")
+    df_cat_tbl[label_a]      = df_cat_tbl[label_a].map(lambda x: f"{x:,.0f}")
+    df_cat_tbl[label_b]      = df_cat_tbl[label_b].map(lambda x: f"{x:,.0f}")
+    df_cat_tbl['Δ (B − A)']  = df_cat_tbl['Δ (B − A)'].map(lambda x: f"{x:+,.0f}")
     st.dataframe(df_cat_tbl, use_container_width=True, hide_index=True)
 
     st.divider()
 
     # ── Comparativo por grupo ─────────────────────────────────────────────
     st.subheader('Por Grupo de Produto')
-    # Sem gráfico aqui de propósito: "grupo" é bem mais granular que
-    # "categoria" (dezenas de grupos por período, contra ~20 categorias
-    # fixas em categorias.py), então uma barra por grupo ficaria ilegível.
-    st.caption('Gráfico omitido aqui — muitos grupos tornariam a barra ilegível; veja a tabela abaixo.')
 
     grp_a = {g['grupo']: g for g in dados_a.get('grupos', [])}
     grp_b = {g['grupo']: g for g in dados_b.get('grupos', [])}
@@ -453,10 +371,9 @@ def _render_comparativo():
     else:
         df_grp = pd.DataFrame(rows).sort_values('Δ (B − A)', ascending=False)
         df_grp_fmt = df_grp.copy()
-        df_grp_fmt[label_a]     = df_grp_fmt[label_a].map(lambda x: _fmt_num(x, 0))
-        df_grp_fmt[label_b]     = df_grp_fmt[label_b].map(lambda x: _fmt_num(x, 0))
-        df_grp_fmt['Δ (B − A)'] = df_grp_fmt['Δ (B − A)'].map(
-            lambda x: f"{'+' if x >= 0 else ''}{_fmt_num(x, 0)}")
+        df_grp_fmt[label_a]     = df_grp_fmt[label_a].map(lambda x: f"{x:,.0f}")
+        df_grp_fmt[label_b]     = df_grp_fmt[label_b].map(lambda x: f"{x:,.0f}")
+        df_grp_fmt['Δ (B − A)'] = df_grp_fmt['Δ (B − A)'].map(lambda x: f"{x:+,.0f}")
         st.dataframe(df_grp_fmt, use_container_width=True, hide_index=True)
 
 
@@ -474,84 +391,6 @@ with tab_s:
 
 with tab_m:
     _render_tab('mensal', 'Mensal')
-
-    st.divider()
-
-    # ── Meta Geral — Realizado (Quebra) ──────────────────────────────────────
-    # Publica DIRETO no painel "🌐 Meta Geral" da Gerência -- pedido explícito
-    # da Ingrid, 29/08/2026 ("o mesmo para a quebra"): mesmo tipo de PDF do
-    # envio Mensal acima, mas publicação INDEPENDENTE (metas_gerais.
-    # MOD_MG_QUEBRA -- não depende de ter sido salvo acima, e o envio Mensal
-    # acima não alimenta isto). Movido pra cá em 03/09/2026, pedido da
-    # Ingrid: "na gerência não é para ficar upload de nada, apenas os
-    # resultados -- upload são todos nos módulos" (antes ficava dentro da
-    # própria Gerência). O resultado publicado aqui só aparece na aba
-    # "🌐 Meta Geral" da Gerência, nunca nesta página -- mesma política de
-    # acesso de 27/08/2026 (ver acesso.py).
-    with st.expander('📤 Publicar Realizado da Meta Geral (Quebra)'):
-        st.caption(
-            'Sobe o mesmo tipo de PDF (Resumo do Estoque, classificação QUEBRA) do envio '
-            'Mensal acima, mas publica DIRETO na Meta Geral (Gerência) -- independente do '
-            'envio Mensal acima.'
-        )
-        pdf_mg_q = st.file_uploader('PDF Resumo do Estoque (Quebra)', type='pdf', key='mg_q_upload')
-        if pdf_mg_q is not None:
-            _raw_mg_q = pdf_mg_q.getvalue()
-            try:
-                _prev_mg_q = parse_quebra(io.BytesIO(_raw_mg_q))
-            except Exception as _e_prev_q:
-                st.error(f'Não foi possível ler este PDF: {_e_prev_q}')
-                _prev_mg_q = None
-            if _prev_mg_q is not None:
-                puc1, puc2 = st.columns(2)
-                puc1.metric('CX quebradas no PDF', _fmt_num(_prev_mg_q.get('total_cx', 0), 0))
-                puc2.metric('Custo no PDF',
-                            _fmt_moeda(_prev_mg_q['total_custo'])
-                            if _prev_mg_q.get('total_custo') is not None else '—')
-
-                _mes_detect_q = mg.mes_do_periodo_pdf(
-                    _prev_mg_q.get('periodo'), _prev_mg_q.get('emissao'))
-                _opcoes_mes_q = periodo_mod.listar_periodos('mensal', n=15)
-                if _mes_detect_q not in _opcoes_mes_q:
-                    _opcoes_mes_q = sorted(set(_opcoes_mes_q) | {_mes_detect_q}, reverse=True)
-                _mes_escolhido_q = st.selectbox(
-                    'Mês de referência (Meta Geral)', _opcoes_mes_q,
-                    index=_opcoes_mes_q.index(_mes_detect_q),
-                    format_func=lambda r: periodo_mod.rotulo('mensal', r), key='mg_q_mes_sel',
-                    help=f"Detectado pelo período do PDF "
-                         f"({_prev_mg_q.get('periodo') or _prev_mg_q.get('emissao') or '?'}). "
-                         f"Corrija aqui se necessário.",
-                )
-                if st.button('📊 Processar e publicar na Meta Geral', key='mg_q_btn'):
-                    # Mesma correção de 03/09/2026 aplicada acima em
-                    # "Processar e Salvar" (ver comentário lá): o spinner não
-                    # pode conter a chamada de redirecionar_pos_upload()
-                    # (st.stop()) -- senão fica preso na tela.
-                    _erro_pub_q = None
-                    _sucesso_pub_q = None
-                    with st.spinner('Publicando...'):
-                        try:
-                            _reg_mg_q = mg.publicar_quebra_pdf(
-                                _mes_escolhido_q, io.BytesIO(_raw_mg_q),
-                                usuario=st.session_state.get('usuario_nome'))
-                            _erro_persist_q = _reg_mg_q.get('_erro_persistencia_remota') if _reg_mg_q else None
-                            if _erro_persist_q:
-                                _sucesso_pub_q = (
-                                    'warning',
-                                    f'Publicado localmente, mas houve um problema ao salvar de '
-                                    f'forma permanente: {_erro_persist_q}')
-                            else:
-                                _sucesso_pub_q = (
-                                    'success',
-                                    f"✅ Publicado na Meta Geral -- "
-                                    f"{periodo_mod.rotulo('mensal', _mes_escolhido_q)}.")
-                        except Exception as _e_pub_q:
-                            _erro_pub_q = _e_pub_q
-                    if _erro_pub_q is not None:
-                        st.error(f'Erro ao publicar: {_erro_pub_q}')
-                    else:
-                        (st.success if _sucesso_pub_q[0] == 'success' else st.warning)(_sucesso_pub_q[1])
-                        acesso.redirecionar_pos_upload()
 
 with tab_comp:
     _render_comparativo()
