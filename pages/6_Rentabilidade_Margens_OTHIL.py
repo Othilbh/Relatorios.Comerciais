@@ -183,7 +183,7 @@ def _comp(chave):
 st.divider()
 st.subheader(f'📊 KPIs — {periodo_mod.rotulo(tipo_periodo, periodo_ref_sel)}')
 
-k1, k2, k3, k4 = st.columns(4)
+k1, k2, k3, k4, k5, k6 = st.columns(6)
 k1.metric('Faturamento Total', _brl(kpi_atual['faturamento']),
           delta=comparativo.formatar_variacao(_comp('faturamento')) if kpi_anterior else None)
 k2.metric('Custo Total', _brl(kpi_atual['custo']),
@@ -193,10 +193,6 @@ k3.metric('Margem de Contribuição', _brl(kpi_atual['margem_rs']),
           delta=comparativo.formatar_variacao(_comp('margem_rs')) if kpi_anterior else None)
 k4.metric('Margem %', _pct(kpi_atual['margem_pct']),
           delta=comparativo.formatar_variacao(_comp('margem_pct')) if kpi_anterior else None)
-# Segunda fileira com as mesmas 4 colunas da primeira (as duas últimas ficam
-# vazias) pra manter a largura dos cards igual à fileira de cima -- mesmo
-# ritmo visual do 4+4 usado em Relatórios de Produtos.
-k5, k6, _k7_vazia, _k8_vazia = st.columns(4)
 k5.metric('Volume Vendido (cx)', _qtd(kpi_atual['volume']),
           delta=comparativo.formatar_variacao(_comp('volume')) if kpi_anterior else None)
 k6.metric('Ticket Médio', _brl(kpi_atual['ticket_medio']),
@@ -328,30 +324,27 @@ with tab_topbottom:
         '(inclui casos com margem negativa, ou seja, prejuízo).'
     )
     n_top = st.slider('Quantidade', min_value=3, max_value=20, value=10, key='rent_topn')
-    # Cada dimensão no seu próprio expander (26/08/2026, melhoria de navegação
-    # pedida pela Ingrid): quem só quer ver Cliente, por exemplo, não precisa
-    # rolar pelas outras duas antes. Só a primeira vem expandida por padrão.
-    for idx_dim, (nome_dim_pl, nome_dim_sg, fn) in enumerate([
+    for nome_dim_pl, nome_dim_sg, fn in [
         ('Vendedores', 'Vendedor', rt.por_vendedor),
         ('Clientes', 'Cliente', rt.por_cliente),
         ('Produtos', 'Produto', rt.por_produto),
-    ]):
+    ]:
         linhas = fn(itens_filtrados)
         if not linhas:
             continue
         ordenadas = sorted(linhas, key=lambda l: l['margem_rs'], reverse=True)
         top = ordenadas[:n_top]
         bottom = list(reversed(ordenadas[-n_top:])) if len(ordenadas) > n_top else list(reversed(ordenadas))
-        with st.expander(f'🏆⚠️ Melhores / Piores {nome_dim_pl} por Margem R$', expanded=(idx_dim == 0)):
-            colT, colB = st.columns(2)
-            with colT:
-                st.markdown(f'**🏆 {len(top)} Melhores {nome_dim_pl} por Margem R$**')
-                df_top = _tabela_dim(top, nome_dim_sg, ['#', nome_dim_sg, 'Faturamento R$', 'Margem R$', 'Margem %'])
-                st.dataframe(_estilo(df_top), use_container_width=True, hide_index=True)
-            with colB:
-                st.markdown(f'**⚠️ {len(bottom)} Piores {nome_dim_pl} por Margem R$**')
-                df_bot = _tabela_dim(bottom, nome_dim_sg, ['#', nome_dim_sg, 'Faturamento R$', 'Margem R$', 'Margem %'])
-                st.dataframe(_estilo(df_bot), use_container_width=True, hide_index=True)
+        colT, colB = st.columns(2)
+        with colT:
+            st.markdown(f'**🏆 {len(top)} Melhores {nome_dim_pl} por Margem R$**')
+            df_top = _tabela_dim(top, nome_dim_sg, ['#', nome_dim_sg, 'Faturamento R$', 'Margem R$', 'Margem %'])
+            st.dataframe(_estilo(df_top), use_container_width=True, hide_index=True)
+        with colB:
+            st.markdown(f'**⚠️ {len(bottom)} Piores {nome_dim_pl} por Margem R$**')
+            df_bot = _tabela_dim(bottom, nome_dim_sg, ['#', nome_dim_sg, 'Faturamento R$', 'Margem R$', 'Margem %'])
+            st.dataframe(_estilo(df_bot), use_container_width=True, hide_index=True)
+        st.divider()
 
 with tab_alertas:
     st.subheader('Pontos de Atenção')
