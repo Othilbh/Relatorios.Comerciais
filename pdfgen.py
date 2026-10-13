@@ -46,19 +46,12 @@ def _fmt_money(v):
     return f"R$ {v:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
 
 
-def _num(v, casas=0):
-    return f"{v:,.{casas}f}".replace(',', 'X').replace('.', ',').replace('X', '.')
-
-
 def _fmt_pct(v):
     return f"{v*100:.1f}%"
 
 
 def _totais(metas_results):
-    # Meta geral = soma do 'estoque_total' real de cada produto, NUNCA a
-    # soma das metas individuais por vendedor (essa soma é inflada pelo
-    # arredondamento pra cima de cada meta individual -- ver calc.compute_metas).
-    meta_total = sum(r.get('estoque_total', 0) for r in metas_results)
+    meta_total = sum(l['meta'] for r in metas_results for l in r['linhas'])
     vendido_total = sum(l['vendido'] for r in metas_results for l in r['linhas'])
     falta_total = soma_falta([l for r in metas_results for l in r['linhas']])
     pct_total = (vendido_total / meta_total) if meta_total else 0.0
@@ -66,9 +59,7 @@ def _totais(metas_results):
 
 
 def _produto_totais(produto_result):
-    # Meta do produto = 'estoque_total' real, não a soma das metas
-    # individuais dos vendedores (mesma regra de _totais acima).
-    meta = produto_result.get('estoque_total', 0)
+    meta = sum(l['meta'] for l in produto_result['linhas'])
     vendido = sum(l['vendido'] for l in produto_result['linhas'])
     falta = soma_falta(produto_result['linhas'])
     pct = (vendido / meta) if meta else 0.0
@@ -178,23 +169,6 @@ def _build_relatorio_vendedor(vendedor: str, data_emissao: str,
                             section_style))
     mheader = ['Produto', 'Meta (cx)', 'Vendido (cx)', 'Falta (cx)', '%']
     mdata = [mheader]
-    # 08/09/2026 -- Ingrid reportou nomes de produto "ultrapassando"/sobrepondo
-    # os numeros ao lado (ex.: prioridade + nome longo virando algo tipo
-    # "...GRANGCRAPE" colado no numero da Meta). Causa: essa celula ia como
-    # string simples (sem quebra de linha) numa coluna de so 7cm -- reportlab
-    # NAO quebra string simples que estoura a largura da coluna, ela
-    # transborda e fica desenhada por cima da coluna seguinte. A tabela de
-    # "Produtos Criticos" do Dashboard (mais abaixo, _build_dashboard) ja
-    # tinha essa correcao (comentario original: "usa Paragraph no nome para
-    # evitar overflow") -- essa tabela do Relatorio por Vendedor nunca tinha
-    # recebido a mesma correcao. Usa Paragraph (quebra automatica dentro da
-    # coluna) e o texto limpo de prioridade (_PRIO_LABEL_TXT, sem emoji --
-    # o emoji cru nao tem glifo nas fontes do reportlab e some virando um
-    # quadrado preto, o "■" que a Ingrid tambem viu no print).
-    prod_meta_style = ParagraphStyle('pm_vend', parent=STYLES['Normal'],
-                                      fontSize=level['meta_font'],
-                                      leading=level['meta_font'] * 1.15,
-                                      wordWrap='LTR')
     meta_t = vendido_t = falta_t = 0.0
     for r in metas_results:
         linha = next((l for l in r['linhas'] if l['vendedor'] == vendedor), None)
@@ -204,9 +178,8 @@ def _build_relatorio_vendedor(vendedor: str, data_emissao: str,
         vendido_t += linha['vendido']
         falta_t += linha['falta']
         prio = r.get('prioridade', 'Normal')
-        prio_txt = _PRIO_LABEL_TXT.get(prio, '')
-        nome_prod = f"{prio_txt} {r['produto']}".strip() if prio_txt else r['produto']
-        mdata.append([Paragraph(nome_prod, prod_meta_style), f"{linha['meta']:.0f}", f"{linha['vendido']:.1f}",
+        nome_prod = f"{prio} {r['produto']}" if prio != 'Normal' else r['produto']
+        mdata.append([nome_prod, f"{linha['meta']:.0f}", f"{linha['vendido']:.1f}",
                       f"{linha['falta']:.1f}", _fmt_pct(linha['atingido'])])
     pct_t = (vendido_t / meta_t) if meta_t else 0.0
     mdata.append(['TOTAL', f"{meta_t:.0f}", f"{vendido_t:.1f}", f"{falta_t:.1f}", _fmt_pct(pct_t)])
@@ -222,7 +195,6 @@ def _build_relatorio_vendedor(vendedor: str, data_emissao: str,
         ('FONTNAME', (0, -1), (-1, -1), 'Helvetica-Bold'),
         ('BACKGROUND', (0, -1), (-1, -1), colors.HexColor('#dfe6e9')),
         ('ROWBACKGROUNDS', (0, 1), (-1, -2), [colors.white, LIGHT_BG]),
-        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
     ]))
     elems.append(mt)
     elems.append(Spacer(1, level['spacer1']))
@@ -309,7 +281,7 @@ def _build_dashboard(periodo: str, metas_results: list, vendedor_pcts: dict,
 
     card = Table([
         ['Meta Total', 'Vendido', 'Falta', '% Atingido', 'Criticos <50%', 'Produtos'],
-        [f"{_num(meta_total)} cx", f"{_num(vendido_total)} cx", f"{_num(falta_total)} cx",
+        [f"{meta_total:,.0f} cx", f"{vendido_total:,.0f} cx", f"{falta_total:,.0f} cx",
          _fmt_pct(pct_total), str(len(criticos)), str(len(metas_results))],
     ], colWidths=[4*cm]*6)
     card.setStyle(TableStyle([
@@ -428,17 +400,17 @@ _PRIO_TITLE_COLOR_RG = {
 # Landscape A4 disponível (com margens): ~27.7 cm largura, ~19.5 cm altura.
 _RESUMO_LEVELS = [
     dict(margin=1.0*cm, font=7,   prod_col=4.2*cm, qtde_col=1.6*cm,
-         num_col=1.25*cm, pct_col=1.0*cm, rs_col=1.5*cm, custo_col=1.5*cm,
-         pad=2.5, lpad=3, rpad=3, spacer=0.4*cm, sec_font=10),
+         num_col=1.25*cm, pct_col=1.0*cm, pad=2.5, lpad=3, rpad=3,
+         spacer=0.4*cm, sec_font=10),
     dict(margin=0.8*cm, font=6.5, prod_col=4.0*cm, qtde_col=1.5*cm,
-         num_col=1.18*cm, pct_col=0.93*cm, rs_col=1.4*cm, custo_col=1.4*cm,
-         pad=2.0, lpad=2, rpad=2, spacer=0.3*cm, sec_font=9.5),
+         num_col=1.18*cm, pct_col=0.93*cm, pad=2.0, lpad=2, rpad=2,
+         spacer=0.3*cm, sec_font=9.5),
     dict(margin=0.6*cm, font=6,   prod_col=3.7*cm, qtde_col=1.4*cm,
-         num_col=1.1*cm,  pct_col=0.87*cm, rs_col=1.3*cm, custo_col=1.3*cm,
-         pad=1.5, lpad=2, rpad=2, spacer=0.2*cm, sec_font=9),
+         num_col=1.1*cm,  pct_col=0.87*cm, pad=1.5, lpad=2, rpad=2,
+         spacer=0.2*cm, sec_font=9),
     dict(margin=0.4*cm, font=5.5, prod_col=3.4*cm, qtde_col=1.3*cm,
-         num_col=1.02*cm, pct_col=0.8*cm, rs_col=1.2*cm, custo_col=1.2*cm,
-         pad=1.0, lpad=1, rpad=1, spacer=0.1*cm, sec_font=8.5),
+         num_col=1.02*cm, pct_col=0.8*cm,  pad=1.0, lpad=1, rpad=1,
+         spacer=0.1*cm, sec_font=8.5),
 ]
 
 
@@ -466,62 +438,40 @@ def _build_resumo_geral(periodo: str, data_emissao: str, metas_results: list,
         fontSize=fs, leading=fs * 1.2, textColor=colors.white,
     )
 
-    # Cada vendedor mostra SÓ o vendido (pedido explícito da Ingrid --
-    # célula com vendido+meta+% junto ficava poluída). Meta e % só aparecem
-    # na coluna TOTAL, que continua usando a meta REAL do produto/grupo
-    # ('estoque_total'), nunca a soma das metas individuais dos vendedores.
     vendedores  = list(vendedor_pcts.keys())
     col_widths  = [level['prod_col'], level['qtde_col']] + \
-                  [level['num_col']] * len(vendedores) + \
-                  [level['num_col'], level['pct_col'], level['rs_col'], level['custo_col']]
+                  [level['num_col'], level['pct_col']] * (len(vendedores) + 1)
 
     def _header_rows():
         r1 = [Paragraph('Produto', hdr_style), Paragraph('Qtde', hdr_style)]
         r2 = ['', '']
         for v in vendedores:
-            r1 += [Paragraph(v, hdr_style)]
-            r2 += ['']
-        r1 += [Paragraph('TOTAL', hdr_style), '', '', '']
-        r2 += ['Vend', '%', 'Venda Méd/cx', 'Custo Méd/cx']
+            r1 += [Paragraph(v, hdr_style), '']
+            r2 += ['Vend', '%']
+        r1 += [Paragraph('TOTAL', hdr_style), '']
+        r2 += ['Vend', '%']
         return r1, r2
 
     def _produto_row(r):
         row = [Paragraph(r['produto'], prod_style), f"{r['estoque_total']:.0f}"]
         for v in vendedores:
             l = next((x for x in r['linhas'] if x['vendedor'] == v), None)
-            row += [f"{l['vendido']:.1f}" if l else '-']
+            row += [f"{l['vendido']:.1f}" if l else '-',
+                    _fmt_pct(l['atingido']) if l else '-']
         _, ve, _, p = _produto_totais(r)
-        media_venda = r.get('media_rs_cx')
-        media_custo = r.get('media_custo_cx')
-        row += [f"{ve:.1f}", _fmt_pct(p),
-                _fmt_money(media_venda) if media_venda is not None else '—',
-                _fmt_money(media_custo) if media_custo is not None else '—']
+        row += [f"{ve:.1f}", _fmt_pct(p)]
         return row
 
     def _subtotal_row(label, group):
-        # 'est' (Qtde) e a meta do grupo/TOTAL usam a mesma base: soma do
-        # 'estoque_total' real dos produtos, não a soma das metas
-        # individuais dos vendedores.
         est = sum(r['estoque_total'] for r in group)
         row = [Paragraph(label, sub_style), f"{est:.0f}"]
         for v in vendedores:
             ve_v = sum(l['vendido'] for r in group for l in r['linhas'] if l['vendedor'] == v)
-            row += [f"{ve_v:.1f}"]
+            m_v  = sum(l['meta']    for r in group for l in r['linhas'] if l['vendedor'] == v)
+            row += [f"{ve_v:.1f}", _fmt_pct(ve_v / m_v if m_v else 0)]
         ve_g = sum(l['vendido'] for r in group for l in r['linhas'])
-        m_g  = est
-        # Média ponderada do grupo: soma dos R$ (só produtos com dado) ÷
-        # soma das cx correspondentes -- nunca a média simples das médias de
-        # cada produto (distorceria quando os produtos têm volumes diferentes).
-        # Mesma regra pra venda e pra custo.
-        fat_g = sum(r.get('media_rs_cx_soma_ponderada', 0.0) for r in group)
-        qtd_fat_g = sum(r.get('media_rs_cx_peso', 0.0) for r in group)
-        media_venda_g = (fat_g / qtd_fat_g) if qtd_fat_g else None
-        custo_g = sum(r.get('media_custo_cx_soma_ponderada', 0.0) for r in group)
-        qtd_custo_g = sum(r.get('media_custo_cx_peso', 0.0) for r in group)
-        media_custo_g = (custo_g / qtd_custo_g) if qtd_custo_g else None
-        row += [f"{ve_g:.1f}", _fmt_pct(ve_g / m_g if m_g else 0),
-                _fmt_money(media_venda_g) if media_venda_g is not None else '—',
-                _fmt_money(media_custo_g) if media_custo_g is not None else '—']
+        m_g  = sum(l['meta']    for r in group for l in r['linhas'])
+        row += [f"{ve_g:.1f}", _fmt_pct(ve_g / m_g if m_g else 0)]
         return row
 
     def _build_table(rows, bg_color):
@@ -546,16 +496,11 @@ def _build_resumo_geral(periodo: str, data_emissao: str, metas_results: list,
             ('SPAN',          (0, 0), (0, 1)),
             ('SPAN',          (1, 0), (1, 1)),
         ]
-        # Cada vendedor agora é 1 coluna só (mostra só o vendido) -- o nome
-        # do vendedor ocupa as 2 linhas do cabeçalho (merge vertical), igual
-        # a 'Produto'/'Qtde'. Só a coluna TOTAL tem 4 sub-colunas
-        # (Vend/%/Venda Méd/cx/Custo Méd/cx), então o nome dela precisa de
-        # merge horizontal.
         col = 2
         for _ in vendedores:
-            cmds.append(('SPAN', (col, 0), (col, 1)))
-            col += 1
-        cmds.append(('SPAN', (col, 0), (col + 3, 0)))
+            cmds.append(('SPAN', (col, 0), (col + 1, 0)))
+            col += 2
+        cmds.append(('SPAN', (col, 0), (col + 1, 0)))
         t.setStyle(TableStyle(cmds))
         return t
 
@@ -581,10 +526,10 @@ def _build_resumo_geral(periodo: str, data_emissao: str, metas_results: list,
     elems = [Paragraph(
         f"OTHIL — RESUMO GERAL DE METAS | {periodo} | {data_emissao}", title_sty)]
     elems.append(Paragraph(
-        f"Quantidade Total: {_num(estoque_total)} cx &nbsp;&nbsp; "
-        f"Meta Total: {_num(meta_total)} cx &nbsp;&nbsp; "
-        f"Vendido Total: {_num(vendido_total)} cx &nbsp;&nbsp; "
-        f"Falta: {_num(falta_total)} cx &nbsp;&nbsp; "
+        f"Quantidade Total: {estoque_total:,.0f} cx &nbsp;&nbsp; "
+        f"Meta Total: {meta_total:,.0f} cx &nbsp;&nbsp; "
+        f"Vendido Total: {vendido_total:,.0f} cx &nbsp;&nbsp; "
+        f"Falta: {falta_total:,.0f} cx &nbsp;&nbsp; "
         f"% Geral Atingido: {_fmt_pct(pct_total)}",
         sub_info_sty))
     elems.append(Spacer(1, spacer * 0.8))
@@ -612,7 +557,8 @@ def _build_resumo_geral(periodo: str, data_emissao: str, metas_results: list,
     elems.append(Paragraph('TOTAL GERAL', tot_sty))
 
     total_row = _subtotal_row('TOTAL GERAL', metas_results)
-    gt = Table([total_row], colWidths=col_widths[:len(total_row)])
+    n_cols = 2 + (len(vendedores) + 1) * 2
+    gt = Table([total_row], colWidths=col_widths[:n_cols])
     gt.setStyle(TableStyle([
         ('BACKGROUND',    (0, 0), (-1, 0), colors.HexColor('#1B4332')),
         ('TEXTCOLOR',     (0, 0), (-1, 0), colors.white),
