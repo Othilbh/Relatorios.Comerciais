@@ -79,16 +79,7 @@ _P_FILL_DAT = {
     'meta':    _fill('E2EFDA'), 'atual':   _fill('FFF2CC'),
 }
 
-# Duas disposições de colunas nas abas por vendedor -- pedido explícito da
-# Ingrid, 04/09/2026: "hoje o modelo é esse [ant_ano+ant_mes+meta+atual],
-# quero que se torne [só meta+atual]... o primeiro modelo só preciso no
-# começo do mês, quando for definir as metas, que aí preciso ver o
-# comparativo." Ou seja: COMPLETO (com Set./Ago. de comparação) continua
-# existindo, mas passa a ser OPCIONAL -- usado só ao configurar as metas no
-# início do mês; toda semana o padrão passa a ser SIMPLIFICADO (só Meta e
-# Atual). Ver `incluir_comparativo` em gerar_xlsx()/_build_vendedor_sheet().
-_P_COL_COMPLETO      = {'ant_ano': 2, 'ant_mes': 5, 'meta': 8, 'atual': 11}
-_P_COL_SIMPLIFICADO  = {'meta': 2, 'atual': 5}
+_P_COL      = {'ant_ano': 2, 'ant_mes': 5, 'meta': 8, 'atual': 11}
 _GERAL_PERS = ['ant_ano', 'ant_mes', 'atual']
 _GERAL_COL  = {'ant_ano': 2, 'ant_mes': 5, 'atual': 8}
 
@@ -193,12 +184,7 @@ def parse_e_agregar(file_objs):
         for it in itens:
             if it.get('vendedor') in _EXCLUIDOS:
                 continue
-            # 'vendedor' pode vir None quando o nome bruto do PDF não bateu
-            # com nenhum vendedor conhecido (VENDOR_ALIASES) -- nesse caso,
-            # usa o nome bruto mesmo como chave, em vez de None (que
-            # quebrava o sorted() mais abaixo, TypeError 'str'/'NoneType').
-            # Preserva os dados em vez de descartar a linha.
-            v = it['vendedor'] or it.get('vendedor_raw') or 'Vendedor não identificado'
+            v = it['vendedor']
             c = _client_base_norm(it['cliente_nome'])   # chave normalizada para consolidacao
             raw[v][c]['vol']   += it.get('qtd', 0)
             raw[v][c]['fat']   += it.get('faturamento', 0)
@@ -217,56 +203,6 @@ def parse_e_agregar(file_objs):
     return out
 
 
-def agregar_produtos_por_cliente(file_objs):
-    """Parse um ou mais PDFs Vendedor-Cliente e retorna, por vendedor e
-    cliente, QUAIS PRODUTOS foram vendidos e quanto -- pedido explícito da
-    Ingrid, 28/08/2026: "uma aba que permita que o vendedor veja todos os
-    seus clientes e quais produtos estão sendo vendidos para estes
-    clientes". Mesma fonte e mesma normalização de cliente de
-    parse_e_agregar (parsers_diario.parse_relatorio_diario), mas SEM
-    descartar o campo 'produto' de cada item -- parse_e_agregar soma tudo
-    junto por cliente; esta função soma por PRODUTO dentro de cada
-    cliente também.
-
-    Aceita um único file-like object OU uma lista deles (multi-upload).
-    Retorna {vendedor: {cliente_base: {produto: {vol, fat}}}}.
-    """
-    if file_objs is None:
-        return {}
-    if not isinstance(file_objs, (list, tuple)):
-        file_objs = [file_objs]
-
-    raw = defaultdict(lambda: defaultdict(lambda: defaultdict(lambda: {'vol': 0.0, 'fat': 0.0})))
-
-    for file_obj in file_objs:
-        if file_obj is None:
-            continue
-        try:
-            result = parse_relatorio_diario(file_obj)
-            itens  = result['itens']
-        except Exception:
-            continue
-        for it in itens:
-            if it.get('vendedor') in _EXCLUIDOS:
-                continue
-            # Mesmo ajuste de parse_e_agregar: nunca usar None como chave.
-            v = it['vendedor'] or it.get('vendedor_raw') or 'Vendedor não identificado'
-            c = _client_base_norm(it['cliente_nome'])
-            p = it.get('produto') or 'Produto não identificado'
-            raw[v][c][p]['vol'] += it.get('qtd', 0)
-            raw[v][c][p]['fat'] += it.get('faturamento', 0)
-
-    out = {}
-    for v, clientes in raw.items():
-        out[v] = {}
-        for c, produtos in clientes.items():
-            out[v][c] = {
-                p: {'vol': round(d['vol']), 'fat': round(d['fat'], 2)}
-                for p, d in produtos.items()
-            }
-    return out
-
-
 def agregar_totais_historicos(file_obj):
     """Soma todos os itens por vendedor -> total real (inclui todos os clientes)."""
     if file_obj is None:
@@ -281,8 +217,7 @@ def agregar_totais_historicos(file_obj):
     for it in itens:
         if it.get('vendedor') in _EXCLUIDOS:
             continue
-        # Mesmo ajuste de parse_e_agregar: nunca usar None como chave.
-        v = it['vendedor'] or it.get('vendedor_raw') or 'Vendedor não identificado'
+        v = it['vendedor']
         raw[v]['vol']   += it.get('qtd', 0)
         raw[v]['fat']   += it.get('faturamento', 0)
         raw[v]['custo'] += it.get('custo_total', 0)
@@ -373,31 +308,6 @@ def ler_xlsx_historico(xlsx_bytes, ref_date=None) -> bytes:
     labels_def = _periodo_labels(ref_date)
 
     wb = openpyxl.load_workbook(io.BytesIO(xlsx_bytes), data_only=True)
-
-    # Validação defensiva, 04/09/2026: desde que o Excel passou a poder ser
-    # gerado no formato SIMPLIFICADO (só Meta+Atual, sem Set./Ago. -- ver
-    # `incluir_comparativo` em gerar_xlsx/_build_vendedor_sheet), um
-    # arquivo simplificado tem as colunas em posições DIFERENTES (Meta
-    # começa na coluna B, não H). Se fosse lido aqui como se fosse o
-    # formato COMPLETO, os números sairiam todos trocados/errados sem
-    # nenhum erro aparecer -- constraint de nunca inventar/deturpar dado.
-    # Detecta isso olhando o cabeçalho da coluna B da linha 2 (só é "META"
-    # no formato simplificado; no completo é sempre o rótulo do período,
-    # tipo "set./2025") e recusa com mensagem clara em vez de gerar um
-    # histórico com dado errado.
-    for _ws_chk in wb.worksheets:
-        if _ws_chk.title.strip().upper() == 'GERAL':
-            continue
-        _b2_chk = _ws_chk.cell(2, 2).value
-        if _b2_chk and str(_b2_chk).strip().upper() == 'META':
-            raise ValueError(
-                'Este Excel está no formato SIMPLIFICADO (só Meta e Atual, sem Set./Ago.) -- '
-                'não dá para usar como histórico do mês, porque falta o comparativo com o '
-                'mesmo mês do ano anterior e o mês anterior. Para configurar o histórico, gere '
-                'o Excel da semana com "Incluir comparativo (Set./Ago.)" marcado, ou envie os '
-                'PDFs históricos na opção ao lado.'
-            )
-        break  # basta checar a primeira aba de vendedor -- todas saem no mesmo formato
 
     result_ant_ano   = {}   # {vend: {'clientes': {...}, 'TOTAL': {...}}}
     result_ant_mes   = {}
@@ -585,43 +495,25 @@ def _write_total_row(ws, r, c0, d, p_key):
 
 
 def _build_vendedor_sheet(ws, title_name, clientes_por_periodo, totais_por_periodo,
-                          meta_vend, labels, ref_label, incluir_comparativo=True):
-    """incluir_comparativo=True (padrão histórico): 4 grupos de colunas --
-    Set./Ago. (comparativo com mesmo mês do ano anterior e mês anterior),
-    Meta e Atual -- útil no início do mês, quando a Ingrid está definindo
-    as metas com base no histórico. incluir_comparativo=False (pedido dela,
-    04/09/2026, pra virar o padrão da geração SEMANAL): só Meta e Atual --
-    "hoje o modelo é [completo]... preciso que se torne [só isso]... o
-    primeiro modelo só preciso no começo do mês, quando for definir as
-    metas". Ver _P_COL_COMPLETO / _P_COL_SIMPLIFICADO."""
-    p_col = _P_COL_COMPLETO if incluir_comparativo else _P_COL_SIMPLIFICADO
-    n_cols = 13 if incluir_comparativo else 7
-
+                          meta_vend, labels, ref_label):
     ws.freeze_panes = 'B4'
     ws.column_dimensions['A'].width = 34
-    for p, c0 in p_col.items():
+    for p, c0 in _P_COL.items():
         ws.column_dimensions[get_column_letter(c0)].width   = 9
         ws.column_dimensions[get_column_letter(c0+1)].width = 14
         ws.column_dimensions[get_column_letter(c0+2)].width = 10
 
-    _build_headers(ws, ref_label, labels, n_cols, p_col, title_name)
+    _build_headers(ws, ref_label, labels, 13, _P_COL, title_name)
 
-    if incluir_comparativo:
-        # Lista predefinida: clientes do historico (ant_ano + ant_mes)
-        # Usa normalizacao para deduplicar clientes com acento/cedilha diferentes
-        predefined_norm = {}   # norm_key -> display_name
-        for p in ('ant_ano', 'ant_mes'):
-            for cli in clientes_por_periodo.get(p, {}):
-                norm = _normalize(cli)
-                if norm not in predefined_norm:
-                    predefined_norm[norm] = cli
-        predefined = {name: True for name in predefined_norm.values()}
-    else:
-        # Simplificado: sem colunas de Set./Ago., não faz sentido listar
-        # cliente que só existe no histórico antigo (sem Meta nem Atual,
-        # ficaria uma linha de dois traços à toa) -- a lista parte só dos
-        # clientes que aparecem em Atual (adicionados abaixo) + Meta.
-        predefined = {}
+    # Lista predefinida: clientes do historico (ant_ano + ant_mes)
+    # Usa normalizacao para deduplicar clientes com acento/cedilha diferentes
+    predefined_norm = {}   # norm_key -> display_name
+    for p in ('ant_ano', 'ant_mes'):
+        for cli in clientes_por_periodo.get(p, {}):
+            norm = _normalize(cli)
+            if norm not in predefined_norm:
+                predefined_norm[norm] = cli
+    predefined = {name: True for name in predefined_norm.values()}
 
     # Adiciona clientes novos do atual que nao correspondem a nenhum predefinido
     for cli in clientes_por_periodo.get('atual', {}):
@@ -645,7 +537,7 @@ def _build_vendedor_sheet(ws, title_name, clientes_por_periodo, totais_por_perio
         c = ws.cell(r, 1, cli)
         _st(c, fill=fill_r, font=FONT_DATA, align=AL_L)
 
-        for p_key, c0 in p_col.items():
+        for p_key, c0 in _P_COL.items():
             if p_key == 'meta':
                 cli_norm = _normalize(cli)
                 m = next((v for k, v in meta_vend.items() if _normalize(k) == cli_norm), None)
@@ -671,7 +563,7 @@ def _build_vendedor_sheet(ws, title_name, clientes_por_periodo, totais_por_perio
     c = ws.cell(tot_row, 1, 'TOTAL')
     _st(c, fill=FILL_TOT, font=FONT_TOT, align=AL_L)
 
-    for p_key, c0 in p_col.items():
+    for p_key, c0 in _P_COL.items():
         if p_key == 'meta':
             t_vol = sum(m.get('vol') or 0 for m in meta_vend.values())
             t_fat = sum(m.get('fat') or 0 for m in meta_vend.values())
@@ -734,7 +626,7 @@ def _build_geral_sheet(ws, geral_data, labels, ref_label):
 
 
 def gerar_xlsx(historico, pdf_clientes_atual, totais_atual,
-               meta_xlsx_bytes=None, ref_date=None, incluir_comparativo=True):
+               meta_xlsx_bytes=None, ref_date=None):
     """Gera o Excel Vendedor-Cliente e retorna bytes.
 
     historico          : dict de carregar_historico()
@@ -742,13 +634,6 @@ def gerar_xlsx(historico, pdf_clientes_atual, totais_atual,
     totais_atual       : dict de parse_totais_vendedor()['vendedores']
     meta_xlsx_bytes    : bytes do xlsx anterior (opcional, para META se nao vier no historico)
     ref_date           : datetime de referencia (default: hoje)
-    incluir_comparativo : True (padrão desta função, mantém o comportamento
-        histórico) inclui as colunas Set./Ago. de comparação em cada aba de
-        vendedor, além de Meta/Atual. False gera só Meta+Atual -- pedido da
-        Ingrid, 04/09/2026, pra virar o padrão da geração semanal (ver
-        _build_vendedor_sheet). Quem decide o valor OPERACIONAL (qual
-        planilha sai quando ela clica "Gerar Excel") é a página
-        (pages/3_Vendedor_Cliente_OTHIL.py), não esta função.
     """
     if ref_date is None:
         ref_date = datetime.today()
@@ -794,7 +679,6 @@ def gerar_xlsx(historico, pdf_clientes_atual, totais_atual,
     for p_dict in (ant_ano_h.get('vendedores', {}), ant_mes_h.get('vendedores', {})):
         all_vendors.update(p_dict.keys())
     all_vendors -= _EXCLUIDOS
-    all_vendors.discard(None)
 
     vendor_list = [v for v in VENDOR_ORDER if v in all_vendors]
     for v in sorted(all_vendors):
@@ -823,8 +707,7 @@ def gerar_xlsx(historico, pdf_clientes_atual, totais_atual,
         }
         meta_vend = meta_global.get(tab_name.upper(), {})
 
-        _build_vendedor_sheet(ws, title_name, cpp, tpp, meta_vend, labels, ref_label,
-                              incluir_comparativo=incluir_comparativo)
+        _build_vendedor_sheet(ws, title_name, cpp, tpp, meta_vend, labels, ref_label)
         geral_data[vend] = {p: tpp[p] for p in _GERAL_PERS}
 
     ws_geral = wb.create_sheet(title='GERAL')
