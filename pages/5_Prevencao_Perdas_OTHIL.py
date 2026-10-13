@@ -200,7 +200,7 @@ def _gerar_excel(df, titulo, emissao_str, periodo_str):
         ('Total Monitorado',   total),
         ('🔴 Críticos',        criticos),
         ('🟠 Alta Prioridade', alta),
-        ('💰 Valor em Risco',  f"R$ {valor_risco:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')),
+        ('💰 Valor em Risco',  f'R$ {valor_risco:,.2f}'),
         ('Sem Venda ≥ 7 dias', sem_v7),
         ('Estoque ≥ 30 dias',  est30),
     ]
@@ -386,9 +386,10 @@ def _cards(df, tipo: str = None):
         anterior = _publicacao_anterior(tipo)
         if anterior:
             resumo_ant = anterior.get('valores', {}).get('resumo', {})
-            st.divider()
-            st.markdown("**📊 Comparação com período anterior**")
-            st.caption(f"Última publicação: {anterior.get('atualizado_em', '')[:10]}")
+            st.caption(
+                f"📊 Comparativo vs última publicação "
+                f"({anterior.get('atualizado_em', '')[:10]}):"
+            )
             pc1, pc2, pc3 = st.columns(3)
             comp_total = comparativo.calcular(total, resumo_ant.get('total'), menor_e_melhor=True)
             comp_crit  = comparativo.calcular(criticos, resumo_ant.get('criticos'), menor_e_melhor=True)
@@ -443,13 +444,6 @@ def _render_tab(key, titulo, upload_label, filtro_sem_venda, dias_min):
         + (f" · Período desde: **{periodo_str}**" if periodo_str else "")
         + f" · Total no relatório: **{len(produtos)} produtos**"
     )
-
-    # Nota (27/08/2026): diferente das outras páginas, aqui o botão
-    # "Publicar na Gerência" só existe DEPOIS do painel/tabela/filtros (ele
-    # publica o resultado já filtrado). Mandar direto pra Gerência antes
-    # dessa parte, como nas outras páginas, tiraria o acesso a esse botão
-    # pra todo mundo -- por isso esta tela continua mostrando o
-    # painel/filtros/publicação normalmente, sem redirecionamento.
 
     # Gerar DataFrame completo e aplicar filtros de negócio
     df_full = _gerar_df(produtos, emissao_date, period_days)
@@ -618,14 +612,6 @@ def _render_alerta_recebimento():
 
     alertas = [p for p in recebidos if p['produto'].strip().upper() in nomes_pp]
     sem_alerta = [p for p in recebidos if p not in alertas]
-
-    # Painel resumo (mesmo ritmo visual das abas 1/2: upload → resumo → detalhe)
-    st.markdown("---")
-    m1, m2, m3 = st.columns(3)
-    m1.metric("📦 Recebidos hoje", len(recebidos))
-    m2.metric("⚠️ Em alerta", len(alertas))
-    m3.metric("✅ Sem alerta", len(sem_alerta))
-    st.markdown("---")
 
     if not alertas:
         st.success(f"✅ Nenhum dos {len(recebidos)} produtos recebidos hoje "
