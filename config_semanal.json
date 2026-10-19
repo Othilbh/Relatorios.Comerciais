@@ -1,172 +1,102 @@
 {
   "produtos": [
     {
-      "nome": "Red Globe Cumb",
-      "codigos_texto": "830100515",
-      "estoque": 25,
-      "prioridade": "🚨 Grande Urgência",
-      "metas_fixas_ativo": false,
-      "metas_fixas": {}
-    },
-    {
-      "nome": "Ameixa 55/60",
-      "codigos_texto": "250100103",
-      "estoque": 469,
-      "prioridade": "🚨 Grande Urgência",
-      "metas_fixas_ativo": false,
-      "metas_fixas": {}
-    },
-    {
-      "nome": "Thompson 8 kg",
-      "codigos_texto": "830200703",
-      "estoque": 9,
-      "prioridade": "🚨 Grande Urgência",
-      "metas_fixas_ativo": false,
-      "metas_fixas": {}
-    },
-    {
-      "nome": "Red Globe 8 kg",
-      "codigos_texto": "830200516\n830200504",
-      "estoque": 166,
-      "prioridade": "🚨 Grande Urgência",
-      "metas_fixas_ativo": false,
-      "metas_fixas": {}
-    },
-    {
-      "nome": "Roma Pomica",
-      "codigos_texto": "8704714",
-      "estoque": 380,
-      "prioridade": "🚨 Grande Urgência",
-      "metas_fixas_ativo": false,
-      "metas_fixas": {}
-    },
-    {
-      "nome": "Mirtilo",
-      "codigos_texto": "87005912\n87005903\n87005904",
-      "estoque": 244,
-      "prioridade": "🚨 Grande Urgência",
-      "metas_fixas_ativo": false,
-      "metas_fixas": {}
-    },
-    {
-      "nome": "Pessego Tany 4 kg",
-      "codigos_texto": "240100101",
-      "estoque": 9,
-      "prioridade": "🚨 Grande Urgência",
-      "metas_fixas_ativo": false,
-      "metas_fixas": {}
-    },
-    {
-      "nome": "Isis Vermelha Doce",
-      "codigos_texto": "830100201",
-      "estoque": 216,
-      "prioridade": "🚨 Grande Urgência",
-      "metas_fixas_ativo": false,
-      "metas_fixas": {}
-    },
-    {
-      "nome": "Goiaba",
-      "codigos_texto": "300200208",
-      "estoque": 176,
-      "prioridade": "🚨 Grande Urgência",
-      "metas_fixas_ativo": false,
-      "metas_fixas": {}
-    },
-    {
-      "nome": "Melao Dino Rei",
-      "codigos_texto": "87038101\n87038102.1\n87038103",
-      "estoque": 961,
-      "prioridade": "🚨 Grande Urgência",
-      "metas_fixas_ativo": false,
-      "metas_fixas": {}
-    },
-    {
-      "nome": "Fuji Rio Jordao",
-      "codigos_texto": "702079220\n702079221\n702079222",
-      "estoque": 467,
-      "prioridade": "🚨 Grande Urgência",
-      "metas_fixas_ativo": false,
-      "metas_fixas": {}
-    },
-    {
-      "nome": "Kiwi Cum Dom Fruto",
+      "nome": "KIWI DOM FRUTO",
       "codigos_texto": "38010115",
-      "estoque": 643,
+      "estoque": 337,
       "prioridade": "🚨 Grande Urgência",
       "metas_fixas_ativo": false,
       "metas_fixas": {}
     },
     {
-      "nome": "Kiwi Cumb cx Preta ",
-      "codigos_texto": "38010106",
-      "estoque": 100,
-      "prioridade": "🚨 Grande Urgência",
-      "metas_fixas_ativo": false,
-      "metas_fixas": {}
+      "nome": "AMEIXA TANNY 55/60",
+      "codigos_texto": "250100103",
+      "estoque": 308,
+      "prioridade": "🚨 Grande Urgência"
     },
     {
-      "nome": "Kiwi Geofrut 33",
-      "codigos_texto": "380103833",
-      "estoque": 186,
-      "prioridade": "🚨 Grande Urgência",
-      "metas_fixas_ativo": false,
-      "metas_fixas": {}
+      "nome": "Romã Pomica",
+      "codigos_texto": "8704714",
+      "estoque": 282,
+      "prioridade": "🚨 Grande Urgência"
     },
     {
-      "nome": "Melao Dino Cepi",
+      "nome": "Thompson Natural",
+      "codigos_texto": "830100891",
+      "estoque": 1351,
+      "prioridade": "🚨 Grande Urgência"
+    },
+    {
+      "nome": "Dino Cepí",
       "codigos_texto": "8703806.2\n8703804.2\n8703805.2\n8703805\n8703806\n8703807",
-      "estoque": 693,
-      "prioridade": "🚨 Grande Urgência",
-      "metas_fixas_ativo": false,
-      "metas_fixas": {}
+      "estoque": 636,
+      "prioridade": "🚨 Grande Urgência"
     },
     {
-      "nome": "Kiwi Sun Gold",
-      "codigos_texto": "38010232",
-      "estoque": 324,
-      "prioridade": "🔥 Alta Prioridade",
-      "metas_fixas_ativo": false,
-      "metas_fixas": {}
+      "nome": "Dino Rei",
+      "codigos_texto": "87038101\n87038102.1\n87038103\n",
+      "estoque": 731,
+      "prioridade": "🚨 Grande Urgência"
     },
     {
       "nome": "Thompson Algodao Doce",
       "codigos_texto": "830100839",
-      "estoque": 206,
-      "prioridade": "🔥 Alta Prioridade",
-      "metas_fixas_ativo": false,
-      "metas_fixas": {}
+      "estoque": 179,
+      "prioridade": "🚨 Grande Urgência"
+    },
+    {
+      "nome": "Port. Clube da Pera",
+      "codigos_texto": "020503303",
+      "estoque": 224,
+      "prioridade": "🚨 Grande Urgência"
+    },
+    {
+      "nome": "Melão Gaia T7",
+      "codigos_texto": "3102006007",
+      "estoque": 714,
+      "prioridade": "🚨 Grande Urgência"
+    },
+    {
+      "nome": "Melao pele de Sapo",
+      "codigos_texto": "3102011012\n3102011004\n3102011005\n102011006.1",
+      "estoque": 76,
+      "prioridade": "🚨 Grande Urgência"
+    },
+    {
+      "nome": "Gala Frutimar",
+      "codigos_texto": "0701105165\n0701105180\n0701105220\n",
+      "estoque": 533,
+      "prioridade": "🚨 Grande Urgência"
+    },
+    {
+      "nome": "Pera Packhams Dole",
+      "codigos_texto": "0102084100\n0102084110\n010208480\n010208490\n0102084120",
+      "estoque": 1700,
+      "prioridade": "🔥 Alta Prioridade"
+    },
+    {
+      "nome": "Thompson Good",
+      "codigos_texto": "830100837",
+      "estoque": 1271,
+      "prioridade": "🔥 Alta Prioridade"
     },
     {
       "nome": "Forelle",
       "codigos_texto": "020502701",
-      "estoque": 60,
-      "prioridade": "🔥 Alta Prioridade",
-      "metas_fixas_ativo": false,
-      "metas_fixas": {}
+      "estoque": 47,
+      "prioridade": "🔥 Alta Prioridade"
     },
     {
-      "nome": "Pink Lady",
-      "codigos_texto": "0502013100\n0502013120\n050201390",
-      "estoque": 433,
-      "prioridade": "🔥 Alta Prioridade",
-      "metas_fixas_ativo": false,
-      "metas_fixas": {}
+      "nome": "Nubia Cumbuca",
+      "codigos_texto": "830100716",
+      "estoque": 318,
+      "prioridade": "🔥 Alta Prioridade"
     },
     {
-      "nome": "Pack Comai",
-      "codigos_texto": "01020812",
-      "estoque": 102,
-      "prioridade": "🔥 Alta Prioridade",
-      "metas_fixas_ativo": false,
-      "metas_fixas": {}
-    },
-    {
-      "nome": "Melao Pele Sapo",
-      "codigos_texto": "3102011012\n3102011004\n3102011005\n3102011007\n3102011008\n3102011006.1",
-      "estoque": 192,
-      "prioridade": "🔥 Alta Prioridade",
-      "metas_fixas_ativo": false,
-      "metas_fixas": {}
+      "nome": "Bergamota",
+      "codigos_texto": "390600109\n390600158\n390600137",
+      "estoque": 440,
+      "prioridade": "🔥 Alta Prioridade"
     }
   ],
   "vendedor_pcts": {
@@ -179,5 +109,5 @@
     "Juliana": 15,
     "Luca": 17
   },
-  "periodo": "10/10/2026 a 16/10/2026"
+  "periodo": "17/10/2026 a 16/10/2026"
 }
