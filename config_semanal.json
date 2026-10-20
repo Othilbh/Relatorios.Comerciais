@@ -97,6 +97,36 @@
       "codigos_texto": "390600109\n390600158\n390600137",
       "estoque": 440,
       "prioridade": "🔥 Alta Prioridade"
+    },
+    {
+      "nome": "KIWI OCHO FUEGOS",
+      "codigos_texto": "3801099",
+      "estoque": 25,
+      "prioridade": "🔥 Alta Prioridade"
+    },
+    {
+      "nome": "KIWI RIO BLANCO 33 ",
+      "codigos_texto": "380102233.1\n380102233",
+      "estoque": 520,
+      "prioridade": "🔥 Alta Prioridade"
+    },
+    {
+      "nome": "PESSEGO",
+      "codigos_texto": "240106401\n81040043",
+      "estoque": 168,
+      "prioridade": "🔥 Alta Prioridade"
+    },
+    {
+      "nome": "KIWI 10X1",
+      "codigos_texto": "38010106\n",
+      "estoque": 473,
+      "prioridade": "🔥 Alta Prioridade"
+    },
+    {
+      "nome": "VITORIA BELLA",
+      "codigos_texto": "830100925",
+      "estoque": 107,
+      "prioridade": "🔥 Alta Prioridade"
     }
   ],
   "vendedor_pcts": {
