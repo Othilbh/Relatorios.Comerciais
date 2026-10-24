@@ -1,132 +1,52 @@
 {
   "produtos": [
     {
-      "nome": "KIWI DOM FRUTO",
-      "codigos_texto": "38010115",
-      "estoque": 337,
-      "prioridade": "🚨 Grande Urgência",
-      "metas_fixas_ativo": false,
-      "metas_fixas": {}
-    },
-    {
-      "nome": "AMEIXA TANNY 55/60",
-      "codigos_texto": "250100103",
-      "estoque": 308,
+      "nome": "Portuguesa Clube da Pera",
+      "codigos_texto": "020503303",
+      "estoque": 336,
       "prioridade": "🚨 Grande Urgência"
     },
     {
-      "nome": "Romã Pomica",
+      "nome": "Roma Pomica",
       "codigos_texto": "8704714",
-      "estoque": 282,
+      "estoque": 225,
       "prioridade": "🚨 Grande Urgência"
     },
     {
-      "nome": "Thompson Natural",
-      "codigos_texto": "830100891",
-      "estoque": 1351,
-      "prioridade": "🚨 Grande Urgência"
-    },
-    {
-      "nome": "Dino Cepí",
-      "codigos_texto": "8703806.2\n8703804.2\n8703805.2\n8703805\n8703806\n8703807",
+      "nome": "Thompson Natural + Good",
+      "codigos_texto": "830100891\n830100837",
       "estoque": 636,
       "prioridade": "🚨 Grande Urgência"
     },
     {
-      "nome": "Dino Rei",
-      "codigos_texto": "87038101\n87038102.1\n87038103\n",
-      "estoque": 731,
+      "nome": "Kiwi Rio Blanco 33",
+      "codigos_texto": "380102233\n380102233.1",
+      "estoque": 498,
       "prioridade": "🚨 Grande Urgência"
     },
     {
-      "nome": "Thompson Algodao Doce",
-      "codigos_texto": "830100839",
-      "estoque": 179,
+      "nome": "Kiwi Dom fruto",
+      "codigos_texto": "38010115",
+      "estoque": 87,
       "prioridade": "🚨 Grande Urgência"
     },
     {
-      "nome": "Port. Clube da Pera",
-      "codigos_texto": "020503303",
-      "estoque": 224,
+      "nome": "Dino Rei ",
+      "codigos_texto": "87038101\n87038102.1\n87038103",
+      "estoque": 544,
       "prioridade": "🚨 Grande Urgência"
     },
     {
-      "nome": "Melão Gaia T7",
-      "codigos_texto": "3102006007",
-      "estoque": 714,
+      "nome": "Dino Cepi",
+      "codigos_texto": "8703804.2\n8703805.2\n8703805\n8703807",
+      "estoque": 133,
       "prioridade": "🚨 Grande Urgência"
     },
     {
-      "nome": "Melao pele de Sapo",
-      "codigos_texto": "3102011012\n3102011004\n3102011005\n102011006.1",
-      "estoque": 76,
-      "prioridade": "🚨 Grande Urgência"
-    },
-    {
-      "nome": "Gala Frutimar",
-      "codigos_texto": "0701105165\n0701105180\n0701105220\n",
-      "estoque": 533,
-      "prioridade": "🚨 Grande Urgência"
-    },
-    {
-      "nome": "Pera Packhams Dole",
-      "codigos_texto": "0102084100\n0102084110\n010208480\n010208490\n0102084120",
-      "estoque": 1700,
-      "prioridade": "🔥 Alta Prioridade"
-    },
-    {
-      "nome": "Thompson Good",
-      "codigos_texto": "830100837",
-      "estoque": 1271,
-      "prioridade": "🔥 Alta Prioridade"
-    },
-    {
-      "nome": "Forelle",
-      "codigos_texto": "020502701",
-      "estoque": 47,
-      "prioridade": "🔥 Alta Prioridade"
-    },
-    {
-      "nome": "Nubia Cumbuca",
-      "codigos_texto": "830100716",
-      "estoque": 318,
-      "prioridade": "🔥 Alta Prioridade"
-    },
-    {
-      "nome": "Bergamota",
-      "codigos_texto": "390600109\n390600158\n390600137",
-      "estoque": 440,
-      "prioridade": "🔥 Alta Prioridade"
-    },
-    {
-      "nome": "KIWI OCHO FUEGOS",
-      "codigos_texto": "3801099",
-      "estoque": 25,
-      "prioridade": "🔥 Alta Prioridade"
-    },
-    {
-      "nome": "KIWI RIO BLANCO 33 ",
-      "codigos_texto": "380102233.1\n380102233",
-      "estoque": 520,
-      "prioridade": "🔥 Alta Prioridade"
-    },
-    {
-      "nome": "PESSEGO",
-      "codigos_texto": "240106401\n81040043",
-      "estoque": 168,
-      "prioridade": "🔥 Alta Prioridade"
-    },
-    {
-      "nome": "KIWI 10X1",
-      "codigos_texto": "38010106\n",
-      "estoque": 473,
-      "prioridade": "🔥 Alta Prioridade"
-    },
-    {
-      "nome": "VITORIA BELLA",
-      "codigos_texto": "830100925",
-      "estoque": 107,
-      "prioridade": "🔥 Alta Prioridade"
+      "nome": "Packams More",
+      "codigos_texto": "",
+      "estoque": 0,
+      "prioridade": "Normal"
     }
   ],
   "vendedor_pcts": {
