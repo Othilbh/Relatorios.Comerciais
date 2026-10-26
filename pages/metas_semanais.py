@@ -16,14 +16,30 @@ import pandas as pd
 from parsers import parse_estoque, parse_vendas, normalize_codigo
 from parsers_diario import parse_vendas_pdftotext
 from parsers_vendedor import parse_totais_vendedor
-from calc import compute_metas, VENDEDORES_PADRAO, parse_codigos_input, map_vendedor, codigo_matches, soma_falta
+from calc import (compute_metas, VENDEDORES_PADRAO, parse_codigos_input, map_vendedor,
+                   codigo_matches, soma_falta, sugestao_codigo_por_nome, round_up,
+                   slug_semana as _slug_semana, label_semana as _label_semana,
+                   dia_semana_atual as _dia_semana_atual)
 from pdfgen import generate_relatorio_vendedor, generate_dashboard, generate_resumo_geral
 import storage
-import periodo
-import comparativo
 import on_track
 import data_store as ds
 import resumo_matriz
+
+# ── Formatação numérica em padrão brasileiro ────────────────────────────────
+# Mesmo idioma já usado em pdfgen.py, pages/1_Relatorio_Diario_OTHIL.py,
+# pages/3_Vendedor_Cliente_OTHIL.py e pages/gerencia.py -- esta página ainda
+# usava o formato padrão do Python (separador de milhar ',' e decimal '.',
+# ex.: "R$ 12,345.67"), que fica invertido em relação ao padrão brasileiro
+# usado no resto do app (ex.: "R$ 12.345,67") -- reclamação explícita da
+# Ingrid de que "fica horrível a visualização".
+def _fmt_num(v, casas=0):
+    return f"{v:,.{casas}f}".replace(',', 'X').replace('.', ',').replace('X', '.')
+
+
+def _fmt_moeda(v):
+    return f"R$ {_fmt_num(v, 2)}"
+
 
 MODULO = 'metas_semanais_fechamento'
 MODULO_ONTRACK = 'metas_semanais_ontrack'
@@ -32,6 +48,20 @@ CONFIG_PATH = 'config_semanal.json'
 _FECHAMENTOS_DIR  = os.path.join(os.path.dirname(__file__), '..', 'gerencia_data', 'fechamentos')
 _ONTRACK_PUB_FILE = os.path.join(os.path.dirname(__file__), '..', 'gerencia_data', 'ontrack_publicado.json')
 _ONTRACK_META_DIR = os.path.join(os.path.dirname(__file__), '..', 'gerencia_data', 'ontrack_metas')
+
+# Texto de ajuda compartilhado pelos dois st.date_input de "data de
+# referência" da semana comercial (Fechar Semana e Publicar On Track pra
+# Gerência) -- antes duplicado quase palavra por palavra em dois lugares
+# diferentes; centralizado aqui pra que uma futura mudança na explicação só
+# precise ser feita uma vez, e pra que a Ingrid veja o mesmo texto nos dois
+# lugares.
+_HELP_DATA_REF_SEMANA = (
+    'Deixe em hoje para a semana atual. Se estiver calculando/fechando/'
+    'publicando com atraso (ex.: PDFs de uma semana anterior), escolha uma '
+    'data dentro daquela semana — os dados ficam salvos no histórico da '
+    'semana específica escolhida, em vez de serem gravados por engano sob '
+    'a semana de hoje.'
+)
 
 # ---------------------------------------------------------------------------
 # Persistência da configuração da semana
@@ -75,17 +105,14 @@ def save_config(cfg, show_feedback=True):
 # ---------------------------------------------------------------------------
 # Fechamento helpers
 # ---------------------------------------------------------------------------
-
-def _slug_semana(data: datetime.date) -> str:
-    """periodo_ref padrão (semana ISO) da semana que contém `data`."""
-    return periodo.periodo_ref('semanal', data)
-
-
-def _label_semana(slug: str) -> str:
-    try:
-        return periodo.rotulo('semanal', slug)
-    except Exception:
-        return slug
+# _slug_semana / _intervalo_semana / _label_semana / _semana_anterior /
+# _semana_ano_anterior / _dia_semana_atual (semana comercial -- sábado a
+# sexta desde 31/08/2026; ver calc.py pra definição/histórico completos)
+# foram MOVIDAS pra calc.py em 26/08/2026 -- fonte única compartilhada com
+# pages/gerencia.py (tela "On Track Atual", que exibe snapshots publicados
+# daqui e precisava da MESMA definição de semana, não uma segunda lógica
+# divergente). Os nomes locais acima continuam funcionando normalmente em
+# todo o resto deste arquivo via os aliases importados no topo.
 
 
 def _salvar_fechamento(resultados: list, totais_rs: dict, periodo_txt: str, slug: str,
@@ -94,7 +121,17 @@ def _salvar_fechamento(resultados: list, totais_rs: dict, periodo_txt: str, slug
     leitura já existente na página de Gerência) E na camada central de
     persistência (data_store — sobrevive a restart do Streamlit Cloud e
     mantém histórico versionado: fechar a mesma semana de novo não apaga
-    o fechamento anterior, ele fica disponível em 'histórico de versões')."""
+    o fechamento anterior, ele fica disponível em 'histórico de versões').
+
+    Retorna o registro devolvido por ds.save_record (mesmo padrão usado em
+    metas_gerais.py/6_Rentabilidade_Margens_OTHIL.py/etc.) para o chamador
+    poder checar 'valores' e o campo '_erro_persistencia_remota' antes de
+    mostrar sucesso -- ds.save_record NÃO levanta exceção quando a gravação
+    remota (GitHub) falha, ela é sinalizada só nesse campo do retorno. Sem
+    checar esse campo, o botão "Fechar Semana" sempre mostrava "✅ salvo"
+    mesmo quando a gravação remota falhava silenciosamente, e o fechamento
+    sumia da Gerência no primeiro restart do Streamlit Cloud (disco local é
+    efêmero) -- exatamente o "não está ficando salvo" relatado pela Ingrid."""
     os.makedirs(_FECHAMENTOS_DIR, exist_ok=True)
     payload = {
         'slug': slug,
@@ -107,18 +144,11 @@ def _salvar_fechamento(resultados: list, totais_rs: dict, periodo_txt: str, slug
     with open(path, 'w', encoding='utf-8') as f:
         json.dump(payload, f, ensure_ascii=False, indent=2)
 
-    try:
-        ds.save_record(
-            modulo=MODULO, tipo_periodo='semanal', periodo_ref=slug,
-            valores={'periodo': periodo_txt, 'produtos': resultados, 'totais_rs': totais_rs},
-            usuario=usuario,
-        )
-    except Exception as e:
-        st.warning(
-            f'O fechamento foi salvo localmente, mas houve um problema ao salvar '
-            f'de forma permanente (histórico pode não sobreviver a um restart do '
-            f'app): {e}'
-        )
+    return ds.save_record(
+        modulo=MODULO, tipo_periodo='semanal', periodo_ref=slug,
+        valores={'periodo': periodo_txt, 'produtos': resultados, 'totais_rs': totais_rs},
+        usuario=usuario,
+    )
 
 
 def _listar_fechamentos():
@@ -194,6 +224,83 @@ def _diagnostico_codigos(vendas_rows: list, produtos_config: list) -> list:
     ]
 
 
+def _aplicar_edicoes_vendido(resultados: list) -> None:
+    """Aplica, em 'resultados', as correções manuais de 'Vendido' que a
+    Ingrid já tenha feito nesta mesma sessão via st.data_editor (chave
+    'vendido_editor_{i}', uma por produto -- ver loop 'Detalhe por
+    vendedor' mais abaixo). Precisa rodar ANTES da tabela-resumo
+    'Resultado por produto' ser montada, senão ela mostraria o valor
+    antigo por um render (o data_editor só é chamado de novo, mais
+    abaixo no código, depois da tabela-resumo).
+
+    Só mexe no Vendido/Falta/% Atingido calculados para ESTA semana (que
+    ficam em st.session_state['resultados'], recriado do zero a cada novo
+    cálculo) -- nunca em produtos_config nem nos percentuais/metas fixas,
+    que continuam sendo a configuração reaproveitada toda semana (pedido
+    explícito da Ingrid, 22/09/2026: a correção vale só pra semana que
+    está sendo calculada agora, não deve 'travar' as semanas seguintes
+    como a meta fixa trava)."""
+    for i, r in enumerate(resultados):
+        estado = st.session_state.get(f'vendido_editor_{i}')
+        if not isinstance(estado, dict):
+            continue
+        for idx_str, mudancas in estado.get('edited_rows', {}).items():
+            if 'Vendido (cx)' not in mudancas:
+                continue
+            try:
+                idx = int(idx_str)
+                novo_vendido = float(mudancas['Vendido (cx)'])
+            except (TypeError, ValueError):
+                continue
+            if idx >= len(r['linhas']):
+                continue
+            linha = r['linhas'][idx]
+            linha['vendido'] = novo_vendido
+            linha['vendido_editado'] = True
+            meta_linha = linha.get('meta', 0)
+            linha['falta'] = max(meta_linha - novo_vendido, 0.0)
+            linha['atingido'] = (novo_vendido / meta_linha) if meta_linha else 0.0
+
+
+def _diagnostico_vendedores_excluidos(vendas_rows: list, produtos_config: list,
+                                       vendedor_pcts: dict) -> list:
+    """Retorna vendedores que o relatório RECONHECE (têm alias mapeado em
+    map_vendedor) mas que não fazem parte da lista de vendedores com meta
+    semanal configurada (vendedor_pcts) -- ou seja, as vendas deles são
+    silenciosamente excluídas do 'Vendido', mesmo quando o CÓDIGO do produto
+    está certinho e o vendedor aparece normalmente no PDF. Já aconteceu antes
+    (histórico: Luca ficou de fora quando foi cadastrado, e as vendas dele
+    sumiam sem nenhum aviso) -- esse diagnóstico existe pra isso nunca mais
+    passar despercebido, em vez de descobrir só quando o número não bate.
+
+    Só conta linhas cujo código casa com algum produto configurado (linhas de
+    código não reconhecido já aparecem no diagnóstico de códigos, e vendas de
+    um vendedor não-rastreado num produto não configurado não afetam nenhuma
+    meta de qualquer forma)."""
+    from collections import defaultdict
+    agg = defaultdict(lambda: {'qtde': 0.0, 'produtos': set()})
+    for row in vendas_rows:
+        disp = map_vendedor(row['vendedor'])
+        if not disp or disp in vendedor_pcts:
+            continue
+        cn = normalize_codigo(row['codigo'])
+        for p in produtos_config:
+            if any(codigo_matches(cn, e) for e in p['codigos']):
+                agg[disp]['qtde'] += row['qtde_vendida']
+                agg[disp]['produtos'].add(p['nome'])
+                break
+    if not agg:
+        return []
+    return [
+        {
+            'Vendedor': vend,
+            'CX fora do cálculo': dados['qtde'],
+            'Produtos afetados': ', '.join(sorted(dados['produtos'])),
+        }
+        for vend, dados in sorted(agg.items(), key=lambda x: -x[1]['qtde'])
+    ]
+
+
 # ---------------------------------------------------------------------------
 # On Track helpers
 # ---------------------------------------------------------------------------
@@ -206,11 +313,12 @@ _STATUS_COR = {
 }
 
 
-def _on_track_status(atingido: float, dia: int, total_dias: int = 5):
+def _on_track_status(atingido: float, dia: int, total_dias: int = 6):
     """Retorna (emoji, label, hex_color) usando a lógica CENTRAL de On Track
     (on_track.py — a mesma usada por todos os módulos do app), com o tempo
-    decorrido calculado em dias úteis da semana comercial (1..total_dias),
-    que é a convenção já usada aqui (em vez de dias corridos do calendário).
+    decorrido calculado em dias de venda da semana comercial (1..total_dias,
+    sábado a sexta, sem domingo -- ver `_dia_semana_atual`), que é a
+    convenção já usada aqui (em vez de dias corridos do calendário).
     `atingido` já vem como fração (vendido/meta) calculada pelo chamador."""
     pct_tempo = (dia / total_dias) if total_dias else 0.0
     r = on_track.calcular(
@@ -238,10 +346,12 @@ def _render_on_track():
     with col_dia:
         dia_semana = st.slider(
             'Dia da semana atual',
-            min_value=1, max_value=5,
-            value=min(datetime.date.today().weekday() + 1, 5),
-            format='Dia %d de 5',
-            help='Segunda=1  Terça=2  Quarta=3  Quinta=4  Sexta=5',
+            min_value=1, max_value=6,
+            value=_dia_semana_atual(),
+            format='Dia %d de 6',
+            help='Semana comercial sábado a sexta (sem domingo, que não tem '
+                 'venda): Sábado=1  Segunda=2  Terça=3  Quarta=4  Quinta=5  '
+                 'Sexta (fecha a semana)=6',
             key='ont_dia',
         )
     with col_sort:
@@ -254,32 +364,38 @@ def _render_on_track():
     st.divider()
 
     # ── KPIs Totais ───────────────────────────────────────────────────────
-    total_meta   = sum(l['meta']    for r in resultados for l in r['linhas'])
+    # IMPORTANTE: a meta GERAL nunca é a soma das metas individuais dos
+    # vendedores (cada uma é round_up(pct% do estoque), e a soma de vários
+    # arredondamentos pra cima estoura o total real). A meta geral é o
+    # 'estoque_total' de cada produto -- o valor real configurado -- somado
+    # entre os produtos. O vendido geral continua sendo a soma do que foi
+    # realmente vendido (isso sim é sempre correto somar).
+    total_meta   = sum(r.get('estoque_total', 0) for r in resultados)
     total_vend   = sum(l['vendido'] for r in resultados for l in r['linhas'])
     total_falta  = soma_falta([l for r in resultados for l in r['linhas']])
     ating_geral  = total_vend / total_meta if total_meta else 0
-    proj_cx      = math.ceil(total_vend / dia_semana * 5) if dia_semana > 0 else 0
+    proj_cx      = math.ceil(total_vend / dia_semana * 6) if dia_semana > 0 else 0
     delta_proj   = proj_cx - total_meta
 
-    on_em, on_lb, on_cor = _on_track_status(ating_geral, dia_semana)
+    on_em, on_lb, _ = _on_track_status(ating_geral, dia_semana)
 
-    st.markdown(
-        f'<div style="background:{on_cor}; color:white; padding:0.55rem 1.2rem; '
-        f'border-radius:10px; display:inline-block; margin-bottom:0.8rem; '
-        f'font-size:1.05rem; font-weight:600;">'
-        f'{on_em} {on_lb} — {ating_geral*100:.1f}% atingido (dia {dia_semana}/5)'
-        f'</div>',
-        unsafe_allow_html=True,
+    # Status geral como st.metric nativo (26/08/2026, padronização pedida
+    # pela Ingrid: trocar a "pill" HTML colorida por st.metric nativo, igual
+    # ao resto do app) -- emoji + label já carregam o mesmo sinal de cor que
+    # o pill tinha (🟢/🟡/🔴/⚪, ver on_track.EMOJI), e o dia da semana vai
+    # no delta. % atingido continua visível no card "% Atingido" ao lado.
+    c0, c1, c2, c3, c4, c5 = st.columns(6)
+    c0.metric(
+        'Status Geral', f'{on_em} {on_lb}',
+        delta=f'dia {dia_semana}/6', delta_color='off',
     )
-
-    c1, c2, c3, c4, c5 = st.columns(5)
-    c1.metric('Meta total (cx)',  f'{total_meta:,.0f}')
-    c2.metric('Vendido (cx)',     f'{total_vend:,.0f}')
+    c1.metric('Meta total (cx)',  _fmt_num(total_meta, 0))
+    c2.metric('Vendido (cx)',     _fmt_num(total_vend, 0))
     c3.metric('% Atingido',      f'{ating_geral*100:.1f}%')
-    c4.metric('Falta (cx)',      f'{total_falta:,.0f}')
+    c4.metric('Falta (cx)',      _fmt_num(total_falta, 0))
     c5.metric(
-        'Projeção semana (cx)',   f'{proj_cx:,.0f}',
-        delta=f'{delta_proj:+,.0f} vs meta',
+        'Projeção semana (cx)',   _fmt_num(proj_cx, 0),
+        delta=f"{'+' if delta_proj >= 0 else ''}{_fmt_num(delta_proj, 0)} vs meta",
         delta_color='normal',
     )
 
@@ -288,9 +404,9 @@ def _render_on_track():
     if tg:
         st.subheader('Faturamento Geral (R$)')
         r1, r2, r3 = st.columns(3)
-        r1.metric('Faturamento', f"R$ {tg.get('fat', 0):,.2f}")
-        r2.metric('MC R$',       f"R$ {tg.get('mc_rs', 0):,.2f}")
-        r3.metric('MC %',        f"{tg.get('mc_pct', 0):.2f}%")
+        r1.metric('Faturamento', _fmt_moeda(tg.get('fat', 0)))
+        r2.metric('MC R$',       _fmt_moeda(tg.get('mc_rs', 0)))
+        r3.metric('MC %',        f"{tg.get('resultado_real', 0):.2f}%")
 
     st.divider()
 
@@ -313,7 +429,7 @@ def _render_on_track():
         meta_v = ag['meta']
         vend_v = ag['vendido']
         atg_v  = vend_v / meta_v if meta_v else 0
-        proj_v = math.ceil(vend_v / dia_semana * 5) if dia_semana > 0 else 0
+        proj_v = math.ceil(vend_v / dia_semana * 6) if dia_semana > 0 else 0
         em, lb, _ = _on_track_status(atg_v, dia_semana)
         rs = vend_rs.get(v, {})
         rows.append({
@@ -325,7 +441,7 @@ def _render_on_track():
             'Projeção (cx)': proj_v,
             'Fat R$':       rs.get('fat'),
             'MC R$':        rs.get('mc_rs'),
-            'MC %':         rs.get('mc_pct'),
+            'MC %':         rs.get('resultado_real'),
             'Status':       f'{em} {lb}',
         })
 
@@ -340,77 +456,100 @@ def _render_on_track():
 
     df_vend = pd.DataFrame(rows)
     df_vend['% Atingido']    = df_vend['% Atingido'].map(lambda x: f'{x*100:.1f}%')
-    df_vend['Meta (cx)']     = df_vend['Meta (cx)'].map(lambda x: f'{x:,.0f}')
-    df_vend['Vendido (cx)']  = df_vend['Vendido (cx)'].map(lambda x: f'{x:,.0f}')
-    df_vend['Falta (cx)']    = df_vend['Falta (cx)'].map(lambda x: f'{x:,.0f}')
-    df_vend['Projeção (cx)'] = df_vend['Projeção (cx)'].map(lambda x: f'{x:,.0f}')
-    df_vend['Fat R$']  = df_vend['Fat R$'].map(lambda x: f'R$ {x:,.2f}' if x is not None else '—')
-    df_vend['MC R$']   = df_vend['MC R$'].map(lambda x: f'R$ {x:,.2f}' if x is not None else '—')
+    df_vend['Meta (cx)']     = df_vend['Meta (cx)'].map(lambda x: _fmt_num(x, 0))
+    df_vend['Vendido (cx)']  = df_vend['Vendido (cx)'].map(lambda x: _fmt_num(x, 0))
+    df_vend['Falta (cx)']    = df_vend['Falta (cx)'].map(lambda x: _fmt_num(x, 0))
+    df_vend['Projeção (cx)'] = df_vend['Projeção (cx)'].map(lambda x: _fmt_num(x, 0))
+    df_vend['Fat R$']  = df_vend['Fat R$'].map(lambda x: _fmt_moeda(x) if x is not None else '—')
+    df_vend['MC R$']   = df_vend['MC R$'].map(lambda x: _fmt_moeda(x) if x is not None else '—')
     df_vend['MC %']    = df_vend['MC %'].map(lambda x: f'{x:.2f}%' if x is not None else '—')
 
     st.dataframe(df_vend, use_container_width=True, hide_index=True)
 
     st.divider()
 
-    # ── Detalhamento por Produto ──────────────────────────────────────────
-    st.subheader('Detalhamento por Produto')
+    # ── On Track por Produto ────────────────────────────────────────────────
+    # Mesmo padrão visual/estrutural do "On Track por Vendedor" acima (uma
+    # tabela via st.dataframe, não mais uma lista de accordions) -- pedido
+    # explícito da Ingrid pra deixar os dois blocos com a mesma cara. As
+    # colunas usam Meta/Vendido em CAIXAS (cx), não em R$: não existe hoje
+    # nenhum Faturamento/MC calculado por PRODUTO no app (só por vendedor,
+    # vindo do PDF de Lucratividade) -- confirmado com a Ingrid antes desta
+    # mudança, pra não inventar um valor em R$ que não existe de verdade.
+    st.subheader('On Track por Produto')
+
+    sort_by_prod = st.selectbox(
+        'Ordenar produtos por',
+        ['Maior % atingido', 'Maior volume (cx)', 'Alfabético'],
+        key='ont_sort_prod',
+    )
+
+    rows_prod = []
     for r in resultados:
-        prio  = r.get('prioridade', 'Normal')
-        badge = f' {prio}' if prio != 'Normal' else ''
-        p_meta = sum(l['meta']    for l in r['linhas'])
+        # Meta do produto = 'estoque_total' (o valor real configurado pra
+        # esse produto), NUNCA a soma das metas individuais por vendedor
+        # (essa soma é inflada pelo arredondamento pra cima de cada uma).
+        p_meta = r.get('estoque_total', 0)
         p_vend = sum(l['vendido'] for l in r['linhas'])
         p_atg  = p_vend / p_meta if p_meta else 0
         p_em, p_lb, _ = _on_track_status(p_atg, dia_semana)
+        rows_prod.append({
+            'Produto':      r['produto'],
+            'Meta (cx)':    p_meta,
+            'Vendido (cx)': p_vend,
+            '% Atingido':   p_atg,
+            'Status':       f'{p_em} {p_lb}',
+        })
 
-        with st.expander(
-            f"{r['produto']}{badge} — {r['estoque_total']:.0f} cx  |  "
-            f"{p_vend:,.0f}/{p_meta:,.0f} cx ({p_atg*100:.1f}%)  {p_em} {p_lb}"
-        ):
-            df_prod = pd.DataFrame([{
-                'Vendedor':     l['vendedor'],
-                'Meta (cx)':   f"{l['meta']:,.0f}",
-                'Vendido (cx)': f"{l['vendido']:,.0f}",
-                'Falta (cx)':  f"{l['falta']:,.0f}",
-                '% Atingido':  f"{l['atingido']*100:.1f}%",
-            } for l in r['linhas']])
-            st.dataframe(df_prod, use_container_width=True, hide_index=True)
+    if sort_by_prod == 'Maior % atingido':
+        rows_prod.sort(key=lambda r: r['% Atingido'], reverse=True)
+    elif sort_by_prod == 'Maior volume (cx)':
+        rows_prod.sort(key=lambda r: r['Vendido (cx)'], reverse=True)
+    else:
+        rows_prod.sort(key=lambda r: r['Produto'])
+
+    df_prod = pd.DataFrame(rows_prod)
+    df_prod['Meta (cx)']    = df_prod['Meta (cx)'].map(lambda x: _fmt_num(x, 0))
+    df_prod['Vendido (cx)'] = df_prod['Vendido (cx)'].map(lambda x: _fmt_num(x, 0))
+    df_prod['% Atingido']   = df_prod['% Atingido'].map(lambda x: f'{x*100:.1f}%')
+
+    st.dataframe(df_prod, use_container_width=True, hide_index=True)
 
 
 # ---------------------------------------------------------------------------
 # Render: Fechamento Semanal
 # ---------------------------------------------------------------------------
 
-def _render_resumo_geral_inline(resultados: list, totais_rs: dict, dia: int = 5):
+def _render_resumo_geral_inline(resultados: list, totais_rs: dict, dia: int = 6):
     """Exibe o Resumo Geral (On Track + matriz produto × vendedor) inline."""
     if not resultados:
         return
 
     # ── On Track KPIs ────────────────────────────────────────────────────
-    total_meta  = sum(l['meta']    for r in resultados for l in r['linhas'])
+    # Meta geral = soma do 'estoque_total' real de cada produto, não a soma
+    # das metas individuais por vendedor (ver nota em _render_ontrack acima).
+    total_meta  = sum(r.get('estoque_total', 0) for r in resultados)
     total_vend  = sum(l['vendido'] for r in resultados for l in r['linhas'])
     ating_geral = total_vend / total_meta if total_meta else 0
-    proj_cx     = math.ceil(total_vend / dia * 5) if dia > 0 else 0
-    on_em, on_lb, on_cor = _on_track_status(ating_geral, dia)
+    proj_cx     = math.ceil(total_vend / dia * 6) if dia > 0 else 0
+    on_em, on_lb, _ = _on_track_status(ating_geral, dia)
 
-    st.markdown(
-        f'<div style="background:{on_cor}; color:white; padding:0.45rem 1rem; '
-        f'border-radius:8px; display:inline-block; margin-bottom:0.6rem; font-weight:600;">'
-        f'{on_em} {on_lb} — {ating_geral*100:.1f}%</div>',
-        unsafe_allow_html=True,
-    )
-    c1, c2, c3, c4, c5 = st.columns(5)
-    c1.metric('Meta total (cx)',    f'{total_meta:,.0f}')
-    c2.metric('Vendido (cx)',       f'{total_vend:,.0f}')
+    # Status geral como st.metric nativo (ver comentário equivalente em
+    # _render_on_track acima -- mesmo padrão, emoji já carrega o sinal de cor).
+    c0, c1, c2, c3, c4, c5 = st.columns(6)
+    c0.metric('Status Geral', f'{on_em} {on_lb}')
+    c1.metric('Meta total (cx)',    _fmt_num(total_meta, 0))
+    c2.metric('Vendido (cx)',       _fmt_num(total_vend, 0))
     c3.metric('% Atingido',        f'{ating_geral*100:.1f}%')
-    c4.metric('Falta (cx)',        f"{soma_falta([l for r in resultados for l in r['linhas']]):,.0f}")
-    c5.metric('Projeção semana (cx)', f'{proj_cx:,.0f}')
+    c4.metric('Falta (cx)',        _fmt_num(soma_falta([l for r in resultados for l in r['linhas']]), 0))
+    c5.metric('Projeção semana (cx)', _fmt_num(proj_cx, 0))
 
     tg = totais_rs.get('total_geral', {})
     if tg:
         f1, f2, f3 = st.columns(3)
-        f1.metric('Faturamento', f"R$ {tg.get('fat', 0):,.2f}")
-        f2.metric('MC R$',       f"R$ {tg.get('mc_rs', 0):,.2f}")
-        f3.metric('MC %',        f"{tg.get('mc_pct', 0):.2f}%")
+        f1.metric('Faturamento', _fmt_moeda(tg.get('fat', 0)))
+        f2.metric('MC R$',       _fmt_moeda(tg.get('mc_rs', 0)))
+        f3.metric('MC %',        f"{tg.get('resultado_real', 0):.2f}%")
 
     st.divider()
 
@@ -431,17 +570,17 @@ def _render_resumo_geral_inline(resultados: list, totais_rs: dict, dia: int = 5)
         meta_v = ag['meta']
         vend_v = ag['vendido']
         atg_v  = vend_v / meta_v if meta_v else 0
-        proj_v = math.ceil(vend_v / dia * 5) if dia > 0 else 0
+        proj_v = math.ceil(vend_v / dia * 6) if dia > 0 else 0
         em, lb, _ = _on_track_status(atg_v, dia)
         rs = vend_rs.get(v, {})
         vrows.append({
             'Vendedor':     v,
-            'Meta (cx)':   f'{meta_v:,.0f}',
-            'Vendido (cx)': f'{vend_v:,.0f}',
+            'Meta (cx)':   _fmt_num(meta_v, 0),
+            'Vendido (cx)': _fmt_num(vend_v, 0),
             '% Atingido':  f'{atg_v*100:.1f}%',
-            'Projeção (cx)': f'{proj_v:,.0f}',
-            'Fat R$':      f"R$ {rs['fat']:,.2f}" if rs.get('fat') is not None else '—',
-            'MC %':        f"{rs['mc_pct']:.2f}%" if rs.get('mc_pct') is not None else '—',
+            'Projeção (cx)': _fmt_num(proj_v, 0),
+            'Fat R$':      _fmt_moeda(rs['fat']) if rs.get('fat') is not None else '—',
+            'MC %':        f"{rs['resultado_real']:.2f}%" if rs.get('resultado_real') is not None else '—',
             'Status':      f'{em} {lb}',
         })
     st.dataframe(pd.DataFrame(vrows), use_container_width=True, hide_index=True)
@@ -454,79 +593,41 @@ def _render_resumo_geral_inline(resultados: list, totais_rs: dict, dia: int = 5)
     resumo_matriz.render_matriz_produto_vendedor(resultados)
 
 
-def _render_comparativo_semanal(resultados: list, totais_rs: dict, slug_atual: str):
-    """Comparativo padrão (componente central comparativo.py): semana atual
-    × semana anterior, e semana atual × mesma semana no ano anterior —
-    usando o histórico real salvo em data_store (sobrevive a restart do app,
-    diferente do que estava em session_state antes)."""
-    st.subheader('📊 Comparativo')
-
-    total_vend_atual = sum(l['vendido'] for r in resultados for l in r['linhas'])
-    fat_atual = totais_rs.get('total_geral', {}).get('fat')
-
-    def _totais_do_registro(registro):
-        if not registro:
-            return None, None
-        prods = registro['valores'].get('produtos', [])
-        vend = sum(l['vendido'] for r in prods for l in r.get('linhas', []))
-        fat = registro['valores'].get('totais_rs', {}).get('total_geral', {}).get('fat')
-        return vend, fat
-
-    slug_ant = periodo.periodo_anterior('semanal', slug_atual)
-    slug_ano_ant = periodo.periodo_ano_anterior('semanal', slug_atual)
-
-    reg_ant = ds.load_current(MODULO, 'semanal', slug_ant)
-    reg_ano_ant = ds.load_current(MODULO, 'semanal', slug_ano_ant)
-    vend_ant, fat_ant = _totais_do_registro(reg_ant)
-    vend_ano_ant, fat_ano_ant = _totais_do_registro(reg_ano_ant)
-
-    col1, col2 = st.columns(2)
-    with col1:
-        st.markdown(f'**Semana atual × {periodo.rotulo("semanal", slug_ant)}**')
-        if vend_ant is None:
-            st.caption('Ainda não há fechamento salvo da semana anterior para comparar.')
-        else:
-            comp_v = comparativo.calcular(total_vend_atual, vend_ant)
-            st.metric('Vendido (cx)', f'{total_vend_atual:,.0f}',
-                       delta=f"{comparativo.formatar_variacao(comp_v)} vs semana anterior")
-            if fat_atual is not None and fat_ant is not None:
-                comp_f = comparativo.calcular(fat_atual, fat_ant)
-                st.metric('Faturamento', f'R$ {fat_atual:,.2f}',
-                           delta=f"{comparativo.formatar_variacao(comp_f)} vs semana anterior")
-    with col2:
-        st.markdown(f'**Semana atual × {periodo.rotulo("semanal", slug_ano_ant)} (ano anterior)**')
-        if vend_ano_ant is None:
-            st.caption('Ainda não há fechamento salvo da mesma semana no ano anterior.')
-        else:
-            comp_v2 = comparativo.calcular(total_vend_atual, vend_ano_ant)
-            st.metric('Vendido (cx)', f'{total_vend_atual:,.0f}',
-                       delta=f"{comparativo.formatar_variacao(comp_v2)} vs ano anterior")
-            if fat_atual is not None and fat_ano_ant is not None:
-                comp_f2 = comparativo.calcular(fat_atual, fat_ano_ant)
-                st.metric('Faturamento', f'R$ {fat_atual:,.2f}',
-                           delta=f"{comparativo.formatar_variacao(comp_f2)} vs ano anterior")
-
-
 def _render_fechamento_semanal():
-    st.header('📅 Fechamento Semanal')
+    st.header('📅 Acompanhamento Semanal')
 
     resultados = st.session_state.get('resultados')
     cfg_atual  = st.session_state.get('config', {})
     periodo_texto = cfg_atual.get('periodo', '')
 
-    # ── Fechar semana atual ──────────────────────────────────────────────
+    # ── Fechar semana atual (ou retroativa) ──────────────────────────────
     if resultados:
-        slug_atual  = _slug_semana(datetime.date.today())
+        data_ref = st.date_input(
+            'Semana a fechar (data de referência)',
+            value=datetime.date.today(),
+            format='DD/MM/YYYY',
+            help=_HELP_DATA_REF_SEMANA,
+            key='fech_data_ref',
+        )
+        slug_atual  = _slug_semana(data_ref)
         label_atual = _label_semana(slug_atual)
+        retroativo  = data_ref != datetime.date.today()
 
-        st.subheader(f'Fechar: {label_atual}')
+        st.subheader(f'Fechar: {label_atual}' + (' (retroativo)' if retroativo else ''))
+        st.caption(
+            'Semana comercial: sábado a sexta (7 dias corridos, sem contar domingo, '
+            'que não tem venda) — a sexta fecha a semana atual (e é o dia em que os '
+            'produtos da semana seguinte já podem ser configurados), mas as vendas '
+            'da semana nova só passam a contar a partir do sábado seguinte.'
+        )
         st.caption(f'Período configurado: **{periodo_texto or "(não informado)"}**')
 
-        # Dia da semana (para o On Track inline)
+        # Dia da semana (para o On Track inline) -- se for retroativo, assume
+        # semana inteira decorrida (dia 6) por padrão, já que já passou.
         dia_fech = st.slider(
-            'Dia da semana (para projeção)', 1, 5,
-            value=min(datetime.date.today().weekday() + 1, 5),
-            format='Dia %d de 5',
+            'Dia da semana (para projeção)', 1, 6,
+            value=6 if retroativo else _dia_semana_atual(),
+            format='Dia %d de 6',
             key='fech_dia',
         )
 
@@ -535,15 +636,26 @@ def _render_fechamento_semanal():
         # Resumo inline completo
         _render_resumo_geral_inline(resultados, totais_rs, dia_fech)
 
+        # Comparativo ("vs semana anterior" / "vs ano anterior") removido a
+        # pedido explícito da Ingrid em 26/08/2026 ("remover completamente"),
+        # pra deixar a tela mais compacta.
         st.divider()
-        _render_comparativo_semanal(resultados, totais_rs, slug_atual)
-
-        st.divider()
-        if st.button('💾 Fechar Semana e Salvar no Histórico', type='primary', key='btn_fechar'):
+        label_botao = '💾 Fechar Semana e Salvar no Histórico' if not retroativo \
+            else f'💾 Fechar {label_atual} (retroativo) e Salvar no Histórico'
+        if st.button(label_botao, type='primary', key='btn_fechar'):
             try:
-                _salvar_fechamento(resultados, totais_rs, periodo_texto, slug_atual,
-                                    usuario=st.session_state.get('usuario_nome'))
-                st.success(f'✅ {label_atual} salvo no histórico da Gerência.')
+                _registro_fech = _salvar_fechamento(
+                    resultados, totais_rs, periodo_texto, slug_atual,
+                    usuario=st.session_state.get('usuario_nome', 'Ingrid'))
+                _erro_fech = _registro_fech.get('_erro_persistencia_remota') if _registro_fech else None
+                if _erro_fech:
+                    st.warning(
+                        f'{label_atual} foi salvo apenas localmente -- houve um problema ao '
+                        f'salvar de forma permanente (pode não sobreviver a um restart do '
+                        f'app e não aparecer na Gerência): {_erro_fech}'
+                    )
+                else:
+                    st.success(f'✅ {label_atual} salvo no histórico da Gerência.')
                 st.rerun()
             except Exception as e:
                 st.error(f'Erro ao salvar: {e}')
@@ -584,30 +696,30 @@ def _render_fechamento_semanal():
         with st.expander(f'🕓 Ver {len(versoes_antigas)} versão(ões) anterior(es) desta semana'):
             for v in reversed(versoes_antigas):
                 v_prods = v.get('valores', {}).get('produtos', [])
-                v_meta = sum(l['meta'] for r in v_prods for l in r.get('linhas', []))
+                v_meta = sum(r.get('estoque_total', 0) for r in v_prods)
                 v_vend = sum(l['vendido'] for r in v_prods for l in r.get('linhas', []))
                 v_quando = (v.get('atualizado_em') or '')[:16].replace('T', ' ')
                 st.markdown(
                     f"- **v{v.get('versao')}** — {v_quando} por {v.get('usuario', 'não identificado')} "
-                    f"— Meta {v_meta:,.0f} cx, Vendido {v_vend:,.0f} cx"
+                    f"— Meta {_fmt_num(v_meta, 0)} cx, Vendido {_fmt_num(v_vend, 0)} cx"
                 )
 
     prods      = dados.get('produtos', [])
-    h_meta     = sum(l['meta']    for r in prods for l in r.get('linhas', []))
+    h_meta     = sum(r.get('estoque_total', 0) for r in prods)
     h_vend     = sum(l['vendido'] for r in prods for l in r.get('linhas', []))
     h_atg      = h_vend / h_meta if h_meta else 0
 
     h1, h2, h3 = st.columns(3)
-    h1.metric('Meta (cx)',  f'{h_meta:,.0f}')
-    h2.metric('Vendido (cx)', f'{h_vend:,.0f}')
+    h1.metric('Meta (cx)',  _fmt_num(h_meta, 0))
+    h2.metric('Vendido (cx)', _fmt_num(h_vend, 0))
     h3.metric('% Atingido', f'{h_atg*100:.1f}%')
 
     tg_h = dados.get('totais_rs', {}).get('total_geral', {})
     if tg_h:
         f1, f2, f3 = st.columns(3)
-        f1.metric('Faturamento', f"R$ {tg_h.get('fat', 0):,.2f}")
-        f2.metric('MC R$',      f"R$ {tg_h.get('mc_rs', 0):,.2f}")
-        f3.metric('MC %',       f"{tg_h.get('mc_pct', 0):.2f}%")
+        f1.metric('Faturamento', _fmt_moeda(tg_h.get('fat', 0)))
+        f2.metric('MC R$',      _fmt_moeda(tg_h.get('mc_rs', 0)))
+        f3.metric('MC %',       f"{tg_h.get('resultado_real', 0):.2f}%")
 
     st.divider()
     resumo_matriz.render_matriz_produto_vendedor(prods)
@@ -634,10 +746,7 @@ if not storage.is_configured():
 st.title('Metas Semanais')
 st.caption('Metas semanais por vendedor e configuração de responsáveis/percentuais.')
 
-with st.expander('👤 Seu nome (fica registrado no histórico de quem salvou cada alteração)'):
-    st.session_state['usuario_nome'] = st.text_input(
-        'Seu nome', value=st.session_state.get('usuario_nome', 'Ingrid'), key='usuario_nome_input',
-    )
+st.session_state.setdefault('usuario_nome', 'Ingrid')
 
 # ---------------------------------------------------------------------------
 # Tabs
@@ -646,372 +755,682 @@ with st.expander('👤 Seu nome (fica registrado no histórico de quem salvou ca
 tab_cfg, tab_on_track, tab_fechamento = st.tabs([
     '⚙️ Configuração',
     '📊 On Track',
-    '📅 Fechamento Semanal',
+    '📅 Acompanhamento Semanal',
 ])
 
 # ============================================================
-# Tab 1 — Configuração e Cálculo (conteúdo original)
+# Tab 1 — Configuração e Cálculo (dividida em 3 sub-abas: Upload &
+# Produtos / Calcular & Diagnóstico / Publicar & PDFs -- ver item B do
+# pedido de usabilidade da Ingrid, 27/08/2026: a aba única original
+# concentrava upload, cadastro de produto, salvar, percentuais, import/
+# export, calcular, diagnósticos, tabela de resultado, drill-down por
+# produto, publicação pra Gerência e geração de PDF tudo junto, ~550
+# linhas empilhadas competindo por atenção)
 # ============================================================
 with tab_cfg:
-    st.header('1. Upload dos relatórios da semana')
-    col1, col2 = st.columns(2)
-    with col1:
-        estoque_file = st.file_uploader(
-            'Estoque Físico (PDF) — opcional, usado só para detalhar '
-            'o estoque completo no relatório individual de cada vendedor',
-            type='pdf', key='estoque',
+    sub_upload, sub_calc, sub_publish = st.tabs([
+        '1. Upload & Produtos',
+        '2. Calcular & Diagnóstico',
+        '3. Publicar & PDFs',
+    ])
+
+    with sub_upload:
+        st.header('Upload dos relatórios da semana')
+        col1, col2 = st.columns(2)
+        with col1:
+            estoque_file = st.file_uploader(
+                'Estoque Físico (PDF) — opcional, usado só para detalhar '
+                'o estoque completo no relatório individual de cada vendedor',
+                type='pdf', key='estoque',
+            )
+        with col2:
+            vendas_file = st.file_uploader(
+                'Lucratividade por Vendedor / Vendas Acumuladas (PDF) — obrigatório',
+                type='pdf', key='vendas',
+            )
+
+        st.header('Produtos da semana')
+        st.caption(
+            'Cole os códigos do relatório de vendas separados por vírgula ou linha. '
+            'Use "*" no final para prefixo (ex.: "3102006*"). Sem "*", código exato.'
         )
-    with col2:
-        vendas_file = st.file_uploader(
-            'Lucratividade por Vendedor / Vendas Acumuladas (PDF) — obrigatório',
-            type='pdf', key='vendas',
-        )
 
-    st.header('2. Produtos da semana')
-    st.caption(
-        'Cole os códigos do relatório de vendas separados por vírgula ou linha. '
-        'Use "*" no final para prefixo (ex.: "3102006*"). Sem "*", código exato.'
-    )
+        if st.button('➕ Adicionar produto'):
+            cfg['produtos'].append({'nome': '', 'codigos_texto': '', 'estoque': 0})
 
-    if st.button('➕ Adicionar produto'):
-        cfg['produtos'].append({'nome': '', 'codigos_texto': '', 'estoque': 0})
+        _PRIORIDADES = ['Normal', '📅 Itens Diários', '🔥 Alta Prioridade', '🚨 Grande Urgência']
 
-    _PRIORIDADES = ['Normal', '🔥 Alta Prioridade', '🚨 Grande Urgência']
+        remover_idx = None
+        for i, p in enumerate(cfg['produtos']):
+            p.setdefault('estoque', 0)
+            p.setdefault('prioridade', 'Normal')
+            prio_label = f' {p["prioridade"]}' if p['prioridade'] != 'Normal' else ''
+            with st.expander(f"Produto {i+1}: {p['nome'] or '(sem nome)'}{prio_label}", expanded=not bool(p['nome'])):
+                c1, c2, c3, c4, c5 = st.columns([3, 4, 1.8, 2, 1])
+                with c1:
+                    p['nome'] = st.text_input('Nome do produto', value=p['nome'], key=f'nome_{i}')
+                with c2:
+                    p['codigos_texto'] = st.text_area(
+                        'Códigos (vírgula ou linha; use * para prefixo) '
+                        '— usados só para identificar as vendas',
+                        value=p['codigos_texto'], key=f'cod_{i}', height=80,
+                    )
+                with c3:
+                    p['estoque'] = st.number_input(
+                        'Quantidade (cx)', min_value=0, step=1,
+                        value=int(p['estoque']), key=f'est_{i}',
+                    )
+                with c4:
+                    prio_idx = _PRIORIDADES.index(p['prioridade']) if p['prioridade'] in _PRIORIDADES else 0
+                    p['prioridade'] = st.selectbox(
+                        'Prioridade', _PRIORIDADES, index=prio_idx, key=f'prio_{i}',
+                    )
+                with c5:
+                    st.write('')
+                    st.write('')
+                    if st.button('🗑️', key=f'del_{i}'):
+                        remover_idx = i
 
-    remover_idx = None
-    for i, p in enumerate(cfg['produtos']):
-        p.setdefault('estoque', 0)
-        p.setdefault('prioridade', 'Normal')
-        prio_label = f' {p["prioridade"]}' if p['prioridade'] != 'Normal' else ''
-        with st.expander(f"Produto {i+1}: {p['nome'] or '(sem nome)'}{prio_label}", expanded=not bool(p['nome'])):
-            c1, c2, c3, c4, c5 = st.columns([3, 4, 1.8, 2, 1])
-            with c1:
-                p['nome'] = st.text_input('Nome do produto', value=p['nome'], key=f'nome_{i}')
-            with c2:
-                p['codigos_texto'] = st.text_area(
-                    'Códigos (vírgula ou linha; use * para prefixo) '
-                    '— usados só para identificar as vendas',
-                    value=p['codigos_texto'], key=f'cod_{i}', height=80,
+                # Meta fixa por vendedor (pedido da Ingrid, 04/09/2026): "Hoje
+                # a meta semanal é definida por porcentagens fixas. Preciso
+                # que eu consiga momentaneamente definir quantidades por
+                # alguns produtos". Por padrão (desligado) o produto continua
+                # 100% pelo percentual, igual sempre foi -- ligar aqui só
+                # afeta ESTE produto, e só os vendedores em que ela realmente
+                # digitar um número; reversível a qualquer momento (desligar
+                # volta pro percentual sem apagar os números já digitados).
+                p.setdefault('metas_fixas_ativo', False)
+                p.setdefault('metas_fixas', {})
+                p['metas_fixas_ativo'] = st.checkbox(
+                    '🔧 Definir meta fixa por vendedor neste produto (em vez de %)',
+                    value=p['metas_fixas_ativo'], key=f'metafixa_on_{i}',
                 )
-            with c3:
-                p['estoque'] = st.number_input(
-                    'Quantidade (cx)', min_value=0, step=1,
-                    value=int(p['estoque']), key=f'est_{i}',
-                )
-            with c4:
-                prio_idx = _PRIORIDADES.index(p['prioridade']) if p['prioridade'] in _PRIORIDADES else 0
-                p['prioridade'] = st.selectbox(
-                    'Prioridade', _PRIORIDADES, index=prio_idx, key=f'prio_{i}',
-                )
-            with c5:
-                st.write('')
-                st.write('')
-                if st.button('🗑️', key=f'del_{i}'):
-                    remover_idx = i
+                if p['metas_fixas_ativo']:
+                    st.caption(
+                        'Com isso ligado, a meta de TODOS os vendedores neste produto passa a '
+                        'ser o número digitado abaixo (já sugerido a partir do % configurado, '
+                        'pra você só ajustar quem precisa mudar). Se o estoque deste produto '
+                        'mudar depois, os números aqui NÃO se atualizam sozinhos -- ajuste à '
+                        'mão ou desligue e ligue de novo pra puxar a sugestão atual.'
+                    )
+                    estoque_atual = int(p.get('estoque', 0) or 0)
+                    vend_cols = st.columns(len(cfg['vendedor_pcts']))
+                    for col, (vend, pct) in zip(vend_cols, cfg['vendedor_pcts'].items()):
+                        sugestao_pct = round_up(pct / 100 * estoque_atual)
+                        valor_atual = p['metas_fixas'].get(vend, sugestao_pct)
+                        with col:
+                            novo_valor = st.number_input(
+                                vend, min_value=0, step=1,
+                                value=int(valor_atual), key=f'metafixa_{i}_{vend}',
+                                help=f'Sugestão pelo % configurado ({pct}%): {sugestao_pct}cx',
+                            )
+                        p['metas_fixas'][vend] = novo_valor
 
-    if remover_idx is not None:
-        cfg['produtos'].pop(remover_idx)
-        st.rerun()
-
-    cb1, cb2 = st.columns([1, 3])
-    with cb1:
-        if st.button('💾 Salvar configuração', use_container_width=True):
-            save_config(cfg)
-
-    with st.expander('⚙️ Percentuais de meta por vendedor — normalmente não precisa alterar'):
-        pct_cols = st.columns(len(cfg['vendedor_pcts']))
-        for col, (vend, pct) in zip(pct_cols, list(cfg['vendedor_pcts'].items())):
-            with col:
-                cfg['vendedor_pcts'][vend] = st.number_input(
-                    vend, min_value=0, max_value=200,
-                    value=int(pct), key=f'pct_{vend}',
-                )
-
-    with st.expander('📤 Exportar / Importar configuração (JSON)'):
-        st.download_button(
-            '⬇️ Exportar configuração',
-            data=json.dumps(cfg, ensure_ascii=False, indent=2),
-            file_name=f"config_metas_{datetime.date.today().isoformat()}.json",
-            mime='application/json',
-        )
-        up_cfg = st.file_uploader('⬆️ Importar configuração', type='json', key='cfg_upload')
-        if up_cfg is not None:
-            st.session_state.config = json.load(up_cfg)
-            save_config(st.session_state.config, show_feedback=False)
+        if remover_idx is not None:
+            cfg['produtos'].pop(remover_idx)
+            # Mesma causa raiz do bug já corrigido na importação de configuração
+            # (ver comentário abaixo, em '_cfg_upload_processado'): as keys dos
+            # widgets (nome_i, cod_i, est_i, prio_i) são posicionais. Remover um
+            # produto do meio da lista desloca o índice de todos os que vêm
+            # depois, mas os widgets recriados nesses índices ignoram o novo
+            # `value=` porque a key já existe no session_state — cada produto
+            # após o removido passava a exibir os dados do produto anterior a
+            # ele (nome/código/estoque "grudados"), e esse valor errado podia
+            # até ser salvo de volta na configuração. Limpar aqui garante que
+            # cada widget reinicialize do zero com os dados corretos da lista já
+            # atualizada.
+            for _k in list(st.session_state.keys()):
+                if _k.startswith(('nome_', 'cod_', 'est_', 'prio_', 'metafixa_on_', 'metafixa_')):
+                    del st.session_state[_k]
             st.rerun()
 
-    st.divider()
+    with sub_calc:
+        cb1, cb2 = st.columns([1, 3])
+        with cb1:
+            if st.button('💾 Salvar configuração', use_container_width=True):
+                save_config(cfg)
 
-    # ── Calcular ─────────────────────────────────────────────────────────
-    st.header('3. Calcular metas e gerar relatórios')
-
-    _pc1, _pc2 = st.columns(2)
-    with _pc1:
-        periodo_texto = st.text_input(
-            'Período (ex.: 22/06/2026 a 26/06/2026)',
-            value=cfg.get('periodo', ''),
-        )
-    with _pc2:
-        data_emissao = st.text_input(
-            'Data de emissão (ex.: 29/06/2026)',
-            value=datetime.date.today().strftime('%d/%m/%Y'),
-        )
-    cfg['periodo'] = periodo_texto
-
-    if st.button('▶️ Calcular metas', type='primary'):
-        if not vendas_file:
-            st.error('Envie o PDF de Vendas (Lucratividade por Vendedor) antes de calcular.')
-        elif not any(p['nome'].strip() for p in cfg['produtos']):
-            st.error('Cadastre ao menos um produto com nome, estoque e códigos.')
-        else:
-            with st.spinner('Lendo PDFs e calculando metas...'):
-                estoque_rows = []
-                if estoque_file:
-                    try:
-                        estoque_rows = parse_estoque(estoque_file)
-                    except Exception:
-                        st.warning(
-                            'Não foi possível ler o PDF de Estoque Físico enviado '
-                            '(arquivo corrompido, protegido ou em formato inesperado). '
-                            'A Meta não depende desse PDF, então o cálculo vai continuar '
-                            'sem a lista detalhada de estoque no relatório individual.'
-                        )
-
-                # Lê os bytes uma vez para reusar nos dois parsers
-                vendas_bytes = vendas_file.read()
-                try:
-                    # Usa pdftotext -layout (mais confiável para colunas adjacentes)
-                    vendas_rows = parse_vendas_pdftotext(io.BytesIO(vendas_bytes))
-                    # Fallback para pdfplumber se pdftotext não encontrou linhas
-                    if not vendas_rows:
-                        vendas_rows = parse_vendas(io.BytesIO(vendas_bytes))
-                except Exception:
-                    try:
-                        vendas_rows = parse_vendas(io.BytesIO(vendas_bytes))
-                    except Exception:
-                        st.error(
-                            'Não foi possível ler o PDF de Vendas/Lucratividade enviado. '
-                            'Verifique se o arquivo não está corrompido ou protegido por '
-                            'senha e tente enviar novamente.'
-                        )
-                        vendas_rows = None
-
-                # Tenta extrair dados em R$ do mesmo PDF (Lucratividade por Vendedor)
-                if vendas_rows is not None:
-                    try:
-                        totais_res = parse_totais_vendedor(io.BytesIO(vendas_bytes))
-                        st.session_state['totais_rs'] = totais_res
-                    except Exception:
-                        st.session_state.pop('totais_rs', None)
-
-            if vendas_rows is not None:
-                produtos_config = [
-                    {
-                        'nome': p['nome'],
-                        'codigos': parse_codigos_input(p['codigos_texto']),
-                        'estoque': p.get('estoque', 0),
-                        'prioridade': p.get('prioridade', 'Normal'),
-                    }
-                    for p in cfg['produtos'] if p['nome'].strip()
-                ]
-                resultados = compute_metas(vendas_rows, produtos_config, cfg['vendedor_pcts'])
-                _prio_map = {p['nome']: p.get('prioridade', 'Normal') for p in produtos_config}
-                for _r in resultados:
-                    _r['prioridade'] = _prio_map.get(_r['produto'], 'Normal')
-                st.session_state['estoque_rows']    = estoque_rows
-                st.session_state['vendas_rows']     = vendas_rows
-                st.session_state['vendas_bytes']    = vendas_bytes
-                st.session_state['resultados']      = resultados
-                st.session_state['produtos_config'] = produtos_config
-                save_config(cfg, show_feedback=False)
-                st.success('Cálculo concluído. Confira a aba **📊 On Track** para o dashboard.')
-
-    # ── Resultados ────────────────────────────────────────────────────────
-    if 'resultados' in st.session_state:
-        resultados      = st.session_state['resultados']
-        estoque_rows    = st.session_state['estoque_rows']
-        vendas_rows_diag = st.session_state.get('vendas_rows', [])
-        produtos_config_diag = st.session_state.get('produtos_config', [])
-
-        # Diagnóstico de códigos não reconhecidos
-        nao_rec = _diagnostico_codigos(vendas_rows_diag, produtos_config_diag)
-        if nao_rec:
-            total_nao_rec = sum(r['CX não reconhecidas'] for r in nao_rec)
-            with st.expander(
-                f'⚠️ {len(nao_rec)} código(s) do PDF não reconhecido(s) '
-                f'— {total_nao_rec:,.0f} cx fora do cálculo',
-                expanded=True,
-            ):
-                st.caption(
-                    'Esses códigos aparecem no PDF mas não casaram com nenhum produto '
-                    'configurado. Se fizerem parte das metas desta semana, adicione ou '
-                    'corrija os códigos na seção **2. Produtos da semana** acima.'
-                )
-                df_diag = pd.DataFrame(nao_rec)
-                df_diag['CX não reconhecidas'] = df_diag['CX não reconhecidas'].map(
-                    lambda x: f'{x:,.0f}'
-                )
-                st.dataframe(df_diag, use_container_width=True, hide_index=True)
-        else:
-            st.success('✅ Todos os códigos do PDF foram reconhecidos — nenhuma cx perdida.')
-
-        # Diagnóstico por produto: mostra linhas brutas extraídas do PDF
-        with st.expander('🔍 Diagnóstico por produto (linhas brutas do PDF)'):
-            for p in produtos_config_diag:
-                linhas_brutas = [
-                    row for row in vendas_rows_diag
-                    if any(codigo_matches(normalize_codigo(row['codigo']), e) for e in p['codigos'])
-                ]
-                total = sum(r['qtde_vendida'] for r in linhas_brutas)
-                st.markdown(f"**{p['nome']}** — {len(linhas_brutas)} linha(s) — total bruto: `{total:.3f} cx`")
-                if linhas_brutas:
-                    df_bruto = pd.DataFrame([{
-                        'Código':   r['codigo'],
-                        'Vendedor Raw': r['vendedor'],
-                        'Vendedor Mapeado': map_vendedor(r['vendedor']) or '❓ NÃO MAPEADO',
-                        'CX Extraída': r['qtde_vendida'],
-                    } for r in linhas_brutas])
-                    st.dataframe(df_bruto, use_container_width=True, hide_index=True)
-                else:
-                    st.caption('— nenhuma linha encontrada')
-
-        # Diagnóstico RAW: mostra exatamente o que o pdftotext extrai do PDF
-        vendas_bytes_diag = st.session_state.get('vendas_bytes')
-        if vendas_bytes_diag:
-            with st.expander('🔬 Diagnóstico RAW pdftotext (para depuração)'):
-                try:
-                    from parsers_diario import extract_text as _extract_text
-                    raw_text = _extract_text(io.BytesIO(vendas_bytes_diag))
-                    raw_lines = raw_text.split('\n')
-                    for p in produtos_config_diag:
-                        codigos_busca = [c.rstrip('*') for c in p['codigos']]
-                        linhas_encontradas = [
-                            l for l in raw_lines
-                            if any(cod in l for cod in codigos_busca)
-                        ]
-                        st.markdown(f"**{p['nome']}** — {len(linhas_encontradas)} linha(s) no pdftotext:")
-                        if linhas_encontradas:
-                            for l in linhas_encontradas:
-                                st.code(repr(l))
-                        else:
-                            st.caption('— código não encontrado no texto extraído pelo pdftotext')
-                except Exception as e:
-                    st.error(f'Erro ao extrair texto: {e}')
-
-        # ── Publicar para Gerência ────────────────────────────────────────
-        st.divider()
-        pub_col, _ = st.columns([2, 4])
-        with pub_col:
-            if st.button('📤 Publicar On Track para Gerência', use_container_width=True):
-                try:
-                    os.makedirs(os.path.dirname(_ONTRACK_PUB_FILE), exist_ok=True)
-                    os.makedirs(_ONTRACK_META_DIR, exist_ok=True)
-                    snapshot = {
-                        'publicado_em': datetime.datetime.now().isoformat(timespec='seconds'),
-                        'periodo':      st.session_state.get('config', {}).get('periodo', ''),
-                        'resultados':   resultados,
-                        'totais_rs':    st.session_state.get('totais_rs', {}),
-                    }
-                    # Arquivo atual (compatibilidade)
-                    with open(_ONTRACK_PUB_FILE, 'w', encoding='utf-8') as f:
-                        json.dump(snapshot, f, ensure_ascii=False, indent=2)
-                    # Histórico por semana ISO (arquivo local — compatibilidade)
-                    slug_sem = periodo.periodo_atual('semanal')
-                    hist_path = os.path.join(_ONTRACK_META_DIR, f'{slug_sem}.json')
-                    with open(hist_path, 'w', encoding='utf-8') as f:
-                        json.dump(snapshot, f, ensure_ascii=False, indent=2)
-                    # Persistência real e versionada (sobrevive a restart do app)
-                    try:
-                        ds.save_record(
-                            modulo=MODULO_ONTRACK, tipo_periodo='semanal', periodo_ref=slug_sem,
-                            valores=snapshot, usuario=st.session_state.get('usuario_nome'),
-                        )
-                    except Exception as e2:
-                        st.warning(f'Publicado localmente, mas houve um problema ao salvar de forma permanente: {e2}')
-                    st.success('✅ On Track publicado — disponível na aba Gerência.')
-                except Exception as e:
-                    st.error(f'Erro ao publicar: {e}')
-
-        st.subheader('Resultado por produto')
-
-        # Tabela resumo compacta
-        resumo_rows = []
-        for r in resultados:
-            p_meta = sum(l['meta']    for l in r['linhas'])
-            p_vend = sum(l['vendido'] for l in r['linhas'])
-            p_atg  = p_vend / p_meta * 100 if p_meta else 0
-            p_falt = max(p_meta - p_vend, 0)
-            resumo_rows.append({
-                'Produto':      r['produto'],
-                'Prioridade':   r.get('prioridade', 'Normal'),
-                'Qtde (cx)':    f"{r['estoque_total']:.0f}",
-                'Meta (cx)':    f"{p_meta:.0f}",
-                'Vendido (cx)': f"{p_vend:.0f}",
-                'Falta (cx)':   f"{p_falt:.0f}",
-                '% Atingido':   f"{p_atg:.1f}%",
-            })
-        st.dataframe(pd.DataFrame(resumo_rows), use_container_width=True, hide_index=True)
-
-        # Detalhe por vendedor (colapsado)
-        st.caption('Clique em um produto para ver o detalhe por vendedor:')
-        for r in resultados:
-            p_meta = sum(l['meta']    for l in r['linhas'])
-            p_vend = sum(l['vendido'] for l in r['linhas'])
-            p_atg  = p_vend / p_meta * 100 if p_meta else 0
-            prio   = r.get('prioridade', 'Normal')
-            badge  = f' — {prio}' if prio != 'Normal' else ''
-            with st.expander(
-                f"{r['produto']}{badge}  |  {p_vend:.0f}/{p_meta:.0f} cx ({p_atg:.1f}%)",
-                expanded=False,
-            ):
-                st.dataframe(
-                    [{'Vendedor': l['vendedor'], '% Meta': f"{l['pct']:.0f}%",
-                      'Meta (cx)': l['meta'], 'Vendido (cx)': l['vendido'],
-                      'Falta (cx)': l['falta'], '% Atingido': f"{l['atingido']*100:.1f}%"}
-                     for l in r['linhas']],
-                    use_container_width=True, hide_index=True,
-                )
-
-        st.divider()
-        st.subheader('Gerar PDFs')
-
-        vendedores_disponiveis = list(cfg['vendedor_pcts'].keys())
-        vendedor_sel = st.selectbox('Relatório individual do vendedor', vendedores_disponiveis)
-
-        pcol1, pcol2, pcol3 = st.columns(3)
-        with pcol1:
-            pdf_bytes = generate_relatorio_vendedor(
-                vendedor_sel, data_emissao, estoque_rows, resultados,
-            )
-            st.download_button(
-                f'⬇️ Relatório — {vendedor_sel}', data=pdf_bytes,
-                file_name=f'Relatorio_{vendedor_sel}_{datetime.date.today().strftime("%d%m%Y")}.pdf',
-                mime='application/pdf',
-            )
-        with pcol2:
-            pdf_bytes = generate_dashboard(periodo_texto, resultados, cfg['vendedor_pcts'])
-            st.download_button(
-                '⬇️ Dashboard', data=pdf_bytes,
-                file_name=f'Dashboard_{datetime.date.today().strftime("%d%m%Y")}.pdf',
-                mime='application/pdf',
-            )
-        with pcol3:
-            pdf_bytes = generate_resumo_geral(periodo_texto, data_emissao, resultados, cfg['vendedor_pcts'])
-            st.download_button(
-                '⬇️ Resumo Geral', data=pdf_bytes,
-                file_name=f'Resumo_Geral_{datetime.date.today().strftime("%d%m%Y")}.pdf',
-                mime='application/pdf',
-            )
-
-        with st.expander('Gerar relatórios de TODOS os vendedores de uma vez'):
-            if st.button('Gerar todos os PDFs individuais'):
-                for v in vendedores_disponiveis:
-                    pdf_bytes = generate_relatorio_vendedor(v, data_emissao, estoque_rows, resultados)
-                    st.download_button(
-                        f'⬇️ {v}', data=pdf_bytes,
-                        file_name=f'Relatorio_{v}_{datetime.date.today().strftime("%d%m%Y")}.pdf',
-                        mime='application/pdf', key=f'all_{v}',
+        with st.expander('⚙️ Percentuais de meta por vendedor — normalmente não precisa alterar'):
+            pct_cols = st.columns(len(cfg['vendedor_pcts']))
+            for col, (vend, pct) in zip(pct_cols, list(cfg['vendedor_pcts'].items())):
+                with col:
+                    cfg['vendedor_pcts'][vend] = st.number_input(
+                        vend, min_value=0, max_value=200,
+                        value=int(pct), key=f'pct_{vend}',
                     )
+
+        with st.expander('📤 Exportar / Importar configuração (JSON)'):
+            st.download_button(
+                '⬇️ Exportar configuração',
+                data=json.dumps(cfg, ensure_ascii=False, indent=2),
+                file_name=f"config_metas_{datetime.date.today().isoformat()}.json",
+                mime='application/json',
+            )
+            up_cfg = st.file_uploader('⬆️ Importar configuração', type='json', key='cfg_upload')
+            # Processa cada arquivo enviado só uma vez (guarda o file_id já
+            # processado): sem isso, como o file_uploader continua retornando o
+            # mesmo arquivo em TODO rerun até o usuário removê-lo manualmente, o
+            # st.rerun() logo abaixo entrava em loop infinito assim que um
+            # arquivo era importado (a página nunca terminava de "Running...").
+            if up_cfg is not None and st.session_state.get('_cfg_upload_processado') != up_cfg.file_id:
+                # Valida/normaliza o conteúdo importado ANTES de aceitar. Sem
+                # isso, um JSON editado à mão, exportado de uma versão antiga do
+                # app, ou simplesmente inválido, derrubava a página inteira com
+                # um traceback técnico (ex.: "vendedor_pcts" vazio/ausente vira
+                # st.columns(0) mais abaixo -> StreamlitInvalidColumnSpecError;
+                # um produto sem "nome"/"codigos_texto" vira KeyError na hora de
+                # renderizar) em vez de avisar a Ingrid de forma compreensível.
+                try:
+                    bruto = json.load(up_cfg)
+                    if not isinstance(bruto, dict) or not isinstance(bruto.get('produtos'), list) \
+                            or not bruto['produtos']:
+                        raise ValueError('o arquivo precisa ter uma lista "produtos" com pelo menos 1 item')
+                    produtos_importados = []
+                    for item in bruto['produtos']:
+                        if not isinstance(item, dict):
+                            continue
+                        prioridade = item.get('prioridade')
+                        metas_fixas_raw = item.get('metas_fixas')
+                        metas_fixas_importado = (
+                            {str(k): int(v or 0) for k, v in metas_fixas_raw.items()}
+                            if isinstance(metas_fixas_raw, dict) else {}
+                        )
+                        produtos_importados.append({
+                            'nome': str(item.get('nome', '')),
+                            'codigos_texto': str(item.get('codigos_texto', '')),
+                            'estoque': int(item.get('estoque') or 0),
+                            'prioridade': prioridade if prioridade in _PRIORIDADES else 'Normal',
+                            # Meta fixa por vendedor (pedido da Ingrid, 04/09/2026)
+                            # -- preserva na importação igual já fazemos com os
+                            # outros campos, em vez de descartar silenciosamente.
+                            'metas_fixas_ativo': bool(item.get('metas_fixas_ativo', False)),
+                            'metas_fixas': metas_fixas_importado,
+                        })
+                    if not produtos_importados:
+                        raise ValueError('nenhum produto válido encontrado no arquivo')
+                    vendedor_pcts_importado = bruto.get('vendedor_pcts')
+                    if not isinstance(vendedor_pcts_importado, dict) or not vendedor_pcts_importado:
+                        # Sem "vendedor_pcts" válido, cai para o padrão em vez de
+                        # travar a tela (dict vazio -> st.columns(0) mais abaixo).
+                        vendedor_pcts_importado = dict(VENDEDORES_PADRAO)
+                    else:
+                        vendedor_pcts_importado = {str(k): int(v or 0)
+                                                    for k, v in vendedor_pcts_importado.items()}
+                except (json.JSONDecodeError, ValueError, TypeError, AttributeError) as e:
+                    st.error(f'Não foi possível importar este arquivo: {e}. Verifique se é um JSON de '
+                             'configuração exportado por este mesmo app (botão "⬇️ Exportar configuração").')
+                else:
+                    st.session_state.config = {
+                        'produtos': produtos_importados,
+                        'vendedor_pcts': vendedor_pcts_importado,
+                    }
+                    save_config(st.session_state.config, show_feedback=False)
+                    st.session_state['_cfg_upload_processado'] = up_cfg.file_id
+                    # Limpa o estado dos widgets por produto/vendedor (nome_i, cod_i,
+                    # est_i, prio_i, pct_vend) guardado da config ANTERIOR. Sem isso,
+                    # um widget com 'key' já existente ignora o `value=`/`index=` em
+                    # reruns seguintes e continua mostrando o valor antigo -- então
+                    # um produto que ocupa o mesmo índice na config antiga e na
+                    # importada continuava exibindo nome/código antigos mesmo depois
+                    # do import (e esse valor velho é que ia pro cálculo e podia até
+                    # ser salvo de volta, sobrescrevendo o import). Isso combina
+                    # exatamente com "alguns códigos não puxam, e outros puxaram
+                    # errado" -- limpar aqui garante que cada widget reinicialize do
+                    # zero com os dados recém-importados.
+                    for _k in list(st.session_state.keys()):
+                        if _k.startswith(('nome_', 'cod_', 'est_', 'prio_', 'pct_')):
+                            del st.session_state[_k]
+                    st.rerun()
+
+        st.divider()
+
+        # ── Calcular ─────────────────────────────────────────────────────────
+        st.header('Calcular metas')
+
+        _pc1, _pc2 = st.columns(2)
+        with _pc1:
+            periodo_texto = st.text_input(
+                'Período (ex.: 22/06/2026 a 26/06/2026)',
+                value=cfg.get('periodo', ''),
+            )
+        with _pc2:
+            data_emissao = st.text_input(
+                'Data de emissão (ex.: 29/06/2026)',
+                value=datetime.date.today().strftime('%d/%m/%Y'),
+            )
+        cfg['periodo'] = periodo_texto
+
+        if st.button('▶️ Calcular metas', type='primary'):
+            if not vendas_file:
+                st.error('Envie o PDF de Vendas (Lucratividade por Vendedor) antes de calcular.')
+            elif not any(p['nome'].strip() for p in cfg['produtos']):
+                st.error('Cadastre ao menos um produto com nome, estoque e códigos.')
+            else:
+                with st.spinner('Lendo PDFs e calculando metas...'):
+                    estoque_rows = []
+                    if estoque_file:
+                        try:
+                            estoque_rows = parse_estoque(estoque_file)
+                        except Exception:
+                            st.warning(
+                                'Não foi possível ler o PDF de Estoque Físico enviado '
+                                '(arquivo corrompido, protegido ou em formato inesperado). '
+                                'A Meta não depende desse PDF, então o cálculo vai continuar '
+                                'sem a lista detalhada de estoque no relatório individual.'
+                            )
+
+                    # Lê os bytes uma vez para reusar nos dois parsers
+                    vendas_bytes = vendas_file.read()
+                    try:
+                        # Usa pdftotext -layout (mais confiável para colunas adjacentes)
+                        vendas_rows = parse_vendas_pdftotext(io.BytesIO(vendas_bytes))
+                        # Fallback para pdfplumber se pdftotext não encontrou linhas
+                        if not vendas_rows:
+                            vendas_rows = parse_vendas(io.BytesIO(vendas_bytes))
+                    except Exception:
+                        try:
+                            vendas_rows = parse_vendas(io.BytesIO(vendas_bytes))
+                        except Exception:
+                            st.error(
+                                'Não foi possível ler o PDF de Vendas/Lucratividade enviado. '
+                                'Verifique se o arquivo não está corrompido ou protegido por '
+                                'senha e tente enviar novamente.'
+                            )
+                            vendas_rows = None
+                            # Não apaga um 'resultados' de um cálculo anterior bem-sucedido
+                            # (evita perder o último trabalho válido), mas marca que ele está
+                            # desatualizado -- sem isso, a seção "Resultados" mais abaixo
+                            # continuava mostrando os números antigos como se fossem deste
+                            # envio, sem nenhum aviso de que o PDF atual falhou.
+                            if 'resultados' in st.session_state:
+                                st.session_state['_resultados_desatualizados'] = True
+
+                    # Tenta extrair dados em R$ do mesmo PDF (Lucratividade por Vendedor)
+                    if vendas_rows is not None:
+                        try:
+                            totais_res = parse_totais_vendedor(io.BytesIO(vendas_bytes))
+                            st.session_state['totais_rs'] = totais_res
+                        except Exception:
+                            st.session_state.pop('totais_rs', None)
+
+                if vendas_rows is not None:
+                    produtos_config = [
+                        {
+                            'nome': p['nome'],
+                            'codigos': parse_codigos_input(p['codigos_texto']),
+                            'estoque': p.get('estoque', 0),
+                            'prioridade': p.get('prioridade', 'Normal'),
+                            # Meta fixa por vendedor (pedido da Ingrid,
+                            # 04/09/2026) -- ver docstring de compute_metas().
+                            'metas_fixas_ativo': p.get('metas_fixas_ativo', False),
+                            'metas_fixas': p.get('metas_fixas', {}),
+                        }
+                        for p in cfg['produtos'] if p['nome'].strip()
+                    ]
+                    resultados = compute_metas(vendas_rows, produtos_config, cfg['vendedor_pcts'], estoque_rows=estoque_rows)
+                    _prio_map = {p['nome']: p.get('prioridade', 'Normal') for p in produtos_config}
+                    for _r in resultados:
+                        _r['prioridade'] = _prio_map.get(_r['produto'], 'Normal')
+                    st.session_state['estoque_rows']    = estoque_rows
+                    st.session_state['vendas_rows']     = vendas_rows
+                    st.session_state['vendas_bytes']    = vendas_bytes
+                    st.session_state['resultados']      = resultados
+                    st.session_state['produtos_config'] = produtos_config
+                    st.session_state['_resultados_desatualizados'] = False
+                    save_config(cfg, show_feedback=False)
+                    st.success('Cálculo concluído. Confira a aba **📊 On Track** para o dashboard.')
+
+        # ── Resultados ────────────────────────────────────────────────────────
+        if 'resultados' in st.session_state:
+            if st.session_state.get('_resultados_desatualizados'):
+                st.warning(
+                    '⚠️ O último PDF enviado não pôde ser lido. Os resultados abaixo são de um '
+                    'cálculo anterior e NÃO refletem o arquivo mais recente — corrija/reenvie o '
+                    'PDF e clique em "▶️ Calcular metas" novamente antes de usar estes números.'
+                )
+            resultados      = st.session_state['resultados']
+            estoque_rows    = st.session_state['estoque_rows']
+            vendas_rows_diag = st.session_state.get('vendas_rows', [])
+            produtos_config_diag = st.session_state.get('produtos_config', [])
+
+            # Aplica correções manuais de Vendido feitas no data_editor mais
+            # abaixo (precisa ser antes da tabela-resumo, ver docstring).
+            _aplicar_edicoes_vendido(resultados)
+
+            # Diagnóstico de códigos não reconhecidos
+            nao_rec = _diagnostico_codigos(vendas_rows_diag, produtos_config_diag)
+            if nao_rec:
+                total_nao_rec = sum(r['CX não reconhecidas'] for r in nao_rec)
+                with st.expander(
+                    f'⚠️ {len(nao_rec)} código(s) do PDF não reconhecido(s) '
+                    f'— {_fmt_num(total_nao_rec, 0)} cx fora do cálculo',
+                    expanded=True,
+                ):
+                    st.caption(
+                        'Esses códigos aparecem no PDF mas não casaram com nenhum produto '
+                        'configurado. Se fizerem parte das metas desta semana, adicione ou '
+                        'corrija os códigos na seção **Produtos da semana**, na aba '
+                        '**1. Upload & Produtos**.'
+                    )
+                    df_diag = pd.DataFrame(nao_rec)
+                    df_diag['CX não reconhecidas'] = df_diag['CX não reconhecidas'].map(
+                        lambda x: _fmt_num(x, 0)
+                    )
+                    st.dataframe(df_diag, use_container_width=True, hide_index=True)
+            else:
+                st.success('✅ Todos os códigos do PDF foram reconhecidos — nenhuma cx perdida.')
+
+            # Diagnóstico de vendedores reconhecidos mas fora da lista de metas
+            # (ex.: aconteceu com o Luca -- vendas dele sumiam do Vendido sem
+            # nenhum aviso, mesmo com o código do produto certinho)
+            vend_excl = _diagnostico_vendedores_excluidos(
+                vendas_rows_diag, produtos_config_diag, cfg['vendedor_pcts'])
+            if vend_excl:
+                total_vend_excl = sum(r['CX fora do cálculo'] for r in vend_excl)
+                with st.expander(
+                    f'⚠️ {len(vend_excl)} vendedor(es) reconhecido(s) mas sem meta configurada '
+                    f'— {_fmt_num(total_vend_excl, 0)} cx fora do cálculo',
+                    expanded=True,
+                ):
+                    st.caption(
+                        'Esses vendedores aparecem no PDF e o app sabe quem são, mas não estão na '
+                        'lista de "Percentuais de meta por vendedor" abaixo — então as vendas deles '
+                        'não entram no Vendido de nenhum produto, mesmo com o código certo. Se '
+                        'devem contar nas metas desta semana, adicione o vendedor no expansor '
+                        '**"⚙️ Percentuais de meta por vendedor"** acima (com o percentual que você '
+                        'quiser aplicar) e calcule de novo.'
+                    )
+                    df_vend = pd.DataFrame(vend_excl)
+                    df_vend['CX fora do cálculo'] = df_vend['CX fora do cálculo'].map(
+                        lambda x: _fmt_num(x, 0)
+                    )
+                    st.dataframe(df_vend, use_container_width=True, hide_index=True)
+
+            # Diagnóstico de possível erro de digitação no código: pra cada
+            # produto configurado que não bateu com NENHUMA venda, procura no
+            # PDF um nome parecido usando um código diferente do configurado.
+            # Você digita nome E código propositalmente pra evitar erro -- isso
+            # aqui usa os dois: se o nome bate com uma linha do PDF mas o código
+            # configurado é outro, é sinal de erro de digitação no código (não
+            # de o produto simplesmente não ter vendido nada essa semana), e o
+            # app agora avisa sozinho em vez de precisar conferir na mão.
+            possiveis_typos = []
+            for p in produtos_config_diag:
+                tem_venda = any(
+                    codigo_matches(normalize_codigo(r['codigo']), e)
+                    for r in vendas_rows_diag for e in p['codigos']
+                )
+                if tem_venda:
+                    continue
+                candidatos = sugestao_codigo_por_nome(p['nome'], vendas_rows_diag)
+                # só sinaliza candidatos com um código DIFERENTE de todos os já
+                # configurados pra esse produto (evita "sugerir" o próprio
+                # código certo de volta, ex. quando bate por prefixo)
+                candidatos = [c for c in candidatos if c['codigo'] not in p['codigos']]
+                for c in candidatos:
+                    possiveis_typos.append({
+                        'Produto configurado': p['nome'],
+                        'Código configurado': ', '.join(p['codigos']) or '(vazio)',
+                        'Nome encontrado no PDF': c['descricao'],
+                        'Código encontrado no PDF': c['codigo'],
+                        'Cx sob esse código': c['qtde'],
+                    })
+            if possiveis_typos:
+                with st.expander(
+                    f'🚨 {len(possiveis_typos)} produto(s) com possível erro de digitação no código',
+                    expanded=True,
+                ):
+                    st.caption(
+                        'O NOME desses produtos bate com uma venda no PDF, mas o CÓDIGO configurado '
+                        'é diferente do código daquela venda -- ou seja, o produto provavelmente '
+                        'vendeu normalmente, só que sob um código diferente do que está cadastrado. '
+                        'Confira e corrija o código na seção **Produtos da semana**, na aba '
+                        '**1. Upload & Produtos**.'
+                    )
+                    df_typo = pd.DataFrame(possiveis_typos)
+                    df_typo['Cx sob esse código'] = df_typo['Cx sob esse código'].map(
+                        lambda x: _fmt_num(x, 0)
+                    )
+                    st.dataframe(df_typo, use_container_width=True, hide_index=True)
+
+            # Diagnóstico por produto: mostra linhas brutas extraídas do PDF
+            with st.expander('🔍 Diagnóstico por produto (linhas brutas do PDF)'):
+                for p in produtos_config_diag:
+                    linhas_brutas = [
+                        row for row in vendas_rows_diag
+                        if any(codigo_matches(normalize_codigo(row['codigo']), e) for e in p['codigos'])
+                    ]
+                    total = sum(r['qtde_vendida'] for r in linhas_brutas)
+                    st.markdown(f"**{p['nome']}** — {len(linhas_brutas)} linha(s) — total bruto: `{total:.3f} cx`")
+                    if linhas_brutas:
+                        df_bruto = pd.DataFrame([{
+                            'Código':   r['codigo'],
+                            'Vendedor Raw': r['vendedor'],
+                            'Vendedor Mapeado': map_vendedor(r['vendedor']) or '❓ NÃO MAPEADO',
+                            'CX Extraída': r['qtde_vendida'],
+                        } for r in linhas_brutas])
+                        st.dataframe(df_bruto, use_container_width=True, hide_index=True)
+                    else:
+                        st.caption('— nenhuma linha encontrada')
+
+            # Diagnóstico RAW: mostra exatamente o que o pdftotext extrai do PDF
+            vendas_bytes_diag = st.session_state.get('vendas_bytes')
+            if vendas_bytes_diag:
+                with st.expander('🔬 Diagnóstico RAW pdftotext (para depuração)'):
+                    try:
+                        from parsers_diario import extract_text as _extract_text
+                        raw_text = _extract_text(io.BytesIO(vendas_bytes_diag))
+                        raw_lines = raw_text.split('\n')
+                        for p in produtos_config_diag:
+                            codigos_busca = [c.rstrip('*') for c in p['codigos']]
+                            linhas_encontradas = [
+                                l for l in raw_lines
+                                if any(cod in l for cod in codigos_busca)
+                            ]
+                            st.markdown(f"**{p['nome']}** — {len(linhas_encontradas)} linha(s) no pdftotext:")
+                            if linhas_encontradas:
+                                for l in linhas_encontradas:
+                                    st.code(repr(l))
+                            else:
+                                st.caption('— código não encontrado no texto extraído pelo pdftotext')
+                    except Exception as e:
+                        st.error(f'Erro ao extrair texto: {e}')
+
+            st.divider()
+
+            st.subheader('Resultado por produto')
+
+            # Tabela resumo compacta -- a meta do produto é sempre 'estoque_total'
+            # (o valor real configurado), nunca a soma das metas individuais dos
+            # vendedores (essa soma é inflada pelo arredondamento pra cima de
+            # cada uma). Falta segue usando essa mesma meta real como base.
+            resumo_rows = []
+            for r in resultados:
+                p_meta = r.get('estoque_total', 0)
+                p_vend = sum(l['vendido'] for l in r['linhas'])
+                p_atg  = p_vend / p_meta * 100 if p_meta else 0
+                p_falt = max(p_meta - p_vend, 0)
+                p_media = r.get('media_rs_cx')
+                _tem_edicao = any(l.get('vendido_editado') for l in r['linhas'])
+                resumo_rows.append({
+                    'Produto':      ('✏️ ' + r['produto']) if _tem_edicao else r['produto'],
+                    'Prioridade':   r.get('prioridade', 'Normal'),
+                    'Meta (cx)':    f"{p_meta:.0f}",
+                    'Vendido (cx)': f"{p_vend:.0f}",
+                    'Falta (cx)':   f"{p_falt:.0f}",
+                    '% Atingido':   f"{p_atg:.1f}%",
+                    'R$ Médio/cx':  _fmt_moeda(p_media) if p_media is not None else '—',
+                })
+            st.dataframe(pd.DataFrame(resumo_rows), use_container_width=True, hide_index=True)
+            if any(r.get('media_rs_cx') is None for r in resultados):
+                st.caption(
+                    '— na coluna **R$ Médio/cx** significa que não há "Md Venda" desse produto '
+                    'para calcular a média: ou o PDF de Estoque Físico não foi enviado (é opcional '
+                    'nesta tela), ou nenhuma linha dele que bate com os códigos desse produto tem '
+                    'Qtde Vendida maior que zero. O restante da meta (Vendido/Falta/%) continua '
+                    'correto mesmo assim.'
+                )
+
+            # Detalhe por vendedor (colapsado) -- 'Vendido (cx)' é editável:
+            # correção pontual da Ingrid pra essa semana (22/09/2026, pedido
+            # dela -- só essa semana, sem travar as seguintes; ver
+            # _aplicar_edicoes_vendido acima). As demais colunas ficam
+            # travadas (% Meta/Meta vêm da configuração; Falta/% Atingido
+            # são recalculadas a partir do Vendido editado).
+            st.caption(
+                'Clique em um produto para ver o detalhe por vendedor. '
+                'A coluna "Vendido (cx)" pode ser corrigida na hora, se precisar '
+                '(ex.: erro de leitura do PDF) -- a correção vale só para esta semana.'
+            )
+            for i, r in enumerate(resultados):
+                p_meta = r.get('estoque_total', 0)
+                p_vend = sum(l['vendido'] for l in r['linhas'])
+                p_atg  = p_vend / p_meta * 100 if p_meta else 0
+                prio   = r.get('prioridade', 'Normal')
+                badge  = f' — {prio}' if prio != 'Normal' else ''
+                with st.expander(
+                    f"{r['produto']}{badge}  |  Meta {p_meta:.0f} cx — Vendido {p_vend:.0f} cx ({p_atg:.1f}%)",
+                    expanded=False,
+                ):
+                    df_linhas = pd.DataFrame([
+                        {'Vendedor': l['vendedor'], '% Meta': f"{l['pct']:.0f}%",
+                         'Meta (cx)': l['meta'], 'Vendido (cx)': l['vendido'],
+                         'Falta (cx)': l['falta'], '% Atingido': f"{l['atingido']*100:.1f}%"}
+                        for l in r['linhas']
+                    ])
+                    df_editado = st.data_editor(
+                        df_linhas,
+                        use_container_width=True, hide_index=True,
+                        num_rows='fixed',
+                        disabled=['Vendedor', '% Meta', 'Meta (cx)', 'Falta (cx)', '% Atingido'],
+                        column_config={
+                            'Vendido (cx)': st.column_config.NumberColumn(
+                                'Vendido (cx)', min_value=0.0, step=1.0, format='%.1f',
+                            ),
+                        },
+                        key=f'vendido_editor_{i}',
+                    )
+                    for idx, linha in enumerate(r['linhas']):
+                        try:
+                            novo_vendido = float(df_editado.iloc[idx]['Vendido (cx)'])
+                        except (TypeError, ValueError, IndexError):
+                            continue
+                        if novo_vendido != linha['vendido']:
+                            linha['vendido'] = novo_vendido
+                            linha['vendido_editado'] = True
+                            meta_linha = linha.get('meta', 0)
+                            linha['falta'] = max(meta_linha - novo_vendido, 0.0)
+                            linha['atingido'] = (novo_vendido / meta_linha) if meta_linha else 0.0
+                    if any(l.get('vendido_editado') for l in r['linhas']):
+                        st.caption('✏️ Vendido corrigido manualmente nesta semana para pelo menos um vendedor.')
+
+    with sub_publish:
+        if 'resultados' not in st.session_state:
+            st.info(
+                'Calcule as metas na aba **2. Calcular & Diagnóstico** antes de '
+                'publicar para a Gerência ou gerar os PDFs.'
+            )
+        else:
+            resultados   = st.session_state['resultados']
+            estoque_rows = st.session_state['estoque_rows']
+
+            st.subheader('Publicar On Track para Gerência')
+            data_ref_pub = st.date_input(
+                'Semana a publicar (data de referência)', value=datetime.date.today(),
+                format='DD/MM/YYYY', help=_HELP_DATA_REF_SEMANA, key='ontrack_pub_data_ref',
+            )
+            pub_col, _ = st.columns([2, 4])
+            with pub_col:
+                if st.button('📤 Publicar On Track para Gerência', use_container_width=True):
+                    try:
+                        os.makedirs(os.path.dirname(_ONTRACK_PUB_FILE), exist_ok=True)
+                        os.makedirs(_ONTRACK_META_DIR, exist_ok=True)
+                        snapshot = {
+                            'publicado_em': datetime.datetime.now().isoformat(timespec='seconds'),
+                            'periodo':      st.session_state.get('config', {}).get('periodo', ''),
+                            'resultados':   resultados,
+                            'totais_rs':    st.session_state.get('totais_rs', {}),
+                        }
+                        # Arquivo atual (compatibilidade)
+                        with open(_ONTRACK_PUB_FILE, 'w', encoding='utf-8') as f:
+                            json.dump(snapshot, f, ensure_ascii=False, indent=2)
+                        # Histórico por semana ISO (arquivo local — compatibilidade).
+                        # Usa a semana ESCOLHIDA acima, não periodo.periodo_atual('semanal')
+                        # (que sempre seria a semana de hoje, mesmo publicando com atraso
+                        # dados de uma semana anterior -- sobrescrevendo por engano o On
+                        # Track real da semana corrente).
+                        slug_sem = _slug_semana(data_ref_pub)
+                        hist_path = os.path.join(_ONTRACK_META_DIR, f'{slug_sem}.json')
+                        with open(hist_path, 'w', encoding='utf-8') as f:
+                            json.dump(snapshot, f, ensure_ascii=False, indent=2)
+                        # Persistência real e versionada (sobrevive a restart do app).
+                        # ds.save_record NÃO levanta exceção quando a gravação remota
+                        # (GitHub) falha -- ela sinaliza isso só no campo
+                        # '_erro_persistencia_remota' do retorno (mesmo padrão de
+                        # metas_gerais.py/6_Rentabilidade_Margens_OTHIL.py/etc.). O
+                        # except abaixo cobre só erros inesperados de verdade; sem
+                        # checar o retorno, esta tela sempre mostrava "✅ publicado"
+                        # mesmo quando a gravação remota falhava silenciosamente.
+                        try:
+                            _reg_ot = ds.save_record(
+                                modulo=MODULO_ONTRACK, tipo_periodo='semanal', periodo_ref=slug_sem,
+                                valores=snapshot, usuario=st.session_state.get('usuario_nome'),
+                            )
+                        except Exception as e2:
+                            _reg_ot = None
+                            st.warning(f'Publicado localmente, mas houve um problema ao salvar de forma permanente: {e2}')
+                        else:
+                            _erro_ot = _reg_ot.get('_erro_persistencia_remota') if _reg_ot else None
+                            if _erro_ot:
+                                st.warning(
+                                    f'Publicado apenas localmente -- houve um problema ao salvar de '
+                                    f'forma permanente (pode não sobreviver a um restart do app): {_erro_ot}'
+                                )
+                            else:
+                                st.success('✅ On Track publicado — disponível na aba Gerência.')
+                    except Exception as e:
+                        st.error(f'Erro ao publicar: {e}')
+
+            st.divider()
+            st.subheader('Gerar PDFs')
+
+            vendedores_disponiveis = list(cfg['vendedor_pcts'].keys())
+            vendedor_sel = st.selectbox('Relatório individual do vendedor', vendedores_disponiveis)
+
+            pcol1, pcol2, pcol3 = st.columns(3)
+            with pcol1:
+                pdf_bytes = generate_relatorio_vendedor(
+                    vendedor_sel, data_emissao, estoque_rows, resultados,
+                )
+                st.download_button(
+                    f'⬇️ Relatório — {vendedor_sel}', data=pdf_bytes,
+                    file_name=f'Relatorio_{vendedor_sel}_{datetime.date.today().strftime("%d%m%Y")}.pdf',
+                    mime='application/pdf',
+                )
+            with pcol2:
+                pdf_bytes = generate_dashboard(periodo_texto, resultados, cfg['vendedor_pcts'])
+                st.download_button(
+                    '⬇️ Dashboard', data=pdf_bytes,
+                    file_name=f'Dashboard_{datetime.date.today().strftime("%d%m%Y")}.pdf',
+                    mime='application/pdf',
+                )
+            with pcol3:
+                pdf_bytes = generate_resumo_geral(periodo_texto, data_emissao, resultados, cfg['vendedor_pcts'])
+                st.download_button(
+                    '⬇️ Resumo Geral', data=pdf_bytes,
+                    file_name=f'Resumo_Geral_{datetime.date.today().strftime("%d%m%Y")}.pdf',
+                    mime='application/pdf',
+                )
+
+            with st.expander('Gerar relatórios de TODOS os vendedores de uma vez'):
+                if st.button('Gerar todos os PDFs individuais'):
+                    for v in vendedores_disponiveis:
+                        pdf_bytes = generate_relatorio_vendedor(v, data_emissao, estoque_rows, resultados)
+                        st.download_button(
+                            f'⬇️ {v}', data=pdf_bytes,
+                            file_name=f'Relatorio_{v}_{datetime.date.today().strftime("%d%m%Y")}.pdf',
+                            mime='application/pdf', key=f'all_{v}',
+                        )
 
 # ============================================================
 # Tab 2 — On Track
