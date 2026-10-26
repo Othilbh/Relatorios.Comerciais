@@ -78,18 +78,36 @@ def parse_quebra(pdf_file) -> dict:
             grupo_nome = _limpar_nome_grupo(m_g.group(2))
             continue
 
-        # Sub-Total: "Sub-Total 96 0 36 0 167 21.551,80 36"
+        # Sub-Total: "Sub-Total 815,000 0,000 2,000 0,000 992,000 138.414,94
+        # 2,000 0,00 0,00 314,72 157,36 -314,72 -100,00" -- 13 números, na
+        # mesma ordem das colunas do cabeçalho ("Saldo Inicial Entrada
+        # Saída Avar. Saí Saldo Final Custo Total Saída Valor Saí. Méd.Saí.
+        # Custo Saída Méd.Cto. Resultado %"):
+        #   [2]=Saída (cx quebrada, já que este relatório é filtrado por
+        #       classificação QUEBRA -- confirmado batendo com o Total
+        #       Geral em PDFs reais)
+        #   [9]=Custo Saída (valor em R$ do custo daquela quebra -- NÃO
+        #       confundir com [5]="Custo", que é o custo médio unitário do
+        #       SALDO que sobrou, outra coisa. Confirmado somando o [9] de
+        #       cada grupo e batendo exatamente com o Total Geral de um
+        #       PDF real de 07/08/2026: R$ 25.394,78.)
+        # O regex não captura o sinal de "-" -- não é problema pra [9]
+        # (custo de uma saída nunca é negativo na prática), mas por
+        # segurança nunca use este parser pra ler [7]/[11]/[12], que podem
+        # vir negativos e perderiam o sinal.
         if s.startswith('Sub-Total') and grupo_nome:
             nums = re.findall(r'[\d]+(?:[.,][\d]+)*', s)
             if len(nums) >= 3:
                 try:
                     cx = _parse_num(nums[2])
                     if cx > 0:
+                        custo = _parse_num(nums[9]) if len(nums) >= 10 else None
                         grupos.append({
                             'grupo': grupo_nome,
                             'codigo': grupo_codigo or '',
                             'categoria': map_categoria(grupo_nome),
                             'cx': cx,
+                            'custo': custo,
                         })
                 except (ValueError, IndexError):
                     pass
@@ -97,22 +115,31 @@ def parse_quebra(pdf_file) -> dict:
             grupo_nome = None
 
     # ── Agrega por categoria ──────────────────────────────────────────────
-    cat_dict: dict[str, float] = {}
+    cat_dict: dict[str, dict] = {}
     for g in grupos:
-        cat_dict[g['categoria']] = cat_dict.get(g['categoria'], 0.0) + g['cx']
+        c = cat_dict.setdefault(g['categoria'], {'cx': 0.0, 'custo': 0.0})
+        c['cx'] += g['cx']
+        if g['custo'] is not None:
+            c['custo'] += g['custo']
 
     categorias = sorted(
-        [{'categoria': k, 'cx': v} for k, v in cat_dict.items()],
+        [{'categoria': k, 'cx': v['cx'], 'custo': v['custo']} for k, v in cat_dict.items()],
         key=lambda x: -x['cx'],
     )
 
     total_cx = sum(g['cx'] for g in grupos)
+    # total_custo: soma só o que foi lido com sucesso -- None (não 0) se
+    # NENHUM grupo tinha a coluna Custo Saída legível, pra não mostrar um
+    # "R$ 0,00" enganoso quando na real não conseguimos ler nada.
+    custos_lidos = [g['custo'] for g in grupos if g['custo'] is not None]
+    total_custo = sum(custos_lidos) if custos_lidos else None
     grupos.sort(key=lambda x: -x['cx'])
 
     return {
         'periodo': periodo,
         'emissao': emissao,
         'total_cx': total_cx,
+        'total_custo': total_custo,
         'grupos': grupos,
         'categorias': categorias,
     }
