@@ -139,7 +139,7 @@
     },
     {
       "nome": "Mamao Havai",
-      "codigos_texto": "4601003*",
+      "codigos_texto": "40601003*",
       "estoque": 277,
       "prioridade": "📅 Itens Diários",
       "metas_fixas_ativo": false,
@@ -147,7 +147,7 @@
     },
     {
       "nome": "Rosada Cam",
-      "codigos_texto": "8101003",
+      "codigos_texto": "8101003*",
       "estoque": 42,
       "prioridade": "📅 Itens Diários",
       "metas_fixas_ativo": false,
