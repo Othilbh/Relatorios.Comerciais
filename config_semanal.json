@@ -6,7 +6,16 @@
       "estoque": 336,
       "prioridade": "🚨 Grande Urgência",
       "metas_fixas_ativo": false,
-      "metas_fixas": {}
+      "metas_fixas": {
+        "Farley": 51,
+        "Dora": 51,
+        "Afanais": 84,
+        "Roni": 84,
+        "Reginaldo": 74,
+        "Luciano": 0,
+        "Juliana": 51,
+        "Luca": 58
+      }
     },
     {
       "nome": "Roma Pomica",
@@ -106,7 +115,7 @@
     },
     {
       "nome": "Gala Frutimar",
-      "codigos_texto": "07011051*",
+      "codigos_texto": "0701105*",
       "estoque": 269,
       "prioridade": "🔥 Alta Prioridade",
       "metas_fixas_ativo": false,
@@ -138,7 +147,7 @@
     },
     {
       "nome": "Rosada Cam",
-      "codigos_texto": "8101003\n801012",
+      "codigos_texto": "8101003",
       "estoque": 42,
       "prioridade": "📅 Itens Diários",
       "metas_fixas_ativo": false,
