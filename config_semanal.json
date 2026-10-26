@@ -4,49 +4,153 @@
       "nome": "Portuguesa Clube da Pera",
       "codigos_texto": "020503303",
       "estoque": 336,
-      "prioridade": "🚨 Grande Urgência"
+      "prioridade": "🚨 Grande Urgência",
+      "metas_fixas_ativo": false,
+      "metas_fixas": {}
     },
     {
       "nome": "Roma Pomica",
       "codigos_texto": "8704714",
       "estoque": 225,
-      "prioridade": "🚨 Grande Urgência"
+      "prioridade": "🚨 Grande Urgência",
+      "metas_fixas_ativo": false,
+      "metas_fixas": {}
     },
     {
       "nome": "Thompson Natural + Good",
       "codigos_texto": "830100891\n830100837",
       "estoque": 636,
-      "prioridade": "🚨 Grande Urgência"
+      "prioridade": "🚨 Grande Urgência",
+      "metas_fixas_ativo": false,
+      "metas_fixas": {}
     },
     {
       "nome": "Kiwi Rio Blanco 33",
       "codigos_texto": "380102233\n380102233.1",
       "estoque": 498,
-      "prioridade": "🚨 Grande Urgência"
+      "prioridade": "🚨 Grande Urgência",
+      "metas_fixas_ativo": false,
+      "metas_fixas": {}
     },
     {
       "nome": "Kiwi Dom fruto",
       "codigos_texto": "38010115",
       "estoque": 87,
-      "prioridade": "🚨 Grande Urgência"
+      "prioridade": "🚨 Grande Urgência",
+      "metas_fixas_ativo": false,
+      "metas_fixas": {}
     },
     {
       "nome": "Dino Rei ",
       "codigos_texto": "87038101\n87038102.1\n87038103",
       "estoque": 544,
-      "prioridade": "🚨 Grande Urgência"
+      "prioridade": "🚨 Grande Urgência",
+      "metas_fixas_ativo": false,
+      "metas_fixas": {}
     },
     {
       "nome": "Dino Cepi",
       "codigos_texto": "8703804.2\n8703805.2\n8703805\n8703807",
       "estoque": 133,
-      "prioridade": "🚨 Grande Urgência"
+      "prioridade": "🚨 Grande Urgência",
+      "metas_fixas_ativo": false,
+      "metas_fixas": {}
     },
     {
       "nome": "Packams More",
-      "codigos_texto": "",
-      "estoque": 0,
-      "prioridade": "Normal"
+      "codigos_texto": "0102083*",
+      "estoque": 500,
+      "prioridade": "🔥 Alta Prioridade",
+      "metas_fixas_ativo": false,
+      "metas_fixas": {}
+    },
+    {
+      "nome": "Packams Dole",
+      "codigos_texto": "0102084*",
+      "estoque": 700,
+      "prioridade": "🔥 Alta Prioridade",
+      "metas_fixas_ativo": false,
+      "metas_fixas": {}
+    },
+    {
+      "nome": "Benitaka 8 kg",
+      "codigos_texto": "830200306",
+      "estoque": 269,
+      "prioridade": "🔥 Alta Prioridade",
+      "metas_fixas_ativo": false,
+      "metas_fixas": {}
+    },
+    {
+      "nome": "Melão Gaia T7",
+      "codigos_texto": "3102006007",
+      "estoque": 368,
+      "prioridade": "🔥 Alta Prioridade",
+      "metas_fixas_ativo": false,
+      "metas_fixas": {}
+    },
+    {
+      "nome": "Crinson Lila | Isis Vitace",
+      "codigos_texto": "830100699\n830101523",
+      "estoque": 992,
+      "prioridade": "🔥 Alta Prioridade",
+      "metas_fixas_ativo": false,
+      "metas_fixas": {}
+    },
+    {
+      "nome": "Ercoline Granfer",
+      "codigos_texto": "020800105",
+      "estoque": 142,
+      "prioridade": "🔥 Alta Prioridade",
+      "metas_fixas_ativo": false,
+      "metas_fixas": {}
+    },
+    {
+      "nome": "Gala Frutimar",
+      "codigos_texto": "07011051*",
+      "estoque": 269,
+      "prioridade": "🔥 Alta Prioridade",
+      "metas_fixas_ativo": false,
+      "metas_fixas": {}
+    },
+    {
+      "nome": "Gran Smith Dole",
+      "codigos_texto": "0503023*",
+      "estoque": 177,
+      "prioridade": "🔥 Alta Prioridade",
+      "metas_fixas_ativo": false,
+      "metas_fixas": {}
+    },
+    {
+      "nome": "Mamao Formoso",
+      "codigos_texto": "4601002*",
+      "estoque": 212,
+      "prioridade": "📅 Itens Diários",
+      "metas_fixas_ativo": false,
+      "metas_fixas": {}
+    },
+    {
+      "nome": "Mamao Havai",
+      "codigos_texto": "4601003*",
+      "estoque": 277,
+      "prioridade": "📅 Itens Diários",
+      "metas_fixas_ativo": false,
+      "metas_fixas": {}
+    },
+    {
+      "nome": "Rosada Cam",
+      "codigos_texto": "8101003\n801012",
+      "estoque": 42,
+      "prioridade": "📅 Itens Diários",
+      "metas_fixas_ativo": false,
+      "metas_fixas": {}
+    },
+    {
+      "nome": "Rosada Band",
+      "codigos_texto": "850100404",
+      "estoque": 92,
+      "prioridade": "📅 Itens Diários",
+      "metas_fixas_ativo": false,
+      "metas_fixas": {}
     }
   ],
   "vendedor_pcts": {
