@@ -1,6 +1,5 @@
 """Página de Gerência OTHIL — acesso restrito por senha."""
 import json
-import math
 import os
 import re
 import datetime
@@ -13,14 +12,17 @@ import sys, pathlib
 sys.path.insert(0, str(pathlib.Path(__file__).parent.parent))
 from categorias import map_categoria
 from dashboard_diario import gerar_dashboard
+from dashboard_custo_real import gerar_dashboard as gerar_dashboard_custo_real
+import margem_produto as mp
 import periodo as periodo_mod
 import comparativo
 import on_track
 import data_store as ds
 import metas_gerais as mg
+import calc
 import rentabilidade as rent
-import produtos as prod
 import resumo_matriz
+import marcas_fornecedor as mf
 from xlsx_vendedor_cliente import VENDOR_TAB, _normalize
 
 MOD_RELATORIO_DIARIO = 'relatorio_diario'
@@ -39,10 +41,55 @@ _ONTRACK_CLI_FILE = os.path.join(_GERENCIA_DIR, 'ontrack_clientes_publicado.json
 _ONTRACK_META_DIR = os.path.join(_GERENCIA_DIR, 'ontrack_metas')
 _ONTRACK_CLI_DIR  = os.path.join(_GERENCIA_DIR, 'ontrack_clientes')
 _QUEBRA_DIR       = os.path.join(_GERENCIA_DIR, 'quebra')
+_MARGEM_REAL_DIR  = os.path.join(_GERENCIA_DIR, 'margem_real')
 _PREVPERDAS_DIR   = os.path.join(_GERENCIA_DIR, 'prevencao_perdas')
 _PERDAS_DIR       = os.path.join(_GERENCIA_DIR, 'perdas_realizadas')
 _MESES_QBR     = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez']
 _SENHA_FALLBACK = 'othil2024'
+
+
+# ── Cores por status de On Track — FONTE ÚNICA ────────────────────────────────
+# Antes existiam DUAS tabelas independentes de cor para os MESMOS 4 estados de
+# on_track.py (_GER_STATUS_COR, hex sólido usado nas pílulas/legendas, e
+# _GER_STATUS_LABEL_COR, pares pastel bg/fg usados nos cartões de Metas
+# Gerais) -- duas tabelas para o mesmo enum significavam manter cor em dois
+# lugares e deixá-las divergir. Agora há um único mapa por status, com tudo
+# que a tela precisa:
+#   cor         -> hex sólido (texto/legenda/barra de progresso)
+#   bg / fg     -> par pastel (fundo/texto) para qualquer bloco colorido
+#   delta_color -> valor aceito por st.metric(delta_color=...)
+#   md          -> nome de cor do markdown do Streamlit (:green[...] etc.),
+#                  usado nas legendas de status abaixo dos st.metric
+_GER_STATUS_CORES = {
+    on_track.STATUS_VERDE: {
+        'cor': '#2D6A4F', 'bg': '#D8EFE3', 'fg': '#1B4332',
+        'delta_color': 'normal', 'md': 'green',
+    },
+    on_track.STATUS_ATENCAO: {
+        'cor': '#B8860B', 'bg': '#FEF9C3', 'fg': '#7D6608',
+        'delta_color': 'off', 'md': 'orange',
+    },
+    on_track.STATUS_FORA: {
+        'cor': '#C00000', 'bg': '#FADADD', 'fg': '#7A1F2B',
+        'delta_color': 'inverse', 'md': 'red',
+    },
+    on_track.STATUS_SEM_META: {
+        'cor': '#6c757d', 'bg': '#EDEDED', 'fg': '#555555',
+        'delta_color': 'off', 'md': 'gray',
+    },
+}
+
+# Alias mantido para os pontos que só precisam do hex sólido — deriva do mapa
+# único acima, nunca mais uma segunda tabela mantida à mão.
+_GER_STATUS_COR = {_s: _v['cor'] for _s, _v in _GER_STATUS_CORES.items()}
+
+
+def _ger_legenda_status(ot):
+    """Legenda curta e colorida de status (🟢 On Track / 🟡 Atenção / ...),
+    exibida logo abaixo de um st.metric. Usa a cor de markdown nativa do
+    Streamlit vinda do mapa único _GER_STATUS_CORES."""
+    md = _GER_STATUS_CORES[ot['status']]['md']
+    st.caption(f":{md}[{ot['emoji']} {ot['label']}]")
 
 
 def _get_senha() -> str:
@@ -154,65 +201,259 @@ def _label_slug(slug, tipo):
         return slug
 
 
+# ── Navegação de período por DATA (mesma lógica/arquitetura da página
+# Relatório Diário — periodo.py + data_store.py — reaproveitada aqui em vez
+# de duplicar uma estrutura paralela). Corrige o mesmo bug de raiz que
+# afetava as setas do Relatório Diário: o código antigo desta seção usava
+# um índice dentro da lista de dashboards SALVOS, combinado com
+# st.selectbox(..., index=...) — o Streamlit ignora esse index= a partir do
+# segundo rerun (o valor persistido no session_state da própria selectbox
+# manda), então o clique nas setas era desfeito na linha seguinte. Além
+# disso, por navegar sobre a LISTA de salvos (não sobre datas), não dava
+# pra "andar" até um período sem dado nenhum — violava a mesma regra do
+# item 2 do pedido original (navegação não pode depender de já existir
+# registro salvo).
+def _diario_data(ref):
+    return datetime.datetime.strptime(ref, '%Y-%m-%d').date()
+
+
+def _periodo_atual_ref(tipo):
+    if tipo == 'diario':
+        return datetime.date.today().strftime('%Y-%m-%d')
+    return periodo_mod.periodo_atual(tipo)
+
+
+def _periodo_anterior(tipo, ref):
+    if tipo == 'diario':
+        return (_diario_data(ref) - datetime.timedelta(days=1)).strftime('%Y-%m-%d')
+    return periodo_mod.periodo_anterior(tipo, ref)
+
+
+def _periodo_posterior(tipo, ref):
+    if tipo == 'diario':
+        return (_diario_data(ref) + datetime.timedelta(days=1)).strftime('%Y-%m-%d')
+    return periodo_mod.periodo_posterior(tipo, ref)
+
+
+def _intervalo_periodo(tipo, ref):
+    if tipo == 'diario':
+        d = _diario_data(ref)
+        return d, d
+    return periodo_mod.intervalo_datas(tipo, ref)
+
+
+def _rotulo_periodo(tipo, ref):
+    if tipo == 'diario':
+        return _diario_data(ref).strftime('%d/%m/%Y')
+    return periodo_mod.rotulo(tipo, ref)
+
+
+def _nav_periodo_row(tipo, state_key, sufixo_key, itens_salvos):
+    """Linha ÚNICA de navegação de período: ◀ | seletor | ▶.
+
+    Padrão visual/interação único do app (mesmo bloco já adotado em
+    pages/1_Relatorio_Diario_OTHIL.py e pages/4_Quebra_OTHIL.py), no lugar
+    da antiga linha de setas + um expander SEPARADO de "🔎 Períodos salvos"
+    logo abaixo. A MECÂNICA de navegação continua exatamente a mesma: as
+    setas andam por DATA (periodo.py), então seguem funcionando para
+    QUALQUER período, com ou sem dado salvo; o seletor lista os períodos
+    salvos e sempre exibe também o período navegado no momento, marcado
+    "(sem dado)" quando não houver registro.
+
+    Devolve (ref_sel, ini, fim, tem_dado) -- os mesmos valores que os dois
+    chamadores (_render_secao_dash e _render_secao_margem_real, antes
+    duplicados linha a linha) calculavam por conta própria.
+    """
+    if state_key not in st.session_state:
+        st.session_state[state_key] = _periodo_atual_ref(tipo)
+
+    def _ir_anterior():
+        st.session_state[state_key] = _periodo_anterior(tipo, st.session_state[state_key])
+
+    def _ir_posterior():
+        st.session_state[state_key] = _periodo_posterior(tipo, st.session_state[state_key])
+
+    labels_salvos = {}
+    for _s, _m in itens_salvos:
+        if tipo == 'diario':
+            labels_salvos[_s] = f"{_m.get('emissao', _s)}  —  {_m.get('periodo','-')}"
+        else:
+            labels_salvos[_s] = _label_slug(_s, tipo) + f"  ({_m.get('periodo','-')})"
+
+    ref_sel = st.session_state[state_key]
+    opcoes = sorted(set(labels_salvos) | {ref_sel}, reverse=True)
+
+    def _fmt_opcao(r):
+        if r in labels_salvos:
+            return labels_salvos[r]
+        try:
+            return _rotulo_periodo(tipo, r) + ' (sem dado)'
+        except Exception:
+            return f'{r} (sem dado)'
+
+    col_prev, col_sel, col_next = st.columns([1, 6, 1], vertical_alignment='bottom')
+    with col_prev:
+        st.button('◀', key=f'ger_prev{sufixo_key}_{tipo}', help='Período anterior',
+                   on_click=_ir_anterior, use_container_width=True)
+    with col_next:
+        st.button('▶', key=f'ger_next{sufixo_key}_{tipo}', help='Próximo período',
+                   on_click=_ir_posterior, use_container_width=True)
+    with col_sel:
+        # Chave escopada por ref_sel (mesma técnica de
+        # pages/1_Relatorio_Diario_OTHIL.py): garante que o `index=` volte a
+        # ser aplicado sempre que o período mudar por clique nas setas, em
+        # vez de ficar preso ao valor anterior guardado pelo próprio widget.
+        escolha = st.selectbox(
+            f'Período ({len(labels_salvos)} salvo(s))', opcoes,
+            format_func=_fmt_opcao,
+            index=opcoes.index(ref_sel),
+            key=f'ger_quick_sel{sufixo_key}_{tipo}_{ref_sel}',
+        )
+    if escolha != ref_sel:
+        st.session_state[state_key] = escolha
+        st.rerun()
+
+    ini, fim = _intervalo_periodo(tipo, ref_sel)
+    tem_dado = ds.has_data(MOD_RELATORIO_DIARIO, tipo, ref_sel)
+
+    if tipo == 'diario':
+        st.markdown(f'**{_rotulo_periodo(tipo, ref_sel)}**')
+    else:
+        st.markdown(f'**{ini.strftime("%d/%m/%Y")} – {fim.strftime("%d/%m/%Y")}**  ·  '
+                    f'{_rotulo_periodo(tipo, ref_sel)}')
+    st.caption('🟢 Período salvo ✓' if tem_dado else '⚪ Nenhum dado cadastrado para este período.')
+
+    return ref_sel, ini, fim, tem_dado
+
+
 def _render_secao_dash(tipo, titulo_secao, emoji):
     st.header(f'{emoji} {titulo_secao}')
-    dashboards = _listar_dashboards(tipo)
 
-    if not dashboards:
+    ref_sel, ini, fim, tem_dado = _nav_periodo_row(
+        tipo, f'_ger_periodo_sel_{tipo}', '', _listar_dashboards(tipo))
+
+    st.divider()
+
+    if not tem_dado:
         tipo_label = {'diario': 'Relatório Diário', 'semanal': 'aba Semanal', 'mensal': 'aba Mensal'}
-        st.info(f'Nenhum dashboard disponível. Gere um na página **{tipo_label.get(tipo,tipo)}** primeiro.')
+        st.info(f'Nenhum dado cadastrado para o período de {ini.strftime("%d/%m/%Y")} a '
+                f'{fim.strftime("%d/%m/%Y")}. Gere ou importe esse período na página '
+                f'**{tipo_label.get(tipo, tipo)}** (seção "Histórico" → "Importar dados históricos").')
         return
 
-    slugs  = [s for s, _ in dashboards]
-    if tipo == 'diario':
-        labels = [f"{m.get('emissao', s)}  —  {m.get('periodo','-')}" for s, m in dashboards]
-    else:
-        labels = [_label_slug(s, tipo) + f"  ({m.get('periodo','-')})" for s, m in dashboards]
+    registro = ds.load_current(MOD_RELATORIO_DIARIO, tipo, ref_sel)
+    valores = registro.get('valores', {}) or {}
+    gerado  = (registro.get('atualizado_em') or '')[:16].replace('T', ' ')
+    st.caption(f'Período: {valores.get("periodo","-")}  |  Salvo em: {gerado}')
 
-    idx_key = f'_ger_idx_{tipo}'
-    if idx_key not in st.session_state:
-        st.session_state[idx_key] = 0
-
-    col_prev, col_sel, col_next = st.columns([1, 6, 1])
-    with col_prev:
-        st.write('')
-        if st.button('◀', key=f'ger_prev_{tipo}', help='Período anterior'):
-            st.session_state[idx_key] = min(st.session_state[idx_key] + 1, len(slugs) - 1)
-    with col_next:
-        st.write('')
-        if st.button('▶', key=f'ger_next_{tipo}', help='Próximo período'):
-            st.session_state[idx_key] = max(st.session_state[idx_key] - 1, 0)
-    with col_sel:
-        escolha = st.selectbox(
-            f'{len(dashboards)} período(s) salvo(s):',
-            labels,
-            index=min(st.session_state[idx_key], len(labels)-1),
-            key=f'ger_sel_{tipo}',
-        )
-        st.session_state[idx_key] = labels.index(escolha)
-
-    idx     = st.session_state[idx_key]
-    slug_h  = slugs[idx]
-    meta_h  = dashboards[idx][1]
-    gerado  = meta_h.get('gerado_em', '')[:16].replace('T', ' ')
-    st.caption(f'Período: {meta_h.get("periodo","-")}  |  Gerado em: {gerado}')
-
-    html_path = os.path.join(_dir_tipo(tipo), f'{slug_h}.html')
+    html_path = os.path.join(_dir_tipo(tipo), f'{ref_sel}.html')
     if not os.path.exists(html_path):
         st.warning('Este dashboard não pôde ser regenerado automaticamente '
-                    '(dado antigo, salvo antes da persistência com histórico de itens). '
-                    'Gere novamente na página de origem.')
+                    '(dado antigo, salvo antes da persistência com histórico de itens, ou período '
+                    'importado sem PDF). Gere novamente (ou reenvie o PDF) na página de origem.')
         return
     with open(html_path, 'r', encoding='utf-8') as f:
         html_text = f.read()
 
     components.html(html_text, height=1400, scrolling=True)
     st.download_button(
-        f'⬇️ Baixar {_label_slug(slug_h, tipo) if tipo != "diario" else slug_h}',
+        f'⬇️ Baixar {_label_slug(ref_sel, tipo) if tipo != "diario" else ref_sel}',
         data=html_text.encode('utf-8'),
-        file_name=f'dashboard_{tipo}_{slug_h}_OTHIL.html',
+        file_name=f'dashboard_{tipo}_{ref_sel}_OTHIL.html',
         mime='text/html',
         key=f'ger_dl_{tipo}',
+    )
+
+
+# ── Margem Real (custo real por produto, sem despesa administrativa) ──────────
+# Reaproveita os MESMOS itens já salvos no histórico do Relatório Diário
+# (MOD_RELATORIO_DIARIO) -- sem nenhuma publicação própria -- e o cadastro
+# de percentuais por produto (margem_produto.py, editável na página
+# "Cadastro de Marcas"). Ao contrário de _listar_dashboards/_render_secao_dash
+# acima, o HTML aqui é SEMPRE regenerado na hora (nunca fica em cache no
+# disco) -- decisão explícita da Ingrid: a Margem Real de um dia antigo tem
+# que usar o percentual MAIS ATUAL do cadastro, não o que valia na época.
+
+def _dir_tipo_margem_real(tipo):
+    d = os.path.join(_MARGEM_REAL_DIR, tipo)
+    os.makedirs(d, exist_ok=True)
+    return d
+
+
+def _listar_periodos_margem_real(tipo):
+    """Períodos que têm itens salvos no Relatório Diário/Semanal/Mensal
+    (mesma fonte de dados do Dashboard Gerencial) -- usado só pro atalho de
+    seleção rápida, igual ao _listar_dashboards acima."""
+    try:
+        out = []
+        for slug in ds.list_periodos(MOD_RELATORIO_DIARIO, tipo):
+            registro = ds.load_current(MOD_RELATORIO_DIARIO, tipo, slug)
+            if registro and registro.get('valores', {}).get('itens'):
+                out.append((slug, registro['valores']))
+        return out
+    except Exception:
+        return []
+
+
+def _render_secao_margem_real(tipo, titulo_secao, emoji):
+    st.header(f'{emoji} {titulo_secao}')
+
+    # Mesma linha ◀ | seletor | ▶ do Dashboard Gerencial -- as duas seções
+    # eram cópias quase idênticas uma da outra; agora compartilham
+    # _nav_periodo_row (a única diferença real, a lista de períodos com dado,
+    # continua vindo da fonte específica de cada uma).
+    ref_sel, ini, fim, tem_dado = _nav_periodo_row(
+        tipo, f'_ger_periodo_sel_mr_{tipo}', '_mr', _listar_periodos_margem_real(tipo))
+
+    st.divider()
+
+    if not tem_dado:
+        tipo_label = {'diario': 'Relatório Diário', 'semanal': 'aba Semanal', 'mensal': 'aba Mensal'}
+        st.info(f'Nenhum dado cadastrado para o período de {ini.strftime("%d/%m/%Y")} a '
+                f'{fim.strftime("%d/%m/%Y")}. Gere ou importe esse período na página '
+                f'**{tipo_label.get(tipo, tipo)}** (seção "Histórico" → "Importar dados históricos").')
+        return
+
+    registro = ds.load_current(MOD_RELATORIO_DIARIO, tipo, ref_sel)
+    valores = registro.get('valores', {}) or {}
+    if not valores.get('itens'):
+        st.warning('Este período foi salvo antes da persistência com histórico de itens, ou foi '
+                   'importado sem PDF — não dá pra calcular a Margem Real sem os itens originais. '
+                   'Gere novamente (ou reenvie o PDF) na página de origem.')
+        return
+
+    gerado = (registro.get('atualizado_em') or '')[:16].replace('T', ' ')
+    st.caption(f'Período: {valores.get("periodo","-")}  |  Dado original salvo em: {gerado}')
+
+    tabela = mp.carregar_marcas()
+    n_sem_cadastro = sum(1 for it in valores['itens'] if not mp.pct_admin(it.get('produto'), tabela)[1])
+    if n_sem_cadastro:
+        st.caption(
+            f'⚠️ {n_sem_cadastro} linha(s) deste período usam produtos sem marca cadastrada — '
+            f'veja a lista no dashboard abaixo e cadastre em **Cadastro de Marcas**.'
+        )
+
+    html_path = os.path.join(_dir_tipo_margem_real(tipo), f'{ref_sel}.html')
+    try:
+        gerar_dashboard_custo_real(
+            {'itens': valores['itens'], 'periodo': valores.get('periodo'),
+             'data_emissao': valores.get('emissao')},
+            tabela, html_path, tipo=tipo,
+        )
+    except Exception as e:
+        st.error(f'Não foi possível calcular a Margem Real deste período: {e}')
+        return
+
+    with open(html_path, 'r', encoding='utf-8') as f:
+        html_text = f.read()
+
+    components.html(html_text, height=1400, scrolling=True)
+    st.download_button(
+        f'⬇️ Baixar Margem Real — {_label_slug(ref_sel, tipo) if tipo != "diario" else ref_sel}',
+        data=html_text.encode('utf-8'),
+        file_name=f'margem_real_{tipo}_{ref_sel}_OTHIL.html',
+        mime='text/html',
+        key=f'ger_dl_mr_{tipo}',
     )
 
 
@@ -324,8 +565,8 @@ def _render_quebra_comparativo():
     delta_pct = (delta / total_a * 100) if total_a else 0
 
     c1, c2, c3 = st.columns(3)
-    c1.metric(f'Total CX — {label_a}', f"{total_a:,.0f} cx")
-    c2.metric(f'Total CX — {label_b}', f"{total_b:,.0f} cx")
+    c1.metric(f'Total CX — {label_a}', f"{_num_vc(total_a, 0)} cx")
+    c2.metric(f'Total CX — {label_b}', f"{_num_vc(total_b, 0)} cx")
     c3.metric('Variação (B − A)', f"{delta:+,.0f} cx",
               delta=f"{delta_pct:+.1f}%", delta_color='inverse')
 
@@ -347,8 +588,8 @@ def _render_quebra_comparativo():
     df_cat_tbl['Δ %'] = df_cat_tbl.apply(
         lambda r: f"{r['Δ (B − A)'] / r[label_a] * 100:+.1f}%" if r[label_a] else '—', axis=1)
     df_cat_tbl = df_cat_tbl.reset_index().rename(columns={'index': 'Categoria'})
-    df_cat_tbl[label_a]     = df_cat_tbl[label_a].map(lambda x: f"{x:,.0f}")
-    df_cat_tbl[label_b]     = df_cat_tbl[label_b].map(lambda x: f"{x:,.0f}")
+    df_cat_tbl[label_a]     = df_cat_tbl[label_a].map(lambda x: f"{_num_vc(x, 0)}")
+    df_cat_tbl[label_b]     = df_cat_tbl[label_b].map(lambda x: f"{_num_vc(x, 0)}")
     df_cat_tbl['Δ (B − A)'] = df_cat_tbl['Δ (B − A)'].map(lambda x: f"{x:+,.0f}")
     st.dataframe(df_cat_tbl, use_container_width=True, hide_index=True)
 
@@ -373,8 +614,8 @@ def _render_quebra_comparativo():
         st.info('Nenhum grupo de produto registrado nesses dois períodos.')
     else:
         df_grp = pd.DataFrame(rows).sort_values('Δ (B − A)', ascending=False)
-        df_grp[label_a]     = df_grp[label_a].map(lambda x: f"{x:,.0f}")
-        df_grp[label_b]     = df_grp[label_b].map(lambda x: f"{x:,.0f}")
+        df_grp[label_a]     = df_grp[label_a].map(lambda x: f"{_num_vc(x, 0)}")
+        df_grp[label_b]     = df_grp[label_b].map(lambda x: f"{_num_vc(x, 0)}")
         df_grp['Δ (B − A)'] = df_grp['Δ (B − A)'].map(lambda x: f"{x:+,.0f}")
         st.dataframe(df_grp, use_container_width=True, hide_index=True)
 
@@ -393,14 +634,18 @@ def _render_quebra_secao(tipo: str, titulo: str, emoji: str):
     if idx_key not in st.session_state:
         st.session_state[idx_key] = 0
 
-    col_prev, col_sel, col_next = st.columns([1, 6, 1])
+    # Mesma linha única ◀ | seletor | ▶ das demais seções (alinhamento pela
+    # base em vez dos antigos st.write('') vazios usados como espaçador).
+    # A mecânica aqui continua sendo por ÍNDICE na lista de salvos, como
+    # sempre foi -- só o layout foi padronizado.
+    col_prev, col_sel, col_next = st.columns([1, 6, 1], vertical_alignment='bottom')
     with col_prev:
-        st.write('')
-        if st.button('◀', key=f'ger_qbr_prev_{tipo}'):
+        if st.button('◀', key=f'ger_qbr_prev_{tipo}', help='Período anterior',
+                      use_container_width=True):
             st.session_state[idx_key] = min(st.session_state[idx_key] + 1, len(slugs) - 1)
     with col_next:
-        st.write('')
-        if st.button('▶', key=f'ger_qbr_next_{tipo}'):
+        if st.button('▶', key=f'ger_qbr_next_{tipo}', help='Próximo período',
+                      use_container_width=True):
             st.session_state[idx_key] = max(st.session_state[idx_key] - 1, 0)
     with col_sel:
         escolha = st.selectbox(
@@ -422,10 +667,10 @@ def _render_quebra_secao(tipo: str, titulo: str, emoji: str):
     grupos = dados.get('grupos', [])
 
     col1, col2 = st.columns(2)
-    col1.metric('Total CX Quebradas', f"{total:,.0f} cx")
+    col1.metric('Total CX Quebradas', f"{_num_vc(total, 0)} cx")
     if categorias:
         top = categorias[0]
-        col2.metric(f'Maior: {top["categoria"]}', f"{top['cx']:,.0f} cx")
+        col2.metric(f'Maior: {top["categoria"]}', f"{_num_vc(top['cx'], 0)} cx")
 
     # ── Comparativo automático vs período anterior salvo (menor é melhor)
     if idx + 1 < len(historico):
@@ -434,7 +679,7 @@ def _render_quebra_secao(tipo: str, titulo: str, emoji: str):
         comp_auto = comparativo.calcular(total, total_ant, menor_e_melhor=True)
         st.metric(
             f'📊 vs período anterior ({_qbr_label(slugs[idx + 1], tipo)})',
-            f"{total:,.0f} cx",
+            f"{_num_vc(total, 0)} cx",
             delta=comparativo.formatar_variacao(comp_auto, casas=1),
             delta_color='inverse',
         )
@@ -481,19 +726,17 @@ def _listar_recorrencias_ger():
 _FECHAMENTOS_DIR = os.path.join(_GERENCIA_DIR, 'fechamentos')
 
 
-_GER_STATUS_COR = {
-    on_track.STATUS_VERDE:    '#2D6A4F',
-    on_track.STATUS_ATENCAO:  '#B8860B',
-    on_track.STATUS_FORA:     '#C00000',
-    on_track.STATUS_SEM_META: '#6c757d',
-}
-
-
-def _on_track_status_ger(atingido: float, dia: int):
+def _on_track_status_ger(atingido: float, dia: int, total_dias: int = 6):
     """(emoji, label, hex_color) — via lógica central de On Track
-    (on_track.py), tempo decorrido em dias úteis (1..5), mesma convenção
-    já usada em Metas Semanais."""
-    pct_tempo = dia / 5 if dia > 0 else 0.0
+    (on_track.py), tempo decorrido em dias de venda da semana comercial
+    sábado a sexta (1..6, sem domingo -- ver calc.dia_semana_atual), MESMA
+    convenção usada em Metas Semanais (calc.py é a fonte única). Corrige
+    inconsistência: esta função usava a convenção ANTIGA segunda-sexta
+    (1..5, dia/5) mesmo depois da semana comercial de Metas Semanais já
+    ter virado sexta-sexta -- exatamente o tipo de divergência que a
+    Ingrid pediu pra eliminar ("não criar uma segunda lógica de
+    semana")."""
+    pct_tempo = (dia / total_dias) if total_dias else 0.0
     r = on_track.calcular(
         meta=1.0, realizado=atingido, tipo_periodo='semanal',
         periodo_ref='(dias uteis)', pct_tempo_decorrido=pct_tempo,
@@ -516,7 +759,7 @@ def _listar_ontrack_metas_hist():
     for slug, data in _listar_ontrack_hist(_ONTRACK_META_DIR):
         if slug not in items:
             items[slug] = data
-    return sorted(items.items(), key=lambda kv: kv[0], reverse=True)
+    return sorted(items.items(), key=lambda kv: _sort_key_semana_slug(kv[0]), reverse=True)
 
 
 def _listar_ontrack_clientes_hist():
@@ -542,7 +785,19 @@ def _listar_ontrack_clientes_hist():
 def _render_ontrack_publicado():
     st.header('📊 On Track Atual')
 
+    # Mensagem da correção de semana (ver "🔧 Corrigir a semana desta
+    # publicação" abaixo) -- precisa ficar guardada no session_state e
+    # exibida SÓ no rerun seguinte: st.success() chamado bem antes de um
+    # st.rerun() nunca chega a aparecer na tela (o rerun já troca a página
+    # antes da pessoa ver), dando a falsa impressão de que o botão não fez
+    # nada (bug real reportado pela Ingrid, 31/08/2026 -- ela clicou,
+    # "nada aconteceu", mas o registro novo tinha sido salvo mesmo assim).
+    _msg_corr_ot = st.session_state.pop('_ger_ot_corrigir_msg', None)
+    if _msg_corr_ot:
+        (st.success if _msg_corr_ot[0] == 'success' else st.warning)(_msg_corr_ot[1])
+
     historico_ot = _listar_ontrack_metas_hist()
+    slug_ot = None
 
     if not historico_ot:
         # backward compat: tentar arquivo único (publicações salvas antes
@@ -557,13 +812,34 @@ def _render_ontrack_publicado():
             snap = json.load(f)
     else:
         labels_ot = [_label_fech(s) + f"  —  {d.get('periodo', '-')}" for s, d in historico_ot]
-        escolha_ot = st.selectbox(
-            f'{len(historico_ot)} semana(s) disponível(is):',
-            labels_ot,
-            index=0,
-            key='ger_ot_meta_sel',
-        )
+        # Linha única ◀ | seletor | ▶, mesmo padrão das demais seções (antes
+        # era só a lista suspensa, sem setas). A lista em si e a leitura do
+        # snapshot continuam iguais -- o índice apenas passou a ficar no
+        # session_state pra as setas poderem andar nele.
+        idx_key_ot = '_ger_ot_meta_idx'
+        if idx_key_ot not in st.session_state:
+            st.session_state[idx_key_ot] = 0
+
+        col_prev_ot, col_sel_ot, col_next_ot = st.columns([1, 6, 1], vertical_alignment='bottom')
+        with col_prev_ot:
+            if st.button('◀', key='ger_ot_meta_prev', help='Semana anterior',
+                          use_container_width=True):
+                st.session_state[idx_key_ot] = min(st.session_state[idx_key_ot] + 1,
+                                                    len(labels_ot) - 1)
+        with col_next_ot:
+            if st.button('▶', key='ger_ot_meta_next', help='Próxima semana',
+                          use_container_width=True):
+                st.session_state[idx_key_ot] = max(st.session_state[idx_key_ot] - 1, 0)
+        with col_sel_ot:
+            escolha_ot = st.selectbox(
+                f'{len(historico_ot)} semana(s) disponível(is):',
+                labels_ot,
+                index=min(st.session_state[idx_key_ot], len(labels_ot) - 1),
+                key='ger_ot_meta_sel',
+            )
         idx_ot = labels_ot.index(escolha_ot)
+        st.session_state[idx_key_ot] = idx_ot
+        slug_ot = historico_ot[idx_ot][0]
         snap = historico_ot[idx_ot][1]
 
     pub_em     = snap.get('publicado_em', '')[:16].replace('T', ' ')
@@ -573,82 +849,159 @@ def _render_ontrack_publicado():
 
     st.caption(f"Período: **{periodo}**  |  Publicado em: **{pub_em}**")
 
-    dia = st.slider(
-        'Dia da semana (para status On Track)', 1, 5,
-        value=min(datetime.date.today().weekday() + 1, 5),
-        format='Dia %d de 5', key='ger_ot_dia',
-    )
+    # Corrigir semana errada (31/08/2026, pedido da Ingrid) -- mesma
+    # ferramenta e mesmo motivo da que existe em "Fechamentos Semanais"
+    # (ver _render_fechamentos_semanais acima): uma publicação feita ANTES
+    # da migração pra semana comercial sábado-a-sexta pode ter sido salva
+    # sob a semana errada, pela mesma ambiguidade da sexta que motivou a
+    # migração (publicar "hoje" numa sexta lia aquela sexta como abertura
+    # da semana NOVA, não fechamento da que estava terminando -- ver
+    # calc.py). Não recalcula nada -- só re-salva o MESMO snapshot já
+    # publicado sob o periodo_ref certo. Só aparece quando há uma semana
+    # selecionada (slug_ot) -- não no fallback do arquivo único legado.
+    if slug_ot:
+        with st.expander('🔧 Corrigir a semana desta publicação'):
+            st.caption(
+                f'Semana atual desta publicação: **{_label_fech(slug_ot)}**. '
+                'Escolha uma data dentro da semana comercial CORRETA e '
+                'confirme abaixo -- o snapshot publicado (resultados, '
+                'totais) continua exatamente o mesmo, só a semana em que '
+                'fica arquivado muda.'
+            )
+            nova_data_ot = st.date_input(
+                'Data dentro da semana correta', value=datetime.date.today(),
+                format='DD/MM/YYYY', key=f'ger_ot_corrigir_data_{slug_ot}',
+            )
+            novo_slug_ot = calc.slug_semana(nova_data_ot)
+            if novo_slug_ot == slug_ot:
+                st.caption('Essa data cai na mesma semana já usada -- nada a corrigir.')
+            else:
+                st.caption(f'Nova semana: **{calc.label_semana(novo_slug_ot)}**')
+                if st.button('✅ Corrigir e salvar sob essa semana', key=f'ger_ot_corrigir_btn_{slug_ot}'):
+                    try:
+                        _reg_corr_ot = ds.save_record(
+                            modulo=MOD_ONTRACK_METAS, tipo_periodo='semanal', periodo_ref=novo_slug_ot,
+                            valores=snap, usuario=st.session_state.get('usuario_nome'),
+                        )
+                        _erro_corr_ot = _reg_corr_ot.get('_erro_persistencia_remota') if _reg_corr_ot else None
+                        # Reseleciona automaticamente o registro CORRIGIDO.
+                        # BUG REAL encontrado em 31/08/2026 (Ingrid: "dá
+                        # sucesso, porém não altera a data"): só ajustar
+                        # st.session_state[idx_key_ot] não bastava -- o
+                        # st.selectbox abaixo tem seu PRÓPRIO key
+                        # ('ger_ot_meta_sel'), que guarda o rótulo (texto)
+                        # já escolhido. Depois que um widget com key já
+                        # rodou uma vez, o Streamlit ignora o argumento
+                        # index= em reruns seguintes e mantém o valor que
+                        # já está em session_state[key] -- por isso a
+                        # semana continuava exibindo a mesma antiga. A
+                        # correção real é apagar esse key do session_state
+                        # também, pra o widget nascer de novo no próximo
+                        # rerun usando o index= (que aí sim reflete a
+                        # semana recém-corrigida).
+                        _hist_novo_ot = _listar_ontrack_metas_hist()
+                        _slugs_novo_ot = [s for s, _ in _hist_novo_ot]
+                        if novo_slug_ot in _slugs_novo_ot:
+                            st.session_state[idx_key_ot] = _slugs_novo_ot.index(novo_slug_ot)
+                            st.session_state.pop('ger_ot_meta_sel', None)
+                        if _erro_corr_ot:
+                            st.session_state['_ger_ot_corrigir_msg'] = (
+                                'warning',
+                                f'Salvo, mas houve um problema ao persistir de forma permanente: {_erro_corr_ot}',
+                            )
+                        else:
+                            st.session_state['_ger_ot_corrigir_msg'] = (
+                                'success',
+                                f'✅ Salvo como {calc.label_semana(novo_slug_ot)}. A publicação antiga '
+                                '(sob a semana errada) continua no histórico, sem uso.',
+                            )
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f'Erro ao corrigir: {e}')
+
+        # Apagar registro órfão/duplicado (31/08/2026, pedido da Ingrid):
+        # depois de corrigir a semana de um registro, o antigo (sob a
+        # semana errada) fica pra trás na lista -- e como save_record()
+        # nunca apaga nada (só versiona), essas sobras iam se acumulando
+        # sem nenhuma forma de sumir com elas. AÇÃO IRREVERSÍVEL -- por
+        # isso exige marcar a caixinha de confirmação antes do botão
+        # ficar disponível, e não é sugerida como automática em nenhum
+        # lugar do app.
+        with st.expander('🗑️ Apagar este registro (irreversível)'):
+            st.caption(
+                f'Apaga PERMANENTEMENTE a publicação "{_label_fech(slug_ot)}" '
+                f'(período: {periodo}) -- não dá pra desfazer. Use só pra '
+                'remover sobras/duplicatas, nunca a semana que você quer manter.'
+            )
+            confirma_del_ot = st.checkbox(
+                'Confirmo que quero apagar esse registro permanentemente',
+                key=f'ger_ot_del_conf_{slug_ot}',
+            )
+            if st.button('🗑️ Apagar definitivamente', key=f'ger_ot_del_btn_{slug_ot}',
+                          disabled=not confirma_del_ot):
+                try:
+                    ok_del, err_del = ds.delete_record(MOD_ONTRACK_METAS, 'semanal', slug_ot)
+                    st.session_state[idx_key_ot] = 0
+                    st.session_state.pop('ger_ot_meta_sel', None)
+                    if ok_del:
+                        st.session_state['_ger_ot_corrigir_msg'] = (
+                            'success', f'🗑️ Registro "{_label_fech(slug_ot)}" apagado.',
+                        )
+                    else:
+                        st.session_state['_ger_ot_corrigir_msg'] = (
+                            'warning', f'Não deu pra apagar: {err_del}',
+                        )
+                    st.rerun()
+                except Exception as e:
+                    st.error(f'Erro ao apagar: {e}')
+
+    # Dia calculado em relação à semana SELECIONADA acima (slug_ot), não à
+    # que o calendário de hoje sugeriria por conta própria -- útil quando a
+    # tela está mostrando uma semana diferente da atual (histórico), já que
+    # calc.dia_semana_atual() sozinho sempre se refere à semana de hoje.
+    #
+    # O slider manual ("Dia da semana para status On Track") foi removido
+    # daqui a pedido explícito da Ingrid (31/08/2026) -- ela quis a tela
+    # mais enxuta, sem esse controle. O cálculo automático (dia_default)
+    # já é confiável agora que a semana comercial sábado-a-sexta está
+    # corrigida, então usa ele direto, sem exigir ajuste manual.
+    dia = (calc.dia_semana_no_periodo(slug_ot) if slug_ot
+           else calc.dia_semana_atual())
 
     st.divider()
 
-    # KPIs gerais
-    total_meta = sum(l['meta']    for r in resultados for l in r.get('linhas', []))
-    total_vend = sum(l['vendido'] for r in resultados for l in r.get('linhas', []))
-    total_atg  = total_vend / total_meta if total_meta else 0
-    proj_cx    = math.ceil(total_vend / dia * 5) if dia > 0 else total_vend
-    em, lb, _  = _on_track_status_ger(total_atg, dia)
+    # KPIs gerais / Faturamento Geral removidos daqui a pedido explícito da
+    # Ingrid (28/08/2026) -- ela quis a tela mais enxuta, indo direto pro
+    # detalhamento Por Produto / Por Vendedor abaixo, sem repetir o resumo
+    # geral aqui.
 
-    k1, k2, k3, k4, k5 = st.columns(5)
-    k1.metric('Meta (cx)',     f'{total_meta:,.0f}')
-    k2.metric('Vendido (cx)',  f'{total_vend:,.0f}')
-    k3.metric('% Atingido',    f'{total_atg*100:.1f}%')
-    k4.metric('Projeção (cx)', f'{proj_cx:,.0f}')
-    k5.metric('Status',        f'{em} {lb}')
-
-    tg = totais_rs.get('total_geral', {})
-    if tg:
-        st.subheader('Faturamento Geral (R$)')
-        r1, r2, r3 = st.columns(3)
-        r1.metric('Faturamento', f"R$ {tg.get('fat', 0):,.2f}")
-        r2.metric('MC R$',       f"R$ {tg.get('mc_rs', 0):,.2f}")
-        r3.metric('MC %',        f"{tg.get('mc_pct', 0):.2f}%")
-
-    # ── Comparativo vs semana anterior salva ────────────────────────────────
-    if historico_ot and idx_ot + 1 < len(historico_ot):
-        snap_ant_ot = historico_ot[idx_ot + 1][1]
-        totais_rs_ant = snap_ant_ot.get('totais_rs', {})
-        tg_ant = totais_rs_ant.get('total_geral', {})
-        vend_ant_total = sum(l['vendido'] for r in snap_ant_ot.get('resultados', [])
-                              for l in r.get('linhas', []))
-        st.subheader('📊 Comparativo vs semana anterior')
-        cc1, cc2, cc3 = st.columns(3)
-        comp_vend = comparativo.calcular(total_vend, vend_ant_total)
-        cc1.metric('Vendido (cx)', f'{total_vend:,.0f}', delta=comparativo.formatar_variacao(comp_vend))
-        if tg and tg_ant:
-            comp_fat = comparativo.calcular(tg.get('fat', 0), tg_ant.get('fat'))
-            comp_mc  = comparativo.calcular(tg.get('mc_rs', 0), tg_ant.get('mc_rs'))
-            cc2.metric('Faturamento', f"R$ {tg.get('fat', 0):,.2f}", delta=comparativo.formatar_variacao(comp_fat))
-            cc3.metric('MC R$', f"R$ {tg.get('mc_rs', 0):,.2f}", delta=comparativo.formatar_variacao(comp_mc))
-        st.caption(f'Base de comparação: {_label_fech(historico_ot[idx_ot + 1][0])}')
-
-    st.divider()
-
-    # Por produto
+    # Por produto -- mesmo padrão visual/estrutural do "Por Vendedor" logo
+    # abaixo (tabela via st.dataframe, não mais uma lista de accordions).
+    # Meta/Vendido seguem em CAIXAS (cx): não existe Faturamento/MC calculado
+    # por PRODUTO no app (só por vendedor, vindo do PDF de Lucratividade).
     st.subheader('Por Produto')
+    prow = []
     for r in resultados:
-        p_meta = sum(l['meta']    for l in r.get('linhas', []))
+        # Meta do produto = 'estoque_total' real, não a soma das metas
+        # individuais por vendedor (ver nota nos KPIs gerais acima).
+        p_meta = r.get('estoque_total', 0)
         p_vend = sum(l['vendido'] for l in r.get('linhas', []))
         p_atg  = p_vend / p_meta if p_meta else 0
         p_em, p_lb, _ = _on_track_status_ger(p_atg, dia)
-        prio = r.get('prioridade', 'Normal')
-        badge = f' — {prio}' if prio != 'Normal' else ''
-        with st.expander(
-            f"{p_em} {r.get('produto', '')}{badge}  |  "
-            f"{p_vend:,.0f}/{p_meta:,.0f} cx ({p_atg*100:.1f}%)  —  {p_lb}",
-            expanded=False,
-        ):
-            vrows = []
-            for l in r.get('linhas', []):
-                v_atg = l['vendido'] / l['meta'] if l['meta'] else 0
-                v_em, v_lb, _ = _on_track_status_ger(v_atg, dia)
-                vrows.append({
-                    'Vendedor':     l.get('vendedor', ''),
-                    'Meta (cx)':   f"{l['meta']:,.0f}",
-                    'Vendido (cx)': f"{l['vendido']:,.0f}",
-                    '% Atingido':  f"{v_atg*100:.1f}%",
-                    'Status':      f'{v_em} {v_lb}',
-                })
-            st.dataframe(pd.DataFrame(vrows), use_container_width=True, hide_index=True)
+        prow.append({
+            'Produto':      r.get('produto', ''),
+            'Prioridade':   r.get('prioridade', 'Normal'),
+            'Meta (cx)':    p_meta,
+            'Vendido (cx)': p_vend,
+            '% Atingido':   p_atg,
+            'Status':       f'{p_em} {p_lb}',
+        })
+    df_prod = pd.DataFrame(prow)
+    if not df_prod.empty:
+        df_prod['Meta (cx)']    = df_prod['Meta (cx)'].map(lambda x: f'{_num_vc(x, 0)}')
+        df_prod['Vendido (cx)'] = df_prod['Vendido (cx)'].map(lambda x: f'{_num_vc(x, 0)}')
+        df_prod['% Atingido']   = df_prod['% Atingido'].map(lambda x: f'{x*100:.1f}%')
+    st.dataframe(df_prod, use_container_width=True, hide_index=True)
 
     st.divider()
 
@@ -671,12 +1024,12 @@ def _render_ontrack_publicado():
         rs = vend_rs.get(v, {})
         vrows_all.append({
             'Vendedor':     v,
-            'Meta (cx)':   f"{ag['meta']:,.0f}",
-            'Vendido (cx)': f"{ag['vendido']:,.0f}",
+            'Meta (cx)':   f"{_num_vc(ag['meta'], 0)}",
+            'Vendido (cx)': f"{_num_vc(ag['vendido'], 0)}",
             '% Atingido':  f"{v_atg*100:.1f}%",
             'Status':      f'{v_em} {v_lb}',
-            'Fat R$':      f"R$ {rs['fat']:,.2f}"   if rs.get('fat')    is not None else '—',
-            'MC R$':       f"R$ {rs['mc_rs']:,.2f}" if rs.get('mc_rs') is not None else '—',
+            'Fat R$':      f"R$ {_num_vc(rs['fat'], 2)}"   if rs.get('fat')    is not None else '—',
+            'MC R$':       f"R$ {_num_vc(rs['mc_rs'], 2)}" if rs.get('mc_rs') is not None else '—',
         })
     st.dataframe(pd.DataFrame(vrows_all), use_container_width=True, hide_index=True)
 
@@ -715,18 +1068,62 @@ def _listar_fechamentos():
         except Exception:
             pass
 
-    return sorted(items.items(), key=lambda kv: kv[0], reverse=True)
+    return sorted(items.items(), key=lambda kv: _sort_key_semana_slug(kv[0]), reverse=True)
 
 
 def _label_fech(slug: str) -> str:
+    """Rótulo em português do fechamento `slug`.
+
+    BUG REAL encontrado em 31/08/2026 (reportado pela Ingrid: rótulo
+    'Semana 28/08 a 04/09' sem sentido pra um fechamento cujo período era
+    21/08 a 28/08): esta função reimplementava sua PRÓPRIA conta de data
+    de fim (+7 dias corridos, sem pular domingo) em vez de usar
+    calc.label_semana() -- exatamente o tipo de "segunda lógica de
+    semana divergente" que a Ingrid pediu pra nunca existir (26/08/2026).
+    Além de duplicada, essa conta local nunca foi atualizada quando a
+    semana comercial virou sábado-a-sexta (31/08/2026, ver calc.py), então
+    seguia calculando como se ainda fosse a definição antiga.
+
+    FONTE ÚNICA agora: calc.label_semana(), a mesma usada em Metas
+    Semanais e nas demais seções desta página. Formato antigo "AAAA-Www"
+    (slugs arquivados de antes da migração pra semana comercial em
+    18/08/2026) continua caindo em periodo_mod.rotulo()."""
+    if '-W' in slug:
+        try:
+            return periodo_mod.rotulo('semanal', slug)
+        except Exception:
+            return slug
+    return calc.label_semana(slug)
+
+
+def _sort_key_semana_slug(slug: str) -> str:
+    """Chave de ordenação cronológica pros slugs de semana de Metas
+    Semanais (MOD_FECHAMENTO / MOD_ONTRACK_METAS), que durante a transição
+    pra semana sexta-a-sexta podem estar em dois formatos: o antigo ISO
+    "AAAA-Www" e o novo "AAAA-MM-DD". Ordenar a string pura intercala os
+    dois formatos errado ('W' > dígito no ASCII) -- aqui os dois convergem
+    pra uma data real comparável (a segunda-feira ISO da semana, no
+    formato antigo)."""
     try:
-        return periodo_mod.rotulo('semanal', slug)
-    except Exception:
+        ano_s, semana_s = slug.split('-W')
+        return datetime.date.fromisocalendar(int(ano_s), int(semana_s), 1).isoformat()
+    except (ValueError, IndexError):
         return slug
 
 
 def _render_fechamentos_semanais():
     st.header('🏁 Fechamentos Semanais')
+
+    # Mensagem da correção de semana (ver "🔧 Corrigir a semana deste
+    # fechamento" abaixo) -- mesmo motivo do comentário equivalente em
+    # _render_ontrack_publicado() acima: st.success() logo antes de um
+    # st.rerun() nunca chega a aparecer (bug real reportado pela Ingrid,
+    # 31/08/2026 -- "não está dando certo" / "nada acontece", quando na
+    # real o registro novo tinha sido salvo).
+    _msg_corr_fech = st.session_state.pop('_ger_fech_corrigir_msg', None)
+    if _msg_corr_fech:
+        (st.success if _msg_corr_fech[0] == 'success' else st.warning)(_msg_corr_fech[1])
+
     historico = _listar_fechamentos()
 
     if not historico:
@@ -743,14 +1140,13 @@ def _render_fechamentos_semanais():
     if idx_key not in st.session_state:
         st.session_state[idx_key] = 0
 
-    col_prev, col_sel, col_next = st.columns([1, 6, 1])
+    # Linha única ◀ | seletor | ▶ padronizada com as demais seções.
+    col_prev, col_sel, col_next = st.columns([1, 6, 1], vertical_alignment='bottom')
     with col_prev:
-        st.write('')
-        if st.button('◀', key='ger_fech_prev', help='Semana anterior'):
+        if st.button('◀', key='ger_fech_prev', help='Semana anterior', use_container_width=True):
             st.session_state[idx_key] = min(st.session_state[idx_key] + 1, len(slugs) - 1)
     with col_next:
-        st.write('')
-        if st.button('▶', key='ger_fech_next', help='Próxima semana'):
+        if st.button('▶', key='ger_fech_next', help='Próxima semana', use_container_width=True):
             st.session_state[idx_key] = max(st.session_state[idx_key] - 1, 0)
     with col_sel:
         escolha = st.selectbox(
@@ -761,28 +1157,115 @@ def _render_fechamentos_semanais():
         )
         st.session_state[idx_key] = labels.index(escolha)
 
-    idx   = st.session_state[idx_key]
-    dados = historico[idx][1]
+    idx        = st.session_state[idx_key]
+    slug_atual = slugs[idx]
+    dados      = historico[idx][1]
 
     gerado = dados.get('gerado_em', '')[:16].replace('T', ' ')
     st.caption(f"Período: {dados.get('periodo', '-')}  |  Salvo em: {gerado}")
 
-    prods     = dados.get('produtos', [])
-    h_meta    = sum(l['meta']    for r in prods for l in r.get('linhas', []))
-    h_vend    = sum(l['vendido'] for r in prods for l in r.get('linhas', []))
-    h_atg     = h_vend / h_meta if h_meta else 0
+    # Corrigir semana errada (31/08/2026, pedido da Ingrid): um fechamento
+    # feito ANTES da migração pra semana comercial sábado-a-sexta podia ter
+    # sido salvo sob a semana errada por causa da própria ambiguidade da
+    # sexta que motivou essa migração (fechar "hoje" numa sexta lia aquela
+    # sexta como abertura da semana NOVA, não fechamento da que estava
+    # terminando -- ver calc.py). A Ingrid não quer recalcular/refechar do
+    # zero pra corrigir isso -- só re-salva os MESMOS dados já calculados
+    # sob o periodo_ref certo. O fechamento antigo (sob a semana errada)
+    # não é apagado (não existe uma função de apagar em data_store.py, e
+    # não é o caso de criar uma só pra isso) -- fica órfão no histórico,
+    # sem efeito prático, exatamente como já foi explicado pra ela.
+    with st.expander('🔧 Corrigir a semana deste fechamento'):
+        st.caption(
+            f'Semana atual deste fechamento: **{_label_fech(slug_atual)}**. '
+            'Escolha uma data dentro da semana comercial CORRETA (qualquer '
+            'dia entre a abertura e o fechamento dela) e confirme abaixo -- '
+            'os dados calculados (metas, vendido, matriz produto × '
+            'vendedor) continuam exatamente os mesmos, só a semana em que '
+            'ficam arquivados muda.'
+        )
+        nova_data_fech = st.date_input(
+            'Data dentro da semana correta', value=datetime.date.today(),
+            format='DD/MM/YYYY', key=f'ger_fech_corrigir_data_{slug_atual}',
+        )
+        novo_slug_fech = calc.slug_semana(nova_data_fech)
+        if novo_slug_fech == slug_atual:
+            st.caption('Essa data cai na mesma semana já usada -- nada a corrigir.')
+        else:
+            st.caption(f'Nova semana: **{calc.label_semana(novo_slug_fech)}**')
+            if st.button('✅ Corrigir e salvar sob essa semana', key=f'ger_fech_corrigir_btn_{slug_atual}'):
+                try:
+                    _reg_corr = ds.save_record(
+                        modulo=MOD_FECHAMENTO, tipo_periodo='semanal', periodo_ref=novo_slug_fech,
+                        valores=dados, usuario=st.session_state.get('usuario_nome'),
+                    )
+                    _erro_corr = _reg_corr.get('_erro_persistencia_remota') if _reg_corr else None
+                    # Reseleciona automaticamente o registro CORRIGIDO --
+                    # mesmo bug e mesma correção do comentário equivalente
+                    # na correção de On Track acima ("dá sucesso, porém não
+                    # altera a data"): o st.selectbox tem seu PRÓPRIO key
+                    # ('ger_fech_sel'), que precisa ser apagado do
+                    # session_state também -- só ajustar idx_key não é
+                    # suficiente, porque o Streamlit ignora index= num
+                    # widget com key que já rodou antes.
+                    _hist_novo_fech = _listar_fechamentos()
+                    _slugs_novo_fech = [s for s, _ in _hist_novo_fech]
+                    if novo_slug_fech in _slugs_novo_fech:
+                        st.session_state[idx_key] = _slugs_novo_fech.index(novo_slug_fech)
+                        st.session_state.pop('ger_fech_sel', None)
+                    if _erro_corr:
+                        st.session_state['_ger_fech_corrigir_msg'] = (
+                            'warning',
+                            f'Salvo, mas houve um problema ao persistir de forma permanente: {_erro_corr}',
+                        )
+                    else:
+                        st.session_state['_ger_fech_corrigir_msg'] = (
+                            'success',
+                            f'✅ Salvo como {calc.label_semana(novo_slug_fech)}. O fechamento antigo '
+                            '(sob a semana errada) continua no histórico, sem uso.',
+                        )
+                    st.rerun()
+                except Exception as e:
+                    st.error(f'Erro ao corrigir: {e}')
 
-    c1, c2, c3 = st.columns(3)
-    c1.metric('Meta total (cx)', f'{h_meta:,.0f}')
-    c2.metric('Vendido (cx)',    f'{h_vend:,.0f}')
-    c3.metric('% Atingido',     f'{h_atg*100:.1f}%')
+    # Apagar registro órfão/duplicado -- mesmo motivo e mesma ferramenta
+    # do comentário equivalente em _render_ontrack_publicado() acima.
+    # AÇÃO IRREVERSÍVEL -- exige confirmação explícita antes do botão
+    # ficar disponível.
+    with st.expander('🗑️ Apagar este fechamento (irreversível)'):
+        st.caption(
+            f'Apaga PERMANENTEMENTE o fechamento "{_label_fech(slug_atual)}" '
+            f'(período: {dados.get("periodo", "-")}) -- não dá pra desfazer. '
+            'Use só pra remover sobras/duplicatas, nunca a semana que você '
+            'quer manter.'
+        )
+        confirma_del_fech = st.checkbox(
+            'Confirmo que quero apagar esse fechamento permanentemente',
+            key=f'ger_fech_del_conf_{slug_atual}',
+        )
+        if st.button('🗑️ Apagar definitivamente', key=f'ger_fech_del_btn_{slug_atual}',
+                      disabled=not confirma_del_fech):
+            try:
+                ok_del_f, err_del_f = ds.delete_record(MOD_FECHAMENTO, 'semanal', slug_atual)
+                st.session_state[idx_key] = 0
+                st.session_state.pop('ger_fech_sel', None)
+                if ok_del_f:
+                    st.session_state['_ger_fech_corrigir_msg'] = (
+                        'success', f'🗑️ Fechamento "{_label_fech(slug_atual)}" apagado.',
+                    )
+                else:
+                    st.session_state['_ger_fech_corrigir_msg'] = (
+                        'warning', f'Não deu pra apagar: {err_del_f}',
+                    )
+                st.rerun()
+            except Exception as e:
+                st.error(f'Erro ao apagar: {e}')
 
-    tg = dados.get('totais_rs', {}).get('total_geral', {})
-    if tg:
-        r1, r2, r3 = st.columns(3)
-        r1.metric('Faturamento', f"R$ {tg.get('fat', 0):,.2f}")
-        r2.metric('MC R$',       f"R$ {tg.get('mc_rs', 0):,.2f}")
-        r3.metric('MC %',        f"{tg.get('mc_pct', 0):.2f}%")
+    prods = dados.get('produtos', [])
+
+    # KPIs gerais / Faturamento Geral removidos daqui a pedido explícito da
+    # Ingrid (28/08/2026), mesmo ajuste feito em "On Track Atual" -- tela
+    # mais enxuta, indo direto pra matriz Produto × Vendedor abaixo.
 
     st.divider()
 
@@ -791,42 +1274,9 @@ def _render_fechamentos_semanais():
     # resumo_matriz.py, pra nunca ficar diferente daqui pra lá)
     resumo_matriz.render_matriz_produto_vendedor(prods)
 
-    # Comparativo entre semanas (se houver mais de 1)
-    if len(historico) >= 2:
-        st.divider()
-        st.subheader('Comparativo de Semanas')
-        st.caption('Variação (Δ%) sempre em relação à semana anterior na lista (mais antiga primeiro).')
-
-        historico_asc = sorted(historico, key=lambda kv: kv[0])  # mais antiga primeiro p/ calcular Δ
-        comp_rows = []
-        vend_anterior = None
-        fat_anterior = None
-        for s, d in historico_asc:
-            dp    = d.get('produtos', [])
-            dm    = sum(l['meta']    for r in dp for l in r.get('linhas', []))
-            dv    = sum(l['vendido'] for r in dp for l in r.get('linhas', []))
-            da    = dv / dm if dm else 0
-            dtg   = d.get('totais_rs', {}).get('total_geral', {})
-            fat   = dtg.get('fat') if dtg else None
-
-            comp_v = comparativo.calcular(dv, vend_anterior)
-            comp_f = comparativo.calcular(fat, fat_anterior) if fat is not None else None
-
-            comp_rows.append({
-                'Semana':        _label_fech(s),
-                'Período':       d.get('periodo', '-'),
-                'Meta (cx)':    f'{dm:,.0f}',
-                'Vendido (cx)': f'{dv:,.0f}',
-                'Δ Vendido':    comparativo.formatar_variacao(comp_v, casas=1),
-                '% Atingido':   f'{da*100:.1f}%',
-                'Fat R$':       f"R$ {fat:,.2f}" if fat is not None else '—',
-                'Δ Fat':        comparativo.formatar_variacao(comp_f, casas=1) if comp_f else 'n/d',
-                'MC %':         f"{dtg.get('mc_pct', 0):.2f}%" if dtg else '—',
-            })
-            vend_anterior = dv
-            fat_anterior = fat
-
-        st.dataframe(pd.DataFrame(list(reversed(comp_rows))), use_container_width=True, hide_index=True)
+    # Comparativo de Semanas removido daqui a pedido explícito da Ingrid
+    # (28/08/2026) -- tela mais enxuta, encerrando na matriz Produto ×
+    # Vendedor acima.
 
 
 def _render_ontrack_clientes():
@@ -847,13 +1297,32 @@ def _render_ontrack_clientes():
             snap = json.load(f)
     else:
         labels_cli = [_label_slug(s, 'mensal') + f"  —  {d.get('periodo', '-')}" for s, d in historico_cli]
-        escolha_cli = st.selectbox(
-            f'{len(historico_cli)} mês(es) disponível(is):',
-            labels_cli,
-            index=0,
-            key='ger_ot_cli_sel',
-        )
+        # Linha única ◀ | seletor | ▶, mesmo padrão das demais seções (antes
+        # era só a lista suspensa, sem setas). A lista e a leitura do
+        # snapshot continuam iguais.
+        idx_key_cli = '_ger_ot_cli_idx'
+        if idx_key_cli not in st.session_state:
+            st.session_state[idx_key_cli] = 0
+
+        col_prev_cli, col_sel_cli, col_next_cli = st.columns([1, 6, 1], vertical_alignment='bottom')
+        with col_prev_cli:
+            if st.button('◀', key='ger_ot_cli_prev', help='Mês anterior',
+                          use_container_width=True):
+                st.session_state[idx_key_cli] = min(st.session_state[idx_key_cli] + 1,
+                                                     len(labels_cli) - 1)
+        with col_next_cli:
+            if st.button('▶', key='ger_ot_cli_next', help='Próximo mês',
+                          use_container_width=True):
+                st.session_state[idx_key_cli] = max(st.session_state[idx_key_cli] - 1, 0)
+        with col_sel_cli:
+            escolha_cli = st.selectbox(
+                f'{len(historico_cli)} mês(es) disponível(is):',
+                labels_cli,
+                index=min(st.session_state[idx_key_cli], len(labels_cli) - 1),
+                key='ger_ot_cli_sel',
+            )
         idx_cli = labels_cli.index(escolha_cli)
+        st.session_state[idx_key_cli] = idx_cli
         snap = historico_cli[idx_cli][1]
 
     pub_em         = snap.get('publicado_em', '')[:16].replace('T', ' ')
@@ -892,37 +1361,19 @@ def _render_ontrack_clientes():
 
     g_em, g_lb, _ = _ot_status_cli(tot_pct, elapsed_pct)
     cor_s  = _COR.get(g_em, '#888')
-    cor_d  = '#2D6A4F' if tot_dif >= 0 else '#C00000'
 
-    # Cards de resumo
-    st.markdown(f"""
-    <div style="display:grid; grid-template-columns:repeat(6,1fr); gap:10px; margin-bottom:14px;">
-      <div style="background:#f8f9fa; border-left:4px solid #2D6A4F; border-radius:8px; padding:12px 10px;">
-        <div style="font-size:10px; color:#666; font-weight:700;">META MENSAL</div>
-        <div style="font-size:15px; font-weight:700; color:#1B4332; margin-top:4px;">{_brl(tot_meta)}</div>
-      </div>
-      <div style="background:#f8f9fa; border-left:4px solid #4472C4; border-radius:8px; padding:12px 10px;">
-        <div style="font-size:10px; color:#666; font-weight:700;">FATURAMENTO</div>
-        <div style="font-size:15px; font-weight:700; color:#1F4E79; margin-top:4px;">{_brl(tot_fat)}</div>
-      </div>
-      <div style="background:#f8f9fa; border-left:4px solid {cor_s}; border-radius:8px; padding:12px 10px;">
-        <div style="font-size:10px; color:#666; font-weight:700;">% ATINGIDO</div>
-        <div style="font-size:15px; font-weight:700; color:{cor_s}; margin-top:4px;">{tot_pct*100:.1f}% {g_em}</div>
-      </div>
-      <div style="background:#f8f9fa; border-left:4px solid #C00000; border-radius:8px; padding:12px 10px;">
-        <div style="font-size:10px; color:#666; font-weight:700;">VALOR RESTANTE</div>
-        <div style="font-size:15px; font-weight:700; color:#C00000; margin-top:4px;">{_brl(tot_rest)}</div>
-      </div>
-      <div style="background:#f8f9fa; border-left:4px solid #375623; border-radius:8px; padding:12px 10px;">
-        <div style="font-size:10px; color:#666; font-weight:700;">PROJEÇÃO MÊS</div>
-        <div style="font-size:15px; font-weight:700; color:#375623; margin-top:4px;">{_brl(tot_proj)}</div>
-      </div>
-      <div style="background:#f8f9fa; border-left:4px solid {cor_d}; border-radius:8px; padding:12px 10px;">
-        <div style="font-size:10px; color:#666; font-weight:700;">DIFERENÇA PROJ.</div>
-        <div style="font-size:15px; font-weight:700; color:{cor_d}; margin-top:4px;">{'▲' if tot_dif >= 0 else '▼'} {_brl(abs(tot_dif))}</div>
-      </div>
-    </div>
-    """, unsafe_allow_html=True)
+    # Cards de resumo em st.metric NATIVO (antes: grid de 6 divs cinza com
+    # borda esquerda colorida montadas à mão). Mesmos 6 indicadores, mesma
+    # ordem e mesmos valores -- o emoji de status segue no "% Atingido" e a
+    # seta ▲/▼ segue na "Diferença Proj.".
+    cm1, cm2, cm3, cm4, cm5, cm6 = st.columns(6)
+    cm1.metric('Meta Mensal',     _brl(tot_meta))
+    cm2.metric('Faturamento',     _brl(tot_fat))
+    cm3.metric('% Atingido',      f'{tot_pct*100:.1f}% {g_em}')
+    cm3.caption(f'{g_em} {g_lb}')
+    cm4.metric('Valor Restante',  _brl(tot_rest))
+    cm5.metric('Projeção Mês',    _brl(tot_proj))
+    cm6.metric('Diferença Proj.', f"{'▲' if tot_dif >= 0 else '▼'} {_brl(abs(tot_dif))}")
 
     # Barra de progresso
     prog_w = min(tot_pct, 1.0) * 100
@@ -1034,6 +1485,11 @@ def _brl_vc(v):
     return f"R$ {'-' if v < 0 else ''}{s}"
 
 
+def _num_vc(v, casas=0):
+    v = v or 0.0
+    return f"{v:,.{casas}f}".replace(',', 'X').replace('.', ',').replace('X', '.')
+
+
 def _get_meta_fat_vc(historico_data: dict, vend: str, cli_key: str):
     """Busca meta de faturamento do cliente no histórico salvo -- mesma
     lógica de pages/3_Vendedor_Cliente_OTHIL.py (não duplica o cálculo,
@@ -1136,7 +1592,7 @@ def _render_top50_clientes_ger():
                 'Vendedor': vendedor, 'Cliente': cliente,
                 '_fat': fat, '_vol': vol, '_mc_rs': mc_rs, '_mc_pct': mc_pct,
                 '_pct_atg': pct_atg or 0, 'Faturamento': _brl_vc(fat),
-                'Volume (cx)': f'{vol:,.0f}', 'Margem (MC R$)': _brl_vc(mc_rs),
+                'Volume (cx)': f'{_num_vc(vol, 0)}', 'Margem (MC R$)': _brl_vc(mc_rs),
                 'Rentabilidade': f'{mc_pct:.1f}%',
                 'Comparativo': comparativo.formatar_variacao(comp),
                 '% Atingido': f'{pct_atg*100:.1f}%' if pct_atg is not None else '—',
@@ -1234,7 +1690,7 @@ def _render_clientes_por_vendedor_ger():
 
         linhas_pv.append({
             '_fat': fat,
-            'Cliente': cliente, 'Faturamento': _brl_vc(fat), 'Volume (cx)': f'{vol:,.0f}',
+            'Cliente': cliente, 'Faturamento': _brl_vc(fat), 'Volume (cx)': f'{_num_vc(vol, 0)}',
             'Margem (MC R$)': _brl_vc(mc_rs), 'Rentabilidade': f'{mc_pct:.1f}%',
             'Comparativo': comparativo.formatar_variacao(comp),
             'Participação no vendedor': f'{participacao*100:.1f}%',
@@ -1575,62 +2031,159 @@ def _render_prevperdas_secao(tipo, titulo):
 
 # ── Metas Gerais ────────────────────────────────────────────────────────────
 
-_GER_STATUS_LABEL_COR = {
-    on_track.STATUS_VERDE:    ('#D8EFE3', '#1B4332'),
-    on_track.STATUS_ATENCAO:  ('#FEF9C3', '#7D6608'),
-    on_track.STATUS_FORA:     ('#FADADD', '#7A1F2B'),
-    on_track.STATUS_SEM_META: ('#EDEDED', '#555555'),
-}
+def _badge_indicador_simples(status, titulo, valor_txt, detalhe=None,
+                              pct_atingido=None, pct_esperado=None):
+    """Indicador em formato de BARRA DE PROGRESSO que cresce em direção à
+    meta -- pedido explícito da Ingrid, 03/09/2026 (com print de referência
+    em anexo, estilo barra de progresso/data bar): "Quero como se fosse uma
+    barra que vai crescendo à medida que chega perto da meta." Antes (desde
+    28/08/2026) era um cartão colorido "chapado" (badge, só cor de fundo +
+    número), sem crescer visualmente com o progresso -- ela esclareceu que
+    não era isso que queria. Reaproveita o MESMO estilo de barra já usado
+    em outros lugares da Gerência (Ranking de Vendedores, OnTrack por
+    Cliente -- ver por ex. as barras logo acima de "🏆 Ranking de
+    Vendedores"), não inventado do zero: fundo cinza claro, preenchimento
+    sólido na cor do status, com o traço vertical de "ritmo esperado".
 
+    O rótulo do OnTrack (🟢 On Track / 🟡 Atenção / 🔴 Fora do Track / ⚪ Sem
+    meta), pedido também em 03/09/2026 ("Eu quero ontrack, alem da
+    porcentagem, lembra?"), continua aparecendo -- agora acima da barra.
 
-def _render_indicador_mg(titulo, unidade_fmt, meta, realizado, ot, completude_msg=None):
-    bg, fg = _GER_STATUS_LABEL_COR[ot['status']]
-    st.markdown(f"""
-    <div style="background:{bg}; color:{fg}; border-radius:10px; padding:0.9rem 1rem; margin-bottom:0.5rem;">
-        <div style="font-weight:600; font-size:0.95rem;">{ot['emoji']} {titulo}</div>
-        <div style="font-size:1.4rem; font-weight:700; margin-top:0.2rem;">
-            {unidade_fmt(realizado) if realizado is not None else '—'}
-        </div>
-        <div style="font-size:0.82rem; opacity:0.85;">
-            Meta: {unidade_fmt(meta) if meta else '—'}
-            {'  |  ' + ot['label'] if meta else ''}
-            {f"  |  {ot['pct_atingido']*100:.0f}% da meta" if ot.get('pct_atingido') is not None else ''}
-        </div>
-        {f'<div style="font-size:0.78rem; opacity:0.75; margin-top:0.2rem;">Projeção de fechamento: {unidade_fmt(ot["projecao_fechamento"])}</div>' if ot.get('projecao_fechamento') is not None else ''}
-    </div>
-    """, unsafe_allow_html=True)
-    if completude_msg:
-        st.caption(completude_msg)
+    pct_atingido: fração (pode passar de 1.0) do quanto já foi atingido da
+    meta -- define o preenchimento da barra (capado visualmente em 100%,
+    mesmo quando o valor real ultrapassa isso). None = sem meta/dado ainda
+    (barra vazia, mesmo caso de sempre tratado pelos chamadores via '—' em
+    valor_txt).
+    pct_esperado: fração (0.0-1.0) de quanto já era esperado ter sido
+    atingido até agora (ex.: tempo decorrido do período) -- desenha o
+    traço de ritmo esperado, igual às barras do Ranking/OnTrack por
+    Cliente. Opcional: nem todo indicador tem essa referência calculada
+    (ex.: Quebra com teto em % do faturamento, onde o "esperado" não é
+    proporcional ao tempo, e sim ao faturamento realizado -- nesse caso
+    fica sem o traço, só a barra)."""
+    cores = _GER_STATUS_CORES[status]
+    rotulo_ot = f'{on_track.EMOJI[status]} {on_track.LABEL[status]}'
+    prog_w = min(max(pct_atingido, 0.0), 1.0) * 100 if pct_atingido is not None else 0.0
+
+    marcador_html = ''
+    if pct_esperado is not None:
+        exp_w = min(max(pct_esperado, 0.0), 1.0) * 100
+        marcador_html = (
+            f'<div style="position:absolute; top:0; left:{exp_w:.1f}%; width:2px; '
+            f'height:28px; background:#333; opacity:.45;" '
+            f'title="Ritmo esperado: {exp_w:.0f}%"></div>'
+        )
+
+    # Com a barra ainda estreita, o número não cabe dentro dela sem cortar
+    # -- abaixo de ~12% de preenchimento o valor sai pra fora, à direita,
+    # em vez de espremido dentro do trecho colorido.
+    if prog_w >= 12:
+        barra_interior = (
+            f'<div style="background:{cores["cor"]}; width:{prog_w:.1f}%; height:28px; '
+            f'border-radius:8px; display:flex; align-items:center; justify-content:flex-end; '
+            f'padding-right:8px;"><span style="color:white; font-weight:700; font-size:13px; '
+            f'white-space:nowrap;">{valor_txt}</span></div>'
+        )
+        valor_fora_html = ''
+    else:
+        barra_interior = (
+            f'<div style="background:{cores["cor"]}; width:{prog_w:.1f}%; height:28px; '
+            f'border-radius:8px;"></div>'
+        )
+        valor_fora_html = (
+            f'<span style="position:absolute; top:0; left:calc({prog_w:.1f}% + 6px); '
+            f'line-height:28px; color:{cores["cor"]}; font-weight:700; font-size:13px; '
+            f'white-space:nowrap;">{valor_txt}</span>'
+        )
+
+    st.markdown(
+        f'<div style="margin-bottom:0.2rem;">'
+        f'<div style="font-size:0.8rem; font-weight:600; color:#333;">{titulo}</div>'
+        f'<div style="font-size:0.8rem; font-weight:700; color:{cores["cor"]}; margin:1px 0 4px;">{rotulo_ot}</div>'
+        f'<div style="background:#e8e8e8; border-radius:8px; height:28px; position:relative;">'
+        f'{barra_interior}{marcador_html}{valor_fora_html}'
+        f'</div></div>',
+        unsafe_allow_html=True,
+    )
+    if detalhe:
+        st.caption(detalhe)
 
 
 def _render_metas_gerais():
     st.header('🌐 Meta Geral')
     st.caption(
         'Painel consolidado — Faturamento, Volume, Margem e Quebra da empresa inteira. '
-        'Independente das Metas Semanais. O "Realizado" é somado automaticamente a partir '
-        'dos módulos Vendedor-Cliente e Quebras (não precisa digitar de novo aqui).'
+        'Independente das Metas Semanais. O "Realizado" é publicado nos módulos '
+        '**Vendedor-Cliente** (Faturamento/Volume/Margem, seção "Publicar Realizado da Meta '
+        'Geral") e **Quebras** (Quebra, aba Mensal) -- upload sempre lá, resultado só aqui.'
     )
 
-    tipos_mg = [t for t in periodo_mod.TIPOS_PERIODO if t != 'semanal']
+    # "Semanal" incluído a pedido explícito da Ingrid, 03/09/2026: "no tipo
+    # de periodo adicionaremos semanal também, e quando selecionarmos o
+    # periodo semanal o ontrack atualiza de acordo com o que foi definido
+    # para a quebra da meta mensal". Semanal NÃO é um período com
+    # meta/realizado PRÓPRIOS (não existe "meta semanal" cadastrada em
+    # lugar nenhum) -- é uma LENTE sobre o mês: escolhida uma semana, os 3
+    # indicadores lá embaixo (Faturamento/Margem/Quebra) passam a comparar
+    # o realizado DAQUELA semana contra o pedaço esperado da meta MENSAL
+    # até ali (mg.quebra_semanal_meta -- a mesma quebra semanal já
+    # configurável em "📅 OnTrack Semanal", agora também disponível pra
+    # Margem e Quebra, não só Faturamento). Todo o resto da aba (Evolução,
+    # Ranking de Vendedores, formulário de meta, histórico) continua
+    # ancorado no MÊS que contém a semana escolhida e funciona exatamente
+    # igual ao modo "Mensal" -- por isso tipo_mg/ref_mg abaixo sempre
+    # acabam virando 'mensal'/<mês> mesmo quando "Semanal" foi selecionado,
+    # em vez de espalhar um tipo de período novo (que periodo.py não
+    # conhece) pelo resto da função.
+    tipos_mg = list(periodo_mod.TIPOS_PERIODO)
     col_tipo, col_periodo = st.columns([1, 2])
     with col_tipo:
-        tipo_mg = st.selectbox(
+        tipo_mg_sel = st.selectbox(
             'Tipo de período', tipos_mg,
             format_func=periodo_mod.rotulo_tipo, index=0, key='mg_tipo',
         )
     with col_periodo:
-        opcoes_periodo = periodo_mod.listar_periodos(tipo_mg, n=16)
-        ref_mg = st.selectbox(
-            'Período', opcoes_periodo,
-            format_func=lambda r: periodo_mod.rotulo(tipo_mg, r), index=0, key='mg_periodo',
+        # Calendário em vez de lista suspensa (pedido explícito da Ingrid,
+        # 31/08/2026: "no período, preciso que tenha um calendário") -- antes
+        # só dava pra escolher entre os últimos 16 períodos prontos
+        # (periodo_mod.listar_periodos), o que não alcançava períodos mais
+        # antigos. Agora escolhe QUALQUER data no calendário e o app calcula
+        # sozinho, via periodo_mod.periodo_ref(), o mês/trimestre/semestre/ano
+        # (ou, em Semanal, a semana comercial de sábado a sexta) que contém
+        # essa data -- a mesma data escolhida também vale ao trocar o "Tipo
+        # de período" ao lado (ex.: escolheu 15/08/2026, troca pra
+        # Trimestral, cai automaticamente no 3º trimestre/2026, sem precisar
+        # reescolher a data).
+        data_ref_mg = st.date_input(
+            'Período', value=datetime.date.today(), format='DD/MM/YYYY', key='mg_data_ref',
+            help='Escolhe qualquer data dentro do período que você quer ver -- '
+                 'o app calcula sozinho o mês/trimestre/semestre/ano (ou, em '
+                 'Semanal, a semana comercial de sábado a sexta) que contém essa data.',
         )
+        semana_sel = None
+        if tipo_mg_sel == 'semanal':
+            ref_mg = periodo_mod.periodo_ref('mensal', data_ref_mg)
+            tipo_mg = 'mensal'
+            _semanas_mes_sel = mg.semanas_comerciais_do_mes(ref_mg)
+            _idx_sem_sel = next(
+                (i for i, s in enumerate(_semanas_mes_sel) if s['ini'] <= data_ref_mg <= s['fim']),
+                len(_semanas_mes_sel) - 1,
+            )
+            semana_sel = _semanas_mes_sel[_idx_sem_sel]
+            st.caption(f"Período selecionado: **{semana_sel['label']}** "
+                       f"— dentro de {periodo_mod.rotulo('mensal', ref_mg)}.")
+        else:
+            tipo_mg = tipo_mg_sel
+            ref_mg = periodo_mod.periodo_ref(tipo_mg, data_ref_mg)
+            st.caption(f'Período selecionado: **{periodo_mod.rotulo(tipo_mg, ref_mg)}**')
 
     # ── Realizado (agregado automaticamente) ────────────────────────────────
     rv = mg.realizado_vendas(tipo_mg, ref_mg)
     rq = mg.realizado_quebra(tipo_mg, ref_mg)
-    ref_ant_mg = periodo_mod.periodo_anterior(tipo_mg, ref_mg)
-    rv_ant = mg.realizado_vendas(tipo_mg, ref_ant_mg)
-    rq_ant = mg.realizado_quebra(tipo_mg, ref_ant_mg)
+    # Os blocos "Comparativo vs período anterior" (Empresa e Vendedor) foram
+    # removidos a pedido explícito da Ingrid em 26/08/2026 ("remover
+    # completamente"), junto com o cálculo de período/realizado anterior
+    # que só existia pra alimentá-los.
 
     tab_empresa, tab_vendedor = st.tabs(['🏢 Empresa', '👤 Vendedor'])
 
@@ -1639,7 +2192,244 @@ def _render_metas_gerais():
     # =========================================================================
     with tab_empresa:
         meta_atual = mg.carregar_meta(tipo_mg, ref_mg) or {}
+
+        # ── Indicadores primeiro ─────────────────────────────────────────────
+        # Ordem de leitura invertida em relação à versão anterior (que abria
+        # com o formulário de meta e o histórico de alterações, empurrando os
+        # KPIs pra baixo): quem abre a aba quer ver PRIMEIRO como a empresa
+        # está no período. As ferramentas de edição/auditoria da meta
+        # (formulário "🎯 Definir/editar meta" e "🕘 Histórico de alterações")
+        # continuam idênticas, só passaram para logo abaixo dos indicadores.
+        pct_tempo_mg = periodo_mod.pct_tempo_decorrido(tipo_mg, ref_mg)
+        _completude_msgs = {
+            'sem_dado': f'⚪ Sem dado publicado ainda para {periodo_mod.rotulo(tipo_mg, ref_mg)} (fonte: {rv.get("origem","-")}).',
+            'parcial':  f'🟡 Dado parcial: {len(rv.get("meses_com_dado", []))}/{len(rv.get("meses_total", []))} mês(es) do período têm publicação.',
+            # Distinto de 'sem_dado': aqui o Vendedor-Cliente PODE já estar
+            # publicado, só não deu pra confirmar agora porque a consulta ao
+            # GitHub falhou (rede/token/rate-limit) -- ver
+            # ds.load_current_com_erro(). Antes esse caso ficava idêntico a
+            # "sem dado publicado", escondendo uma falha real de leitura.
+            'erro_leitura': (f'🔴 Não deu pra confirmar o dado de {periodo_mod.rotulo(tipo_mg, ref_mg)} agora '
+                              f'-- a consulta ao GitHub falhou (pode já estar publicado, mas não foi possível '
+                              f'verificar). Tente recarregar a página em alguns instantes. '
+                              f'Detalhe técnico: {rv.get("erro_leitura", "-")}'),
+            'completo': None,
+        }
+
+        # 3 indicadores simplificados -- Faturamento, Margem e Quebra, TODOS
+        # no mesmo formato de badge "ontrack" (_badge_indicador_simples),
+        # cada um mostrando a % da meta atingida como número principal.
+        # Antes (28/08/2026) o Faturamento tinha um formato diferente (barra
+        # horizontal enchendo) enquanto Margem/Quebra já usavam o badge --
+        # pedido explícito da Ingrid, 31/08/2026: "tudo funciona com o
+        # ontrack, acho que vai ser melhor que o gráfico... Faturamento,
+        # margem, quebra. Tudo um ontrack. E esse ontrack deverá ter a
+        # porcentagem da meta" -- unificou os três no badge, com a % da meta
+        # (pct_atingido, que on_track.calcular/mg.status_quebra já
+        # calculavam mas não apareciam na tela) como valor principal, e os
+        # números concretos (realizado/meta) no detalhe abaixo. Os CÁLCULOS
+        # continuam os mesmos de sempre (mg.realizado_vendas /
+        # on_track.calcular / mg.status_quebra / mg.quebra_pct_faturamento).
+        # Volume (CX) continua sem indicador dedicado aqui (fica no gráfico
+        # de Evolução logo abaixo e no ranking da aba Vendedor).
+        st.subheader('Indicadores da Empresa')
+
+        # NÃO usar `or 0` no realizado: rv.get(...) retorna None quando
+        # ainda não há dado publicado (diferente de "publicado e deu
+        # zero"), e on_track.calcular já trata None corretamente (status
+        # ⚪ Sem meta/dado). Convertendo para 0 aqui, o cálculo interpretava
+        # como "0% atingido" e mostrava 🔴 Fora do Track incorretamente
+        # assim que o período começava, mesmo sem nenhum dado publicado.
+        #
+        # Quando "Semanal" está selecionado, os 3 indicadores abaixo passam
+        # a seguir o RITMO SEMANAL configurado na quebra da meta mensal
+        # (pedido explícito da Ingrid, 04/09/2026: "quando selecionarmos o
+        # periodo semanal o ontrack atualiza de acordo como o que foi
+        # definido para a quebra da meta mensal") -- em vez do
+        # pct_tempo_decorrido calendário (dias corridos do mês), o
+        # "esperado" passa a ser o pct_acumulado configurado (soma dos %
+        # semanais até a semana escolhida -- ver
+        # mg.quebra_semanal_meta/mg.carregar_pcts_semanais) e o "realizado"
+        # passa a ser o acumulado até o FIM da semana escolhida (não o mês
+        # inteiro). A META continua sendo a meta MENSAL cheia -- pct_atingido
+        # = realizado-até-a-semana / meta do mês, exatamente como
+        # quebra_semanal_meta já expõe em 'atingimento'. O resto da aba
+        # (Evolução, Ranking de Vendedores, formulário de meta, histórico)
+        # continua mostrando o MÊS inteiro -- só estes 3 indicadores mudam.
+        if semana_sel is not None:
+            _idx_sem = semana_sel['semana'] - 1
+            _meta_fat_sem = meta_atual.get('faturamento') or 0
+            _linha_fat_sem = mg.quebra_semanal_meta(ref_mg, _meta_fat_sem, metrica='faturamento')[_idx_sem]
+            ot_fat = on_track.calcular(_meta_fat_sem, _linha_fat_sem['vendido_acumulado'], tipo_mg, ref_mg,
+                                        pct_tempo_decorrido=(_linha_fat_sem['pct_acumulado'] or 0) / 100)
+            _meta_marg_sem = meta_atual.get('margem_pct') or 0
+            _linha_marg_sem = mg.quebra_semanal_meta(ref_mg, _meta_marg_sem, metrica='margem')[_idx_sem]
+            ot_marg = on_track.calcular(_meta_marg_sem, _linha_marg_sem['vendido_acumulado'], tipo_mg, ref_mg,
+                                         pct_tempo_decorrido=(_linha_marg_sem['pct_acumulado'] or 0) / 100)
+        else:
+            _linha_fat_sem = _linha_marg_sem = None
+            ot_fat = on_track.calcular(meta_atual.get('faturamento') or 0, rv.get('faturamento'),
+                                        tipo_mg, ref_mg, pct_tempo_decorrido=pct_tempo_mg)
+            ot_marg = on_track.calcular(meta_atual.get('margem_pct') or 0, rv.get('margem_pct'),
+                                         tipo_mg, ref_mg, pct_tempo_decorrido=pct_tempo_mg)
+
+        _col_fat, _col_marg, _col_qbr = st.columns(3)
+        with _col_fat:
+            _fat_pct_txt = (f"{ot_fat['pct_atingido'] * 100:.0f}% da meta"
+                             if ot_fat['pct_atingido'] is not None else '—')
+            if semana_sel is not None:
+                if not meta_atual.get('faturamento'):
+                    _fat_det = 'Meta de faturamento não definida'
+                elif _linha_fat_sem['vendido_acumulado'] is not None:
+                    _fat_det = (f"R$ {_num_vc(_linha_fat_sem['vendido_acumulado'], 0)} de "
+                                f"R$ {_num_vc(meta_atual['faturamento'], 0)} -- acumulado até "
+                                f"{semana_sel['label']}")
+                else:
+                    _fat_det = f"Faturamento ainda não publicado até {semana_sel['label']}"
+            else:
+                _fat_msg_completude = _completude_msgs.get(rv['completude'])
+                if _fat_msg_completude:
+                    _fat_det = _fat_msg_completude
+                elif not meta_atual.get('faturamento'):
+                    _fat_det = 'Meta de faturamento não definida'
+                elif rv.get('faturamento') is not None:
+                    _fat_det = f"R$ {_num_vc(rv['faturamento'], 0)} de R$ {_num_vc(meta_atual['faturamento'], 0)}"
+                else:
+                    _fat_det = 'Faturamento ainda não publicado'
+            _badge_indicador_simples(ot_fat['status'], '💰 Faturamento', _fat_pct_txt, _fat_det,
+                                      pct_atingido=ot_fat['pct_atingido'], pct_esperado=ot_fat['pct_esperado'])
+        with _col_marg:
+            _marg_pct_txt = (f"{ot_marg['pct_atingido'] * 100:.0f}% da meta"
+                              if ot_marg['pct_atingido'] is not None else '—')
+            if semana_sel is not None:
+                if not meta_atual.get('margem_pct'):
+                    _marg_det = 'Meta de margem não definida'
+                elif _linha_marg_sem['vendido_acumulado'] is not None:
+                    _marg_det = (f"{_linha_marg_sem['vendido_acumulado']:.1f}% de "
+                                 f"{meta_atual['margem_pct']:.1f}% de meta -- acumulado até "
+                                 f"{semana_sel['label']}")
+                else:
+                    _marg_det = f"Margem ainda não publicada até {semana_sel['label']}"
+            else:
+                _marg_msg_completude = _completude_msgs.get(rv['completude'])
+                if _marg_msg_completude:
+                    _marg_det = _marg_msg_completude
+                elif not meta_atual.get('margem_pct'):
+                    _marg_det = 'Meta de margem não definida'
+                elif rv.get('margem_pct') is not None:
+                    _marg_det = f"{rv['margem_pct']:.1f}% de {meta_atual['margem_pct']:.1f}% de meta"
+                else:
+                    _marg_det = 'Margem ainda não publicada'
+            _badge_indicador_simples(ot_marg['status'], '📊 Margem', _marg_pct_txt, _marg_det,
+                                      pct_atingido=ot_marg['pct_atingido'], pct_esperado=ot_marg['pct_esperado'])
+        with _col_qbr:
+            # Mesma prioridade R$ > cx de sempre: usa custo real (R$) quando
+            # já extraído do PDF e o Teto em R$ (calculado a partir do % ou
+            # digitado) já foi definido; senão cai pra cx.
+            _qbr_meta_rs = meta_atual.get('quebra_max_rs')
+            _qbr_meta_pct = meta_atual.get('quebra_max_pct')
+            _qbr_realizado_rs = rq.get('total_custo')
+            _usa_rs_qbr = bool(_qbr_meta_rs) and _qbr_realizado_rs is not None
+            _qbr_meta_fixa = _qbr_meta_rs if _usa_rs_qbr else meta_atual.get('quebra_max_cx')
+            if semana_sel is not None:
+                _linha_qbr_sem = mg.quebra_semanal_meta(ref_mg, _qbr_meta_fixa or 0, metrica='quebra')[_idx_sem]
+                _qbr_realizado_disp = _linha_qbr_sem['vendido_acumulado']
+                _fat_realizado_disp = _linha_fat_sem['vendido_acumulado'] if _linha_fat_sem else None
+                # Mesma regra especial de sempre pro Teto em %: "quanto já
+                # podia ter quebrado até agora" = % do teto sobre o
+                # FATURAMENTO REALIZADO (não a meta pró-rateada) -- só que
+                # agora "até agora" quer dizer "até o fim da semana
+                # escolhida", usando o faturamento semanal acumulado em vez
+                # do mensal. Sem faturamento semanal disponível, cai pro
+                # esperado pró-rateado pelos % semanais configurados pra
+                # Quebra (fallback, mesma ideia de sempre pra Teto em CX).
+                if _usa_rs_qbr and _qbr_meta_pct and _fat_realizado_disp is not None:
+                    _qbr_orcamento_ja = _qbr_meta_pct / 100 * _fat_realizado_disp
+                else:
+                    _qbr_orcamento_ja = _linha_qbr_sem.get('esperado_acumulado')
+                _ot_qbr = mg.status_quebra(_qbr_meta_fixa, _qbr_realizado_disp, tipo_mg, ref_mg,
+                                            orcamento_ate_agora=_qbr_orcamento_ja)
+            else:
+                _fat_realizado_disp = rv.get('faturamento')
+                if _usa_rs_qbr:
+                    # Pedido explícito da Ingrid, 31/08/2026: quando o Teto é em %
+                    # do Faturamento, o "quanto já podia ter quebrado até agora"
+                    # (usado no status Verde/Atenção/Fora) é esse % sobre o
+                    # FATURAMENTO REALIZADO até agora -- não o teto total
+                    # pro-rateado pelo tempo decorrido (comportamento padrão de
+                    # status_quebra, mantido como fallback pra Teto em CX ou pra
+                    # períodos antigos com Teto em R$ digitado manualmente, sem %).
+                    _qbr_orcamento_ja = (
+                        _qbr_meta_pct / 100 * rv.get('faturamento')
+                        if (_qbr_meta_pct and rv.get('faturamento') is not None) else None
+                    )
+                    _ot_qbr = mg.status_quebra(_qbr_meta_rs, _qbr_realizado_rs, tipo_mg, ref_mg,
+                                                orcamento_ate_agora=_qbr_orcamento_ja)
+                else:
+                    _ot_qbr = mg.status_quebra(meta_atual.get('quebra_max_cx'), rq.get('total_cx'),
+                                                tipo_mg, ref_mg)
+                _qbr_realizado_disp = _ot_qbr.get('realizado')
+            # "% da meta" pra Quebra = % do TETO já consumido (_ot_qbr já
+            # calcula isso -- 'pct_atingido' -- só não aparecia na tela
+            # antes). Continua sendo a mesma badge/cor de status de sempre;
+            # só o número principal virou essa % em vez da relação
+            # quebra/faturamento (que continua disponível no detalhe abaixo).
+            _qbr_pct_atingido = _ot_qbr.get('pct_atingido')
+            _qbr_pct_txt = (f"{_qbr_pct_atingido * 100:.0f}% da meta"
+                             if _qbr_pct_atingido is not None else '—')
+            # Relação quebra vs faturamento pedida pela Ingrid -- REALIZADO
+            # sobre REALIZADO (não meta sobre meta): quanto da quebra de
+            # verdade já representa do faturamento de verdade até agora.
+            # Continua calculada (some no detalhe), mesmo não sendo mais o
+            # número principal do badge. Só faz sentido em modo R$ (_usa_rs_qbr) --
+            # em modo cx não há como comparar quebra (cx) com faturamento (R$).
+            _qbr_pct_real = mg.quebra_pct_faturamento(
+                _qbr_realizado_disp if _usa_rs_qbr else None, _fat_realizado_disp)
+            _qbr_sufixo_sem = f" -- acumulado até {semana_sel['label']}" if semana_sel is not None else ''
+            if _ot_qbr.get('meta') and _ot_qbr.get('realizado') is not None:
+                if _usa_rs_qbr:
+                    _qbr_det = (f"R$ {_num_vc(_ot_qbr['realizado'], 2)} de "
+                                f"R$ {_num_vc(_ot_qbr['meta'], 2)} de teto{_qbr_sufixo_sem}")
+                    if _qbr_meta_pct:
+                        _qbr_det += f" (teto = {_qbr_meta_pct:.2f}% do faturamento)"
+                    if _qbr_pct_real is not None:
+                        _qbr_det += f" — quebra representa {_qbr_pct_real:.2f}% do faturamento realizado"
+                else:
+                    _qbr_det = (f"{_num_vc(_ot_qbr['realizado'], 0)} cx de "
+                                f"{_num_vc(_ot_qbr['meta'], 0)} cx de teto{_qbr_sufixo_sem}")
+            elif not (_qbr_meta_rs or meta_atual.get('quebra_max_cx')):
+                _qbr_det = 'Teto de quebra não definido'
+            elif semana_sel is not None:
+                _qbr_det = f"Ainda sem realizado de Quebra publicado até {semana_sel['label']} pra comparar com o teto."
+            else:
+                _qbr_det = 'Ainda sem realizado de Quebra publicado pra comparar com o teto.'
+            # Mesma distinção "sem dado" vs "falha ao consultar" já aplicada
+            # no Faturamento (ver _completude_msgs['erro_leitura']) -- sem
+            # isso, uma falha de leitura no GitHub ficava idêntica a "nunca
+            # publicou quebra nenhuma" aqui também.
+            if _qbr_pct_atingido is None and rq.get('erro_leitura'):
+                _qbr_det = (f'🔴 Não deu pra confirmar -- consulta ao GitHub falhou. '
+                            f'Detalhe técnico: {rq["erro_leitura"]}')
+            _badge_indicador_simples(_ot_qbr['status'], '📦 Quebra', _qbr_pct_txt, _qbr_det,
+                                      pct_atingido=_qbr_pct_atingido)
+
+        st.divider()
+
         with st.expander(f'🎯 Definir/editar meta — {periodo_mod.rotulo(tipo_mg, ref_mg)}'):
+            # Mensagem de sucesso persistida via session_state (mesmo padrão já
+            # usado em _render_ontrack_publicado / _render_fechamentos_semanais
+            # / Publicar Realizado acima) -- um st.success() seguido de
+            # st.rerun() na mesma execução nunca chega a aparecer na tela.
+            _msg_mg_meta = st.session_state.pop('_mg_msg_meta', None)
+            if _msg_mg_meta:
+                (st.success if _msg_mg_meta[0] == 'success' else st.warning)(_msg_mg_meta[1])
+
+            if meta_atual.get('quebra_max_pct'):
+                st.caption(
+                    f"Teto de Quebra atual: {meta_atual['quebra_max_pct']:.2f}% × "
+                    f"R$ {_num_vc(meta_atual.get('faturamento') or 0, 2)} (Meta Faturamento) = "
+                    f"R$ {_num_vc(meta_atual.get('quebra_max_rs') or 0, 2)}")
+
             with st.form(key='mg_form_meta'):
                 mc1, mc2 = st.columns(2)
                 with mc1:
@@ -1652,62 +2442,101 @@ def _render_metas_gerais():
                                                  value=float(meta_atual.get('margem_pct') or 0.0), step=1.0)
                     meta_qbr = st.number_input('Teto de Quebra (CX)', min_value=0.0,
                                                 value=float(meta_atual.get('quebra_max_cx') or 0.0), step=10.0)
+                    # Trocado de "Teto de Quebra (R$)" digitado direto pra "(%)
+                    # sobre Faturamento" -- pedido explícito da Ingrid,
+                    # 31/08/2026: "o teto de quebra é para ser em porcentagem...
+                    # o teto aceitável de quebra é de 0,6% sobre o faturamento".
+                    # O R$ guardado (quebra_max_rs, ainda usado por todo o resto
+                    # do app -- indicador, histórico, on_track) passa a ser
+                    # CALCULADO daqui (% × Meta Faturamento acima, no momento em
+                    # que a meta é salva) em vez de digitado à parte -- os dois
+                    # nunca mais podem ficar dessincronizados um do outro.
+                    meta_qbr_pct = st.number_input(
+                        'Teto de Quebra (%) sobre Faturamento', min_value=0.0,
+                        value=float(meta_atual.get('quebra_max_pct') or 0.0), step=0.1, format='%.2f',
+                        help='Percentual aceitável de quebra sobre a Meta Faturamento ao lado -- '
+                             'ex.: 0,6 = 0,6% de R$ 18.000.000,00 = R$ 108.000,00 de teto pro período '
+                             'inteiro (calcula sozinho, sem precisar digitar o R$ à parte). Não confundir '
+                             'com o Teto em CX acima -- os dois continuam independentes. No indicador de '
+                             'On Track, o "quanto já podia ter quebrado até agora" passa a usar esse % '
+                             'sobre o Faturamento REALIZADO até agora, não o tempo decorrido no período.')
                 if st.form_submit_button('💾 Salvar meta', type='primary'):
-                    mg.salvar_meta(tipo_mg, ref_mg, meta_fat, meta_vol, meta_marg, meta_qbr,
-                                    usuario=st.session_state.get('usuario_nome'))
-                    st.success('Meta salva.')
+                    _meta_qbr_rs_calc = (meta_qbr_pct / 100 * meta_fat) if meta_qbr_pct else None
+                    _reg_meta = mg.salvar_meta(tipo_mg, ref_mg, meta_fat, meta_vol, meta_marg, meta_qbr,
+                                                quebra_max_rs=_meta_qbr_rs_calc,
+                                                quebra_max_pct=meta_qbr_pct or None,
+                                                usuario=st.session_state.get('usuario_nome'))
+                    # data_store.save_record devolve '_erro_persistencia_remota' quando
+                    # a gravação no GitHub falha (token expirado, instabilidade da API,
+                    # etc.) -- nesse caso o dado só fica no cache local efêmero e é
+                    # perdido no próximo restart/redeploy do Streamlit Cloud. Antes esse
+                    # retorno era descartado e a tela sempre mostrava "Meta salva." como
+                    # se tivesse persistido de verdade, mesmo quando não persistiu.
+                    _erro_meta = _reg_meta.get('_erro_persistencia_remota') if _reg_meta else None
+                    if _erro_meta:
+                        st.session_state['_mg_msg_meta'] = (
+                            'warning',
+                            f'Meta salva localmente, mas houve um problema ao salvar de forma '
+                            f'permanente: {_erro_meta}. Tente salvar de novo em alguns instantes.')
+                    else:
+                        _msg_qbr = (f" Teto de Quebra: {meta_qbr_pct:.2f}% × R$ {_num_vc(meta_fat, 2)} "
+                                    f"= R$ {_num_vc(_meta_qbr_rs_calc, 2)}." if _meta_qbr_rs_calc else '')
+                        st.session_state['_mg_msg_meta'] = ('success', 'Meta salva.' + _msg_qbr)
                     st.rerun()
 
-        pct_tempo_mg = periodo_mod.pct_tempo_decorrido(tipo_mg, ref_mg)
-        _completude_msgs = {
-            'sem_dado': f'⚪ Sem dado publicado ainda para {periodo_mod.rotulo(tipo_mg, ref_mg)} (fonte: {rv.get("origem","-")}).',
-            'parcial':  f'🟡 Dado parcial: {len(rv.get("meses_com_dado", []))}/{len(rv.get("meses_total", []))} mês(es) do período têm publicação.',
-            'completo': None,
-        }
+        _hist_meta = mg.historico_meta(tipo_mg, ref_mg)
+        with st.expander(f'🕘 Histórico de alterações da meta — {periodo_mod.rotulo(tipo_mg, ref_mg)} '
+                          f'({len(_hist_meta)} versão(ões) anterior(es))'):
+            if not _hist_meta:
+                st.caption('Nenhuma alteração anterior registrada para este período — a meta atual '
+                           'acima é a primeira versão salva.')
+            else:
+                # Mais recente primeiro (load_history devolve da mais antiga pra mais nova).
+                _linhas_hist = []
+                for _v in reversed(_hist_meta):
+                    _vals = _v.get('valores', {}) or {}
+                    _linhas_hist.append({
+                        'Versão': _v.get('versao'),
+                        'Salvo em': (_v.get('atualizado_em') or '')[:16].replace('T', ' '),
+                        'Por': _v.get('usuario', 'não identificado'),
+                        'Faturamento': f"R$ {_num_vc(_vals.get('faturamento', 0), 0)}",
+                        'Volume (CX)': f"{_num_vc(_vals.get('volume', 0), 0)}",
+                        'Margem (%)': f"{_vals.get('margem_pct', 0):.2f}%",
+                        'Teto Quebra (CX)': f"{_num_vc(_vals.get('quebra_max_cx', 0), 0)}",
+                        'Teto Quebra (%)': (f"{_vals['quebra_max_pct']:.2f}%"
+                                             if _vals.get('quebra_max_pct') else '—'),
+                        'Teto Quebra (R$)': (f"R$ {_num_vc(_vals.get('quebra_max_rs'), 2)}"
+                                              if _vals.get('quebra_max_rs') else '—'),
+                    })
+                st.dataframe(pd.DataFrame(_linhas_hist), hide_index=True, use_container_width=True)
 
-        st.subheader('Indicadores da Empresa')
-        ic1, ic2, ic3, ic4 = st.columns(4)
-        with ic1:
-            ot_fat = on_track.calcular(meta_atual.get('faturamento') or 0, rv.get('faturamento') or 0,
-                                        tipo_mg, ref_mg, pct_tempo_decorrido=pct_tempo_mg)
-            _render_indicador_mg('Faturamento', lambda x: f'R$ {x:,.0f}',
-                                  meta_atual.get('faturamento'), rv.get('faturamento'), ot_fat,
-                                  _completude_msgs.get(rv['completude']))
-        with ic2:
-            ot_vol = on_track.calcular(meta_atual.get('volume') or 0, rv.get('volume') or 0,
-                                        tipo_mg, ref_mg, pct_tempo_decorrido=pct_tempo_mg)
-            _render_indicador_mg('Volume (CX)', lambda x: f'{x:,.0f} cx',
-                                  meta_atual.get('volume'), rv.get('volume'), ot_vol)
-        with ic3:
-            ot_marg = on_track.calcular(meta_atual.get('margem_pct') or 0, rv.get('margem_pct') or 0,
-                                         tipo_mg, ref_mg, pct_tempo_decorrido=pct_tempo_mg)
-            _render_indicador_mg('Margem (%)', lambda x: f'{x:.2f}%',
-                                  meta_atual.get('margem_pct'), rv.get('margem_pct'), ot_marg)
-        with ic4:
-            ot_qbr = mg.status_quebra(meta_atual.get('quebra_max_cx'), rq.get('total_cx'), tipo_mg, ref_mg)
-            _render_indicador_mg('Quebra (CX)', lambda x: f'{x:,.0f} cx',
-                                  meta_atual.get('quebra_max_cx'), rq.get('total_cx'), ot_qbr,
-                                  _completude_msgs.get(rq['completude']))
+        # Comparativo vs período anterior removido a pedido explícito da
+        # Ingrid em 26/08/2026 ("remover completamente"), pra deixar a tela
+        # mais compacta.
 
-        # ── Comparativo vs período anterior ──────────────────────────────────
-        st.subheader('📊 Comparativo vs período anterior')
-        if rv.get('faturamento') is not None and rv_ant.get('faturamento') is not None:
-            cc1, cc2, cc3, cc4 = st.columns(4)
-            for _col, _lab, _atual, _ant, _fmt, _menor_melhor in [
-                (cc1, 'Faturamento', rv.get('faturamento'), rv_ant.get('faturamento'), lambda x: f'R$ {x:,.0f}', False),
-                (cc2, 'Volume (CX)', rv.get('volume'), rv_ant.get('volume'), lambda x: f'{x:,.0f}', False),
-                (cc3, 'Margem (%)', rv.get('margem_pct'), rv_ant.get('margem_pct'), lambda x: f'{x:.2f}%', False),
-                (cc4, 'Quebra (CX)', rq.get('total_cx'), rq_ant.get('total_cx'), lambda x: f'{x:,.0f}', True),
-            ]:
-                if _atual is None:
-                    continue
-                _comp = comparativo.calcular(_atual, _ant, menor_e_melhor=_menor_melhor)
-                _col.metric(_lab, _fmt(_atual), delta=comparativo.formatar_variacao(_comp))
-            st.caption(f'Base de comparação: {periodo_mod.rotulo(tipo_mg, ref_ant_mg)}')
-        else:
-            st.info('Sem dado suficiente no período anterior para comparar.')
+        # O upload de PDFs pra publicar o Realizado (Vendas/Quebra) que
+        # ficava aqui foi movido em 03/09/2026, pedido da Ingrid: "na
+        # gerência não é para ficar upload de nada, apenas os resultados --
+        # upload são todos nos módulos". Agora fica em
+        # pages/3_Vendedor_Cliente_OTHIL.py (seção "📤 Publicar Realizado da
+        # Meta Geral", Faturamento/Volume/Margem) e pages/4_Quebra_OTHIL.py
+        # (mesma seção, aba Mensal) -- mesma publicação INDEPENDENTE de
+        # sempre (mg.MOD_MG_VENDAS / mg.MOD_MG_QUEBRA, mg.publicar_vendas_pdf
+        # / mg.publicar_quebra_pdf, sem nenhuma mudança de comportamento),
+        # só a TELA de upload que mudou de lugar. O resultado publicado lá
+        # continua aparecendo só aqui.
 
         # ── Evolução ──────────────────────────────────────────────────────────
+        # Faturamento, Volume e Margem já existiam (Quebra tinha sido removida
+        # DESSE MESMO gráfico combinado a pedido da Ingrid em 25/08/2026:
+        # "gráfico de quebra não é necessário" -- ela se referia a não misturar
+        # Quebra no mesmo gráfico/eixo de Faturamento/Volume/Margem).
+        # Gráfico de Quebra (R$) adicionado em 26/08/2026 a pedido explícito
+        # (item 5 do pedido "AJUSTES NO APP": "adicionar também um gráfico de
+        # quebra na aba Evolução" -- ela esclareceu que é o indicador de
+        # Quebra de verdade, não uma quebra/breakdown por dimensão). Fica
+        # como card SEPARADO dos outros 3, mesmos filtros/período, sem alterar
+        # os 3 gráficos existentes.
         st.subheader('📈 Evolução')
         hist_refs = list(reversed(periodo_mod.listar_periodos(tipo_mg, n=8, ate=ref_mg)))
         evol_rows = []
@@ -1717,18 +2546,139 @@ def _render_metas_gerais():
             evol_rows.append({
                 'Período': periodo_mod.rotulo(tipo_mg, r),
                 'Faturamento': rv_h.get('faturamento') or 0,
-                'Quebra (CX)': rq_h.get('total_cx') or 0,
+                'Volume (CX)': rv_h.get('volume') or 0,
+                'Margem (%)': rv_h.get('margem_pct') or 0,
+                # Mesma prioridade R$ > cx do indicador de Quebra acima:
+                # custo real quando já extraído do PDF, senão cx como fallback.
+                'Quebra (R$)': (rq_h.get('total_custo') if rq_h.get('total_custo') is not None
+                                 else (rq_h.get('total_cx') or 0)),
             })
         if evol_rows:
             import pandas as _pd
             df_evol = _pd.DataFrame(evol_rows).set_index('Período')
-            ev1, ev2 = st.columns(2)
-            with ev1:
+            # sort=False em todos: por padrão o st.bar_chart ordena o eixo
+            # categórico em ordem alfabética (comportamento do Altair/Vega-Lite
+            # pra colunas de texto), o que embaralhava os meses (Abril, Agosto,
+            # Fevereiro, Janeiro...) mesmo com df_evol já montado na ordem
+            # cronológica certa (via hist_refs acima). sort=False desliga essa
+            # ordenação automática e preserva a ordem das linhas do DataFrame.
+            # Layout 2x2 (2 gráficos em cima, 2 embaixo) -- pedido explícito
+            # da Ingrid, 03/09/2026: antes eram 3 colunas lado a lado
+            # (Faturamento/Volume/Margem) e a Quebra sozinha, ocupando a
+            # largura inteira, numa linha por baixo -- ela achou que ficava
+            # "se encontrando"/apertado visualmente com 3 gráficos espremidos
+            # numa linha só. Mesmos 4 gráficos, mesmos dados/cores/período,
+            # só a distribuição em colunas que mudou.
+            ev_r1c1, ev_r1c2 = st.columns(2)
+            with ev_r1c1:
                 st.caption('Faturamento (R$)')
-                st.bar_chart(df_evol[['Faturamento']], color='#2D6A4F')
-            with ev2:
-                st.caption('Quebra (CX)')
-                st.bar_chart(df_evol[['Quebra (CX)']], color='#C00000')
+                st.bar_chart(df_evol[['Faturamento']], color='#2D6A4F', sort=False)
+            with ev_r1c2:
+                st.caption('Volume (CX)')
+                st.bar_chart(df_evol[['Volume (CX)']], color='#7C6FAD', sort=False)
+            ev_r2c1, ev_r2c2 = st.columns(2)
+            with ev_r2c1:
+                st.caption('Margem (%)')
+                st.bar_chart(df_evol[['Margem (%)']], color='#2A6F97', sort=False)
+            with ev_r2c2:
+                st.caption('Quebra (R$ — ou cx, quando o custo real ainda não foi extraído do PDF)')
+                st.bar_chart(df_evol[['Quebra (R$)']], color='#BC4749', sort=False)
+
+        # ── OnTrack Semanal — quebra da meta MENSAL fixa (Faturamento, Margem
+        # e Quebra) ──────────────────────────────────────────────────────
+        # Só faz sentido pra 'mensal' (não dá pra quebrar um trimestre/ano em
+        # semanas). As metas em si (definidas acima) NUNCA mudam aqui -- só a
+        # expectativa acumulada por semana, calculada a partir dos
+        # percentuais configuráveis abaixo. Generalizada em 04/09/2026 --
+        # pedido explícito da Ingrid ("Crie percentuais semanais
+        # configuraveis para margem e quebra tbm"): antes só existia pra
+        # Faturamento; agora os 3 indicadores (os mesmos de "Indicadores da
+        # Empresa" acima, inclusive o próprio seletor "Semanal" do topo da
+        # aba) têm sua própria quebra semanal configurável, reaproveitando
+        # 100% a mesma função central já usada ali
+        # (mg.quebra_semanal_meta/carregar_pcts_semanais/salvar_pcts_semanais,
+        # já generalizadas com o parâmetro `metrica`) numa única função
+        # auxiliar (_bloco_ontrack_semanal) em vez de triplicar a lógica.
+        if tipo_mg == 'mensal':
+            st.divider()
+            st.subheader('📅 OnTrack Semanal — Quebra da Meta Mensal')
+            st.caption(
+                'As metas definidas acima nunca mudam aqui. Por indicador, se acompanha, '
+                'semana a semana, quanto já era esperado (percentuais incrementais '
+                'configuráveis -- podem somar mais ou menos que 100%, isso é normal) e o '
+                '**Atingimento**, que é sempre o acumulado sobre a META TOTAL do mês (não '
+                'sobre o esperado daquela semana). As semanas são a semana comercial '
+                '(sábado a sexta) -- a Semana 01 pode começar no mês anterior, quando o dia 1 '
+                'do mês não cai num sábado.'
+            )
+
+            def _bloco_ontrack_semanal(icone_titulo, titulo, metrica, meta_valor, fmt, key_prefix):
+                st.markdown(f'**{icone_titulo}**')
+                if not meta_valor:
+                    st.info(f'Defina a {titulo} acima pra ver a quebra semanal.')
+                    return
+                with st.expander(f'⚙️ Configurar percentuais semanais -- {titulo}'):
+                    st.caption(
+                        f'Percentuais específicos de {periodo_mod.rotulo(tipo_mg, ref_mg)} pra '
+                        f'{titulo} -- cada mês/indicador tem o seu próprio conjunto de '
+                        f'percentuais (configurar aqui não afeta os outros indicadores).'
+                    )
+                    _pcts_atuais = mg.carregar_pcts_semanais(ref_mg, metrica=metrica)
+                    with st.form(key=f'mg_form_pcts_{key_prefix}'):
+                        _n_sem_cfg = st.number_input(
+                            'Quantidade de semanas configuradas', min_value=1, max_value=8,
+                            value=len(_pcts_atuais), step=1, key=f'mg_pcts_n_{key_prefix}',
+                        )
+                        _pcts_inputs = []
+                        _cols_pct = st.columns(int(_n_sem_cfg))
+                        for _i in range(int(_n_sem_cfg)):
+                            _valor_padrao = _pcts_atuais[_i] if _i < len(_pcts_atuais) else 0.0
+                            with _cols_pct[_i]:
+                                _pcts_inputs.append(st.number_input(
+                                    f'Semana {_i + 1:02d} (%)', min_value=0.0,
+                                    value=float(_valor_padrao), step=1.0, key=f'mg_pct_{key_prefix}_{_i}',
+                                ))
+                        _soma_pcts = sum(_pcts_inputs)
+                        st.caption(f'Soma dos percentuais: {_soma_pcts:.0f}% — pode ser diferente '
+                                   f'de 100% (maior ou menor), isso é permitido de propósito.')
+                        if st.form_submit_button('💾 Salvar percentuais', type='primary',
+                                                  key=f'mg_pcts_salvar_{key_prefix}'):
+                            mg.salvar_pcts_semanais(ref_mg, _pcts_inputs, metrica=metrica,
+                                                     usuario=st.session_state.get('usuario_nome'))
+                            st.success(f'Percentuais semanais de {titulo} de '
+                                       f'{periodo_mod.rotulo(tipo_mg, ref_mg)} salvos.')
+                            st.rerun()
+
+                _linhas = mg.quebra_semanal_meta(ref_mg, meta_valor, metrica=metrica)
+                _rows = [{
+                    'Semana':              l['label'],
+                    'Meta fixa':           fmt(meta_valor),
+                    '% semanal':           f"{l['pct_semana']:.0f}%",
+                    'Esperado acumulado':  fmt(l['esperado_acumulado']),
+                    'Realizado acumulado': fmt(l['vendido_acumulado']) if l['vendido_acumulado'] is not None else '—',
+                    'Atingimento':         f"{l['atingimento']:.0f}%" if l['atingimento'] is not None else '—',
+                } for l in _linhas]
+                st.dataframe(pd.DataFrame(_rows), use_container_width=True, hide_index=True)
+
+            _bloco_ontrack_semanal('💰 Faturamento', 'Meta de Faturamento', 'faturamento',
+                                    meta_atual.get('faturamento'),
+                                    lambda v: f"R$ {_num_vc(v, 2)}", 'fat')
+            st.markdown('<div style="height:0.4rem;"></div>', unsafe_allow_html=True)
+            _bloco_ontrack_semanal('📊 Margem', 'Meta de Margem', 'margem',
+                                    meta_atual.get('margem_pct'),
+                                    lambda v: f"{v:.1f}%", 'marg')
+            st.markdown('<div style="height:0.4rem;"></div>', unsafe_allow_html=True)
+            # Quebra: mesma prioridade R$ > cx de sempre (ver "Indicadores da
+            # Empresa" acima) -- usa o Teto em R$ quando definido, senão cai
+            # pro Teto em cx.
+            _qbr_meta_rs_sem = meta_atual.get('quebra_max_rs')
+            _qbr_meta_cx_sem = meta_atual.get('quebra_max_cx')
+            if _qbr_meta_rs_sem:
+                _bloco_ontrack_semanal('📦 Quebra', 'Teto de Quebra', 'quebra', _qbr_meta_rs_sem,
+                                        lambda v: f"R$ {_num_vc(v, 2)}", 'qbr')
+            else:
+                _bloco_ontrack_semanal('📦 Quebra', 'Teto de Quebra', 'quebra', _qbr_meta_cx_sem,
+                                        lambda v: f"{_num_vc(v, 0)} cx", 'qbr')
 
     # =========================================================================
     # ABA VENDEDOR — ranking + detalhe individual (equivalente às abas por
@@ -1739,56 +2689,242 @@ def _render_metas_gerais():
         if not vendedores_mg:
             st.info('Sem dado de vendedores para este período ainda.')
         else:
+            # On Track por vendedor (Faturamento e Margem) -- pedido explícito
+            # da Ingrid, 02/09/2026: "nos vendedores, também deve ter o
+            # ontrack, faturamento e margem", no Ranking e no Detalhe (os dois).
+            #   Faturamento: contra a meta fixa INDIVIDUAL de cada vendedor
+            #   (mg.carregar_metas_vendedores -- a mesma meta configurada mais
+            #   abaixo em "🎯 Definir/editar meta fixa de Faturamento por
+            #   vendedor"; só existe pra tipo_mg 'mensal', então em
+            #   trimestral/semestral/anual aparece "sem meta").
+            #   Margem: NÃO existe meta de margem individual por vendedor --
+            #   só a meta de Margem da EMPRESA (meta_atual['margem_pct']).
+            #   Decisão explícita da Ingrid quando perguntada (02/09/2026):
+            #   "Compara" -- cada vendedor é comparado contra essa mesma meta
+            #   única da empresa, sem precisar cadastrar nada novo por
+            #   vendedor.
+            # IMPORTANTE: a Margem de cada vendedor usada aqui (Ranking,
+            # Detalhe e no On Track de Margem) é v['resultado_real']
+            # (= mc_pct + 15pp), NÃO v['mc_pct'] bruto -- pedido explícito da
+            # Ingrid, 02/09/2026 ("é para ter o ajuste de 15pp"), pra ficar
+            # na MESMA base da margem da EMPRESA (rv['margem_pct'], usada na
+            # meta -- já vinha com esse ajuste, ver metas_gerais.
+            # realizado_vendas) e do resto do app (parsers_vendedor._agg,
+            # dashboard_diario, xlsx_diario -- mesmo "+15pp de despesa
+            # administrativa" de sempre, não é um cálculo novo). Sem isso,
+            # comparar a margem crua do vendedor com a meta da empresa (que
+            # já é na base ajustada) subestimava o quanto ele bateu da meta.
+            _metas_vend_ot = mg.carregar_metas_vendedores(tipo_mg, ref_mg)
+
+            def _ontrack_vendedor(nome_v, v_dados):
+                _meta_fat_v = _metas_vend_ot.get(nome_v)
+                _ot_fat_v = on_track.calcular(_meta_fat_v or 0, v_dados.get('fat'), tipo_mg, ref_mg,
+                                               pct_tempo_decorrido=pct_tempo_mg)
+                _ot_marg_v = on_track.calcular(meta_atual.get('margem_pct') or 0,
+                                                v_dados.get('resultado_real'),
+                                                tipo_mg, ref_mg, pct_tempo_decorrido=pct_tempo_mg)
+                return _ot_fat_v, _ot_marg_v
+
+            def _ontrack_txt(ot):
+                _pct = ot.get('pct_atingido')
+                return f"{ot['emoji']} {_pct * 100:.0f}%" if _pct is not None else f"{ot['emoji']} —"
+
             st.subheader('🏆 Ranking de Vendedores')
             ordenar_por = st.selectbox('Ordenar por', ['Faturamento', 'Volume (CX)', 'Margem %'],
                                         key='mg_rank_ordenar')
             fat_total_emp = sum(v.get('fat', 0) or 0 for v in vendedores_mg.values())
             rows_rank = []
             for nome, v in vendedores_mg.items():
+                _ot_fat_r, _ot_marg_r = _ontrack_vendedor(nome, v)
                 rows_rank.append({
                     'Vendedor': nome,
                     'Faturamento': v.get('fat', 0) or 0,
                     'Volume (CX)': v.get('vol', 0) or 0,
-                    'Margem %': v.get('mc_pct', 0) or 0,
+                    'Margem %': v.get('resultado_real', 0) or 0,
                     'Participação': (v.get('fat', 0) or 0) / fat_total_emp * 100 if fat_total_emp else 0,
+                    'On Track Faturamento': _ontrack_txt(_ot_fat_r),
+                    'On Track Margem': _ontrack_txt(_ot_marg_r),
                 })
             chave_ord = {'Faturamento': 'Faturamento', 'Volume (CX)': 'Volume (CX)', 'Margem %': 'Margem %'}[ordenar_por]
             rows_rank.sort(key=lambda r: r[chave_ord], reverse=True)
             for i, r in enumerate(rows_rank, start=1):
                 r['#'] = i
-            df_rank = pd.DataFrame(rows_rank)[['#', 'Vendedor', 'Faturamento', 'Volume (CX)', 'Margem %', 'Participação']]
+            df_rank = pd.DataFrame(rows_rank)[['#', 'Vendedor', 'Faturamento', 'Volume (CX)', 'Margem %',
+                                                'Participação', 'On Track Faturamento', 'On Track Margem']]
             styled_rank = df_rank.style.format({
-                'Faturamento': 'R$ {:,.2f}', 'Volume (CX)': '{:,.3f}',
+                'Faturamento': lambda v: f"R$ {_num_vc(v, 2)}", 'Volume (CX)': lambda v: _num_vc(v, 3),
                 'Margem %': '{:.2f}%', 'Participação': '{:.1f}%',
             })
             st.dataframe(styled_rank, use_container_width=True, hide_index=True)
+            st.caption(
+                '"On Track Faturamento" compara com a meta fixa individual de cada vendedor '
+                '(definida mais abaixo); "On Track Margem" compara com a meta de Margem da '
+                'empresa (não existe meta de margem individual por vendedor).'
+            )
 
             # Drill-down individual
             st.divider()
             st.subheader('🔎 Detalhe por vendedor')
             vend_sel_mg = st.selectbox('Selecionar vendedor', sorted(vendedores_mg.keys()), key='mg_vend_sel')
             v_sel = vendedores_mg.get(vend_sel_mg, {})
-            vend_ant = (rv_ant.get('vendedores') or {}).get(vend_sel_mg, {})
             dc1, dc2, dc3, dc4 = st.columns(4)
-            dc1.metric('Faturamento', f"R$ {v_sel.get('fat', 0):,.2f}")
-            dc2.metric('Volume (CX)', f"{v_sel.get('vol', 0):,.3f}")
-            dc3.metric('Margem %', f"{v_sel.get('mc_pct', 0):.2f}%")
+            dc1.metric('Faturamento', f"R$ {_num_vc(v_sel.get('fat', 0), 2)}")
+            dc2.metric('Volume (CX)', f"{_num_vc(v_sel.get('vol', 0), 3)}")
+            dc3.metric('Margem %', f"{v_sel.get('resultado_real', 0):.2f}%")
             dc4.metric('Participação na empresa',
                        f"{(v_sel.get('fat', 0) / fat_total_emp * 100) if fat_total_emp else 0:.1f}%")
-            if vend_ant:
-                st.caption('Comparativo vs período anterior')
-                comp_fat_v = comparativo.calcular(v_sel.get('fat', 0), vend_ant.get('fat'))
-                comp_vol_v = comparativo.calcular(v_sel.get('vol', 0), vend_ant.get('vol'))
-                dcc1, dcc2 = st.columns(2)
-                dcc1.metric('Faturamento', f"R$ {v_sel.get('fat', 0):,.2f}",
-                            delta=comparativo.formatar_variacao(comp_fat_v))
-                dcc2.metric('Volume (CX)', f"{v_sel.get('vol', 0):,.3f}",
-                            delta=comparativo.formatar_variacao(comp_vol_v))
+            # Comparativo vs período anterior removido a pedido explícito da
+            # Ingrid em 26/08/2026 ("remover completamente").
+
+            st.markdown('<div style="height:0.6rem;"></div>', unsafe_allow_html=True)
+            _ot_fat_sel, _ot_marg_sel = _ontrack_vendedor(vend_sel_mg, v_sel)
+            _dcol_fat_sel, _dcol_marg_sel = st.columns(2)
+            with _dcol_fat_sel:
+                _fat_sel_txt = (f"{_ot_fat_sel['pct_atingido'] * 100:.0f}% da meta"
+                                 if _ot_fat_sel['pct_atingido'] is not None else '—')
+                _meta_fat_sel = _metas_vend_ot.get(vend_sel_mg)
+                if _meta_fat_sel:
+                    _fat_sel_det = f"R$ {_num_vc(v_sel.get('fat', 0), 0)} de R$ {_num_vc(_meta_fat_sel, 0)}"
+                else:
+                    _fat_sel_det = 'Meta individual de Faturamento não definida'
+                _badge_indicador_simples(_ot_fat_sel['status'], '💰 Faturamento (On Track)',
+                                          _fat_sel_txt, _fat_sel_det,
+                                          pct_atingido=_ot_fat_sel['pct_atingido'],
+                                          pct_esperado=_ot_fat_sel['pct_esperado'])
+            with _dcol_marg_sel:
+                _marg_sel_txt = (f"{_ot_marg_sel['pct_atingido'] * 100:.0f}% da meta"
+                                  if _ot_marg_sel['pct_atingido'] is not None else '—')
+                if meta_atual.get('margem_pct'):
+                    _marg_sel_det = (f"{v_sel.get('resultado_real', 0):.1f}% de "
+                                      f"{meta_atual['margem_pct']:.1f}% de meta (meta da empresa)")
+                else:
+                    _marg_sel_det = 'Meta de Margem da empresa não definida'
+                _badge_indicador_simples(_ot_marg_sel['status'], '📊 Margem (On Track)',
+                                          _marg_sel_txt, _marg_sel_det,
+                                          pct_atingido=_ot_marg_sel['pct_atingido'],
+                                          pct_esperado=_ot_marg_sel['pct_esperado'])
+
+        # ── OnTrack Semanal por Vendedor — quebra da meta MENSAL fixa dele ──
+        # Fica FORA do if/else acima de propósito: precisa estar disponível
+        # mesmo sem nenhum dado de vendas ainda (início do mês), já que a
+        # meta é digitada aqui, não vem de realizado_vendas.
+        if tipo_mg == 'mensal':
+            st.divider()
+            st.subheader('📅 OnTrack Semanal por Vendedor')
+            st.caption(
+                'Meta fixa individual de Faturamento por vendedor (independente da meta '
+                'da empresa) -- nunca é calculada como fatia da meta geral nem como soma '
+                'de outra coisa, você digita direto aqui.'
+            )
+            # Cadastro de vendedores ativos -- pedido explícito da Ingrid,
+            # 02/09/2026: "já tem vendedores que não fazem mais parte da
+            # equipe, assim como tem vendedores que precisamos acrescentar...
+            # melhor criarmos um campo para adicionar e excluir". Antes essa
+            # lista vinha fixa de calc.VENDEDORES_PADRAO (só dava pra mudar
+            # editando código) -- agora é um cadastro editável e persistido
+            # (mg.carregar_vendedores_ativos/salvar_vendedores_ativos), mesmo
+            # padrão já usado em "Cadastro de Marcas"
+            # (pages/8_Cadastro_Produtos_OTHIL.py: st.data_editor com linhas
+            # dinâmicas + persistência central versionada). Essa lista só
+            # decide quem aparece no formulário de meta fixa logo abaixo --
+            # não mexe no reconhecimento de vendedor nos PDFs (vendedores.py)
+            # nem nas Metas Semanais por produto (calc.VENDEDORES_PADRAO),
+            # que continuam intocados.
+            with st.expander('👥 Vendedores ativos (adicionar / remover)'):
+                st.caption(
+                    'Edite direto na tabela: clique numa célula pra corrigir o nome, use o "+" '
+                    'no fim da tabela pra adicionar um vendedor novo, ou clique na linha pra '
+                    'selecioná-la (fica destacada) e aperte Delete ou Backspace no teclado pra '
+                    'remover quem não faz mais parte da equipe -- não existe ícone de lixeira, '
+                    'a tabela usa o teclado pra apagar linha. Remover aqui não apaga a meta '
+                    'antiga já salva dele -- só faz ele sumir do formulário abaixo na próxima '
+                    'vez que as metas forem salvas.'
+                )
+                if 'mg_vend_ativos_df' not in st.session_state:
+                    st.session_state['mg_vend_ativos_df'] = pd.DataFrame(
+                        {'Vendedor': mg.carregar_vendedores_ativos()}
+                    )
+                _df_vend_ativos_ed = st.data_editor(
+                    st.session_state['mg_vend_ativos_df'],
+                    num_rows='dynamic', use_container_width=True, hide_index=True,
+                    column_config={
+                        'Vendedor': st.column_config.TextColumn('Vendedor', required=True, width='large'),
+                    },
+                    key='mg_vend_ativos_editor',
+                )
+                st.session_state['mg_vend_ativos_df'] = _df_vend_ativos_ed
+                if st.button('💾 Salvar lista de vendedores', key='mg_btn_salvar_vend_ativos'):
+                    _nomes_novos_va = [str(n).strip() for n in _df_vend_ativos_ed['Vendedor'].tolist()
+                                        if str(n).strip()]
+                    _norm_va = [n.upper() for n in _nomes_novos_va]
+                    if len(set(_norm_va)) != len(_norm_va):
+                        _dups_va = sorted({n for n in _norm_va if _norm_va.count(n) > 1})
+                        st.error(
+                            f"Não salvei: nome(s) repetido(s) na tabela (mesmo nome, ignorando "
+                            f"maiúsculas/espaços): {', '.join(_dups_va)}. Corrija e tente de novo."
+                        )
+                    else:
+                        mg.salvar_vendedores_ativos(_nomes_novos_va,
+                                                     usuario=st.session_state.get('usuario_nome'))
+                        st.session_state.pop('mg_vend_ativos_df', None)
+                        st.success(f'Lista salva -- {len(_nomes_novos_va)} vendedor(es) ativo(s).')
+                        st.rerun()
+
+            _metas_vend_atuais = mg.carregar_metas_vendedores(tipo_mg, ref_mg)
+            with st.expander('🎯 Definir/editar meta fixa de Faturamento por vendedor'):
+                with st.form(key='mg_form_metas_vendedores'):
+                    _novas_metas_vend = {}
+                    _nomes_vend_cfg = mg.carregar_vendedores_ativos()
+                    if not _nomes_vend_cfg:
+                        st.info(
+                            'Nenhum vendedor ativo cadastrado -- adicione ao menos um na seção '
+                            '"Vendedores ativos" acima.'
+                        )
+                    _cols_mv = st.columns(4)
+                    for _i, _nome_v in enumerate(_nomes_vend_cfg):
+                        with _cols_mv[_i % 4]:
+                            _novas_metas_vend[_nome_v] = st.number_input(
+                                f'{_nome_v} (R$)', min_value=0.0,
+                                value=float(_metas_vend_atuais.get(_nome_v) or 0.0), step=1000.0,
+                                key=f'mg_meta_vend_{_nome_v}',
+                            )
+                    if st.form_submit_button('💾 Salvar metas dos vendedores', type='primary'):
+                        mg.salvar_metas_vendedores(tipo_mg, ref_mg, _novas_metas_vend,
+                                                    usuario=st.session_state.get('usuario_nome'))
+                        st.success('Metas dos vendedores salvas.')
+                        st.rerun()
+
+            _vend_com_meta = {k: v for k, v in _metas_vend_atuais.items() if v}
+            if not _vend_com_meta:
+                st.info('Defina a meta fixa de pelo menos um vendedor acima pra ver a quebra semanal.')
+            else:
+                _vend_sel_sem = st.selectbox('Vendedor', sorted(_vend_com_meta.keys()),
+                                              key='mg_ot_semanal_vend_sel')
+                _meta_fixa_v = _vend_com_meta[_vend_sel_sem]
+                _quebra_v = mg.quebra_semanal_meta(ref_mg, _meta_fixa_v, vendedor=_vend_sel_sem)
+                _rows_quebra_v = [{
+                    'Semana':             l['label'],
+                    'Meta fixa (R$)':     f"R$ {_num_vc(_meta_fixa_v, 2)}",
+                    '% semanal':          f"{l['pct_semana']:.0f}%",
+                    'Esperado acumulado': f"R$ {_num_vc(l['esperado_acumulado'], 2)}",
+                    'Vendido acumulado':  f"R$ {_num_vc(l['vendido_acumulado'], 2)}" if l['vendido_acumulado'] is not None else '—',
+                    'Atingimento':        f"{l['atingimento']:.0f}%" if l['atingimento'] is not None else '—',
+                } for l in _quebra_v]
+                st.dataframe(pd.DataFrame(_rows_quebra_v), use_container_width=True, hide_index=True)
 
 
 # ── Auth ──────────────────────────────────────────────────────────────────────
 if not _check_auth():
     st.stop()
+
+# Mesmo padrão usado em todas as outras páginas (ex.: pages/metas_semanais.py,
+# pages/4_Quebra_OTHIL.py) -- sem isso, qualquer gravação feita a partir desta
+# página (ex.: "Salvar meta" em Metas Gerais) ficava com usuario="não
+# identificado" no histórico versionado sempre que a Gerência era a primeira
+# página aberta na sessão (não passando antes por nenhuma outra página que já
+# define este valor).
+st.session_state.setdefault('usuario_nome', 'Ingrid')
+
 
 def _render_rentabilidade_resumo():
     st.header('💰 Rentabilidade e Margens — Resumo')
@@ -1833,13 +2969,13 @@ def _render_rentabilidade_resumo():
         return comparativo.calcular(kpi[chave], kpi_ant[chave]) if kpi_ant else None
 
     c1, c2, c3, c4 = st.columns(4)
-    c1.metric('Faturamento', f"R$ {kpi['faturamento']:,.2f}",
+    c1.metric('Faturamento', f"R$ {_num_vc(kpi['faturamento'], 2)}",
               delta=comparativo.formatar_variacao(_c('faturamento')) if kpi_ant else None)
-    c2.metric('Margem R$', f"R$ {kpi['margem_rs']:,.2f}",
+    c2.metric('Margem R$', f"R$ {_num_vc(kpi['margem_rs'], 2)}",
               delta=comparativo.formatar_variacao(_c('margem_rs')) if kpi_ant else None)
     c3.metric('Margem %', f"{kpi['margem_pct']:.2f}%",
               delta=comparativo.formatar_variacao(_c('margem_pct')) if kpi_ant else None)
-    c4.metric('Ticket Médio', f"R$ {kpi['ticket_medio']:,.2f}",
+    c4.metric('Ticket Médio', f"R$ {_num_vc(kpi['ticket_medio'], 2)}",
               delta=comparativo.formatar_variacao(_c('ticket_medio')) if kpi_ant else None)
 
     rcol1, rcol2, rcol3 = st.columns(3)
@@ -1874,102 +3010,193 @@ def _render_rentabilidade_resumo():
             st.caption(f'+ {len(alertas) - 5} outro(s) ponto(s) de atenção. Veja o módulo completo para a lista inteira.')
 
 
-def _render_produtos_resumo():
-    st.header('📦 Relatórios de Produtos — Resumo')
-    st.caption('Visão consolidada para a Gerência (reaproveita o mesmo motor de cálculo do módulo '
-               'completo -- nenhuma lógica de faturamento/volume foi duplicada aqui).')
-    try:
+# ── Marca/Fornecedor (exibida como "Resultado de Produtos") ─────────────────
+# A antiga aba "📦 Produtos" (_render_produtos_resumo(), base consolidada de
+# Relatório Diário/Semanal/Mensal via produtos.carregar_base_consolidada())
+# foi removida em 03/09/2026, pedido da Ingrid -- a base em produtos.py
+# continua intacta (módulo compartilhado, outras páginas podem usá-la), só
+# deixou de ser chamada aqui.
+# Pedido da Ingrid, 02/09/2026: reunião comercial do 1º sábado do mês pra
+# discutir fornecedores. Upload dos PDFs mensais ("Resumo do Estoque",
+# Vendas+Bonificação e Quebra) é feito em Resultado de Produtos, NUNCA
+# aqui -- pedido explícito dela ("TODAS as opções que forem fazer upload,
+# o upload é feito no módulo e não na gerência"). Toda a classificação por
+# marca e o ajuste de +15pp vêm de marcas_fornecedor.py (não duplicados
+# aqui). Comparação com o mês anterior usa o mês anterior QUE TEM DADO
+# publicado (não necessariamente o mês civil anterior -- pode faltar um
+# mês se ela esquecer de enviar), mesmo espírito de outras comparações do
+# app que lidam com meses sem dado.
+
+def _render_marca_fornecedor():
+    st.header('📦 Resultado de Produtos')
+    st.caption('Base: PDFs "Resumo do Estoque" (Vendas+Bonificação e Quebra) enviados mensalmente em '
+               '**Resultado de Produtos**. Margem com o mesmo ajuste de +15pp usado no resto do app.')
+
+    # Mensagem da correção/exclusão de mês (ver "🗑️ Apagar os dados deste
+    # mês" abaixo) -- mesmo padrão de session_state já usado em
+    # _render_ontrack_publicado/_render_fechamentos_semanais, porque um
+    # st.success() seguido de st.rerun() nunca chega a aparecer na tela.
+    _msg_mf_del = st.session_state.pop('_mf_del_msg', None)
+    if _msg_mf_del:
+        (st.success if _msg_mf_del[0] == 'success' else st.warning)(_msg_mf_del[1])
+
+    meses = mf.meses_disponiveis()
+    if not meses:
+        st.info('Nenhum Resumo do Estoque enviado ainda.')
         st.page_link('pages/7_Relatorios_Produtos_OTHIL.py',
-                      label='Abrir módulo completo (filtros, rankings, matrizes, histórico) →', icon='📦')
-    except Exception:
-        pass
-
-    itens_base, avisos = prod.carregar_base_consolidada()
-    if not itens_base:
-        st.info('Ainda não há dados suficientes. Faça upload de pelo menos um Relatório Diário, '
-                'Semanal ou Mensal.')
+                      label='Ir para Resultado de Produtos →', icon='📦')
         return
-    if avisos:
-        st.caption(f'ℹ️ {len(avisos)} registro(s) não incluído(s) no histórico consolidado (evita duplicidade).')
 
-    col_tipo, col_periodo = st.columns([1, 2])
-    with col_tipo:
-        tipo_p = st.selectbox('Período', periodo_mod.TIPOS_PERIODO, format_func=periodo_mod.rotulo_tipo,
-                               index=1, key='ger_prod_tipo')
-    opcoes_p = prod.periodos_disponiveis(itens_base, tipo_p)
-    if not opcoes_p:
-        st.warning('Nenhum dado disponível para esse tipo de período.')
+    mes_sel = st.selectbox('Mês', meses, format_func=lambda m: periodo_mod.rotulo('mensal', m),
+                            key='mf_mes_sel')
+    itens_v, itens_q = mf.carregar_mes(mes_sel)
+    if not itens_v and not itens_q:
+        st.info(f'Nenhum dado publicado para {periodo_mod.rotulo("mensal", mes_sel)}.')
         return
-    with col_periodo:
-        ref_p = st.selectbox('Referência', opcoes_p, format_func=lambda r: periodo_mod.rotulo(tipo_p, r),
-                              key='ger_prod_periodo')
+    if not itens_v:
+        st.warning('Só a Quebra foi enviada neste mês -- faturamento/custo de Vendas ficam zerados '
+                   'até o PDF de Vendas+Bonificação ser enviado.')
+    elif not itens_q:
+        st.caption('Quebra ainda não enviada neste mês.')
 
-    itens_p = prod.filtrar_periodo(itens_base, tipo_p, ref_p)
-    if not itens_p:
-        st.info('Sem dados para este período.')
-        return
-    kpi = prod.kpis_produto(itens_p)
-    ref_ant = periodo_mod.periodo_anterior(tipo_p, ref_p)
-    itens_ant = prod.filtrar_periodo(itens_base, tipo_p, ref_ant)
-    kpi_ant = prod.kpis_produto(itens_ant) if itens_ant else None
+    # Apagar dados de um mês (03/09/2026, pedido da Ingrid: um PDF emitido
+    # nos primeiros dias do mês seguinte pode ter sido publicado no mês
+    # errado antes de existir o seletor de mês em Resultado de Produtos).
+    # AÇÃO IRREVERSÍVEL -- mesmo padrão já usado em "🔧 Corrigir a semana"
+    # (_render_ontrack_publicado/_render_fechamentos_semanais): só habilita
+    # o botão depois de marcar a confirmação, nunca automático.
+    with st.expander(f'🗑️ Apagar os dados de {periodo_mod.rotulo("mensal", mes_sel)} (irreversível)'):
+        st.caption(
+            'Apaga PERMANENTEMENTE o(s) PDF(s) publicado(s) para este mês (Vendas+Bonificação '
+            'e/ou Quebra) -- não dá pra desfazer. Use só quando o mês foi identificado errado '
+            '(ex.: PDF emitido já no mês seguinte); depois reenvie os PDFs em **Resultado de '
+            'Produtos**, escolhendo o mês correto.'
+        )
+        confirma_del_mf = st.checkbox(
+            'Confirmo que quero apagar os dados deste mês permanentemente',
+            key=f'mf_del_conf_{mes_sel}',
+        )
+        if st.button('🗑️ Apagar definitivamente', key=f'mf_del_btn_{mes_sel}',
+                      disabled=not confirma_del_mf):
+            erros_del_mf = []
+            if itens_v:
+                ok_v_mf, err_v_mf = ds.delete_record(mf.MOD_VENDAS, 'mensal', mes_sel)
+                if not ok_v_mf:
+                    erros_del_mf.append(f'Vendas: {err_v_mf}')
+            if itens_q:
+                ok_q_mf, err_q_mf = ds.delete_record(mf.MOD_QUEBRA, 'mensal', mes_sel)
+                if not ok_q_mf:
+                    erros_del_mf.append(f'Quebra: {err_q_mf}')
+            # Limpa o key do selectbox de mês -- mesmo motivo já documentado
+            # em "🔧 Corrigir a semana": depois que um widget com key já
+            # rodou, o Streamlit ignora index= em reruns seguintes.
+            st.session_state.pop('mf_mes_sel', None)
+            if erros_del_mf:
+                st.session_state['_mf_del_msg'] = (
+                    'warning', 'Não deu pra apagar tudo: ' + '; '.join(erros_del_mf))
+            else:
+                st.session_state['_mf_del_msg'] = (
+                    'success', f'🗑️ Dados de {periodo_mod.rotulo("mensal", mes_sel)} apagados.')
+            st.rerun()
 
-    def _c(chave):
-        return comparativo.calcular(kpi.get(chave), kpi_ant.get(chave)) if kpi_ant else None
+    marcas_cad = mp.carregar_marcas()
+    resultado = mf.agregar_por_marca(itens_v, itens_q, marcas_cad)
+    marcas = resultado['marcas']
+    sem_v = resultado['sem_marca_vendas']
+    sem_q = resultado['sem_marca_quebra']
+
+    # mês anterior COM dado (vendas ou quebra), pra comparação -- pode não
+    # ser o mês civil anterior se ela pulou algum envio.
+    idx = meses.index(mes_sel)
+    resultado_ant = None
+    mes_ant = None
+    for candidato in meses[idx + 1:]:
+        iv_a, iq_a = mf.carregar_mes(candidato)
+        if iv_a or iq_a:
+            mes_ant = candidato
+            resultado_ant = mf.agregar_por_marca(iv_a, iq_a, marcas_cad)
+            break
+
+    fat_marcas = sum(d['faturamento'] for d in marcas.values())
+    custo_marcas = sum(d['custo'] for d in marcas.values())
+    sem_v_valor = sum(d['valor'] for d in sem_v.values())
+    sem_v_custo = sum(d['custo'] for d in sem_v.values())
+    grand_fat = fat_marcas + sem_v_valor
+    grand_custo = custo_marcas + sem_v_custo
+    resultado_real_geral = ((grand_fat - grand_custo) / grand_custo * 100 + mf.AJUSTE_RESULTADO_REAL_PP
+                             ) if grand_custo else 0.0
+
+    fat_ant = None
+    if resultado_ant:
+        sv_ant = resultado_ant['sem_marca_vendas']
+        fat_ant = (sum(d['faturamento'] for d in resultado_ant['marcas'].values())
+                   + sum(d['valor'] for d in sv_ant.values()))
 
     c1, c2, c3, c4 = st.columns(4)
-    c1.metric('Produtos Trabalhados', kpi.get('skus', 0),
-              delta=comparativo.formatar_variacao(_c('skus')) if kpi_ant else None)
-    c2.metric('Faturamento', f"R$ {kpi['faturamento']:,.2f}",
-              delta=comparativo.formatar_variacao(_c('faturamento')) if kpi_ant else None)
-    c3.metric('Volume (cx)', f"{kpi['volume']:,.3f}",
-              delta=comparativo.formatar_variacao(_c('volume')) if kpi_ant else None)
-    c4.metric('Margem de Contribuição', f"R$ {kpi['margem_rs']:,.2f}",
-              delta=comparativo.formatar_variacao(_c('margem_rs')) if kpi_ant else None)
+    comp_fat = comparativo.calcular(grand_fat, fat_ant) if resultado_ant else None
+    c1.metric('Faturamento (Vendas)', _brl_vc(grand_fat),
+              delta=comparativo.formatar_variacao(comp_fat) if comp_fat else None)
+    c2.metric('Resultado Real geral', f"{resultado_real_geral:.2f}".replace('.', ',') + '%')
+    c3.metric('Marcas com movimento', len(marcas))
+    pct_sem_marca = (sem_v_valor / grand_fat * 100) if grand_fat else 0.0
+    c4.metric('Faturamento sem marca', f"{pct_sem_marca:.1f}".replace('.', ',') + '%')
+    st.caption(f"Comparando com {periodo_mod.rotulo('mensal', mes_ant)}." if mes_ant else
+               'Sem mês anterior publicado pra comparar ainda.')
 
-    c5, c6, c7 = st.columns(3)
-    margem_pp_ger = (kpi['margem_pct'] - kpi_ant['margem_pct']) if kpi_ant else None
-    c5.metric('Margem %', f"{kpi['margem_pct']:.2f}%",
-              delta=(f"{'+' if margem_pp_ger >= 0 else ''}{margem_pp_ger:.2f} p.p."
-                     if margem_pp_ger is not None else None))
-    c6.metric('Grupo Líder', kpi.get('grupo_lider') or '-')
-    c7.metric('Produto Líder', kpi.get('produto_lider') or '-')
+    if not marcas:
+        st.info('Nenhuma marca reconhecida neste mês.')
+        return
 
-    ranking_ger = prod.ranking_com_crescimento(itens_p, itens_ant or None)
-    contagem_ger = prod.contagem_crescimento_queda(ranking_ger)
-    dest = prod.destaques(itens_p, itens_ant)
-    if dest:
-        rcol1, rcol2 = st.columns(2)
-        with rcol1:
-            if dest.get('maior_crescimento'):
-                mc = dest['maior_crescimento']
-                st.markdown(f"**📈 Maior crescimento:** {mc['chave']} ({mc['crescimento_pct']:.2f}%) "
-                            f"— {contagem_ger['crescimento']} produto(s) em crescimento no total.")
-            else:
-                st.markdown('**📈 Maior crescimento:** nenhum produto cresceu neste recorte.')
-        with rcol2:
-            if dest.get('maior_queda'):
-                mq = dest['maior_queda']
-                st.markdown(f"**📉 Maior queda:** {mq['chave']} ({mq['crescimento_pct']:.2f}%) "
-                            f"— {contagem_ger['queda']} produto(s) em queda no total.")
-            else:
-                st.markdown('**📉 Maior queda:** nenhum produto caiu neste recorte.')
+    linhas = [{
+        'Marca': nome, 'CX': d['cx'], 'Faturamento': d['faturamento'], 'Custo': d['custo'],
+        'MC R$': d['mc_rs'], 'Resultado Real %': d['resultado_real_pct'],
+        'Quebra CX': d['quebra_cx'], 'Quebra R$': d['quebra_rs'],
+    } for nome, d in marcas.items()]
+    linhas.sort(key=lambda r: -r['Faturamento'])
 
-    st.markdown('**🏆 Top 5 Produtos (Faturamento)**')
-    top_p = sorted(prod.por_produto(itens_p), key=lambda l: l['faturamento'], reverse=True)[:5]
-    st.dataframe(pd.DataFrame([{'Produto': p['chave'], 'Faturamento R$': p['faturamento'],
-                                 'Margem R$': p['margem_rs'], 'Volume (cx)': p['volume']} for p in top_p]),
-                 use_container_width=True, hide_index=True)
+    df_fmt = pd.DataFrame(linhas)
+    df_fmt['CX'] = df_fmt['CX'].apply(lambda v: _num_vc(v, 0))
+    df_fmt['Faturamento'] = df_fmt['Faturamento'].apply(_brl_vc)
+    df_fmt['Custo'] = df_fmt['Custo'].apply(_brl_vc)
+    df_fmt['MC R$'] = df_fmt['MC R$'].apply(_brl_vc)
+    df_fmt['Resultado Real %'] = df_fmt['Resultado Real %'].apply(lambda v: f"{v:.2f}".replace('.', ',') + '%')
+    df_fmt['Quebra CX'] = df_fmt['Quebra CX'].apply(lambda v: _num_vc(v, 0))
+    df_fmt['Quebra R$'] = df_fmt['Quebra R$'].apply(_brl_vc)
+    st.dataframe(df_fmt, use_container_width=True, hide_index=True)
 
-    alertas = prod.alertas_produtos(itens_p, itens_ant or None)
-    st.markdown('**🚨 Pontos de Atenção**')
-    if not alertas:
-        st.success('Nenhum ponto de atenção identificado.')
-    else:
-        for a in alertas[:5]:
-            icone = '🔴' if a['severidade'] == 'critico' else '🟡'
-            st.markdown(f"{icone} **{a['tipo']}** — {a['detalhe']}")
-        if len(alertas) > 5:
-            st.caption(f'+ {len(alertas) - 5} outro(s) ponto(s) de atenção. Veja o módulo completo para a lista inteira.')
+    st.markdown('**🔎 Detalhe por marca**')
+    nomes_marcas = [r['Marca'] for r in linhas]
+    marca_sel = st.selectbox('Marca', nomes_marcas, key='mf_marca_sel')
+    if marca_sel:
+        produtos_marca = marcas[marca_sel]['produtos']
+        linhas_p = [{
+            'Produto': prod_nome, 'CX': _num_vc(pdet['cx'], 0), 'Faturamento': _brl_vc(pdet['faturamento']),
+            'Custo': _brl_vc(pdet['custo']), 'MC R$': _brl_vc(pdet['mc_rs']),
+            'Resultado Real %': f"{pdet['resultado_real_pct']:.2f}".replace('.', ',') + '%',
+            'Quebra CX': _num_vc(pdet['quebra_cx'], 0), 'Quebra R$': _brl_vc(pdet['quebra_rs']),
+        } for prod_nome, pdet in sorted(produtos_marca.items(), key=lambda kv: -kv[1]['faturamento'])]
+        st.dataframe(pd.DataFrame(linhas_p), use_container_width=True, hide_index=True)
+
+    if sem_v or sem_q:
+        with st.expander(f'⚠️ {len(sem_v)} produto(s) de Vendas e {len(sem_q)} de Quebra sem marca reconhecida'):
+            st.caption('Não bateram com nenhuma marca do **Cadastro de Marcas** nem com as unificações '
+                       'manuais já pedidas (Itaueira, Vitória, Thompson, Mamão, Kiwi Importado, Pimentão, '
+                       'Tâmara, Red Globe, Mirtilo). Cadastre a marca ou peça mais uma unificação se for o caso.')
+            if sem_v:
+                st.caption(f'Vendas -- top produtos por faturamento (R$ {_num_vc(sem_v_valor, 0)} no total):')
+                top_sv = sorted(sem_v.items(), key=lambda kv: -kv[1]['valor'])[:15]
+                st.dataframe(pd.DataFrame([
+                    {'Produto': p, 'CX': _num_vc(d['cx'], 0), 'Faturamento': _brl_vc(d['valor'])}
+                    for p, d in top_sv
+                ]), use_container_width=True, hide_index=True)
+            if sem_q:
+                sem_q_custo = sum(d['custo'] for d in sem_q.values())
+                st.caption(f'Quebra -- top produtos por custo (R$ {_num_vc(sem_q_custo, 0)} no total):')
+                top_sq = sorted(sem_q.items(), key=lambda kv: -kv[1]['custo'])[:15]
+                st.dataframe(pd.DataFrame([
+                    {'Produto': p, 'CX': _num_vc(d['cx'], 0), 'Custo': _brl_vc(d['custo'])}
+                    for p, d in top_sq
+                ]), use_container_width=True, hide_index=True)
 
 
 def _render_recorrencia_resumo():
@@ -2019,12 +3246,12 @@ def _render_recorrencia_resumo():
                 return comparativo.calcular(totais_rc.get(chave), tot_ant_rc.get(chave)) if tot_ant_rc else None
 
             c1, c2, c3, c4, c5 = st.columns(5)
-            c1.metric('Faturamento', f"R$ {totais_rc.get('faturamento', 0):,.2f}",
+            c1.metric('Faturamento', f"R$ {_num_vc(totais_rc.get('faturamento', 0), 2)}",
                       delta=comparativo.formatar_variacao(_c_rc('faturamento')) if tot_ant_rc else None)
-            c2.metric('MC R$', f"R$ {totais_rc.get('mc_rs', 0):,.2f}",
+            c2.metric('MC R$', f"R$ {_num_vc(totais_rc.get('mc_rs', 0), 2)}",
                       delta=comparativo.formatar_variacao(_c_rc('mc_rs')) if tot_ant_rc else None)
             c3.metric('MC %', f"{totais_rc.get('mc_pct', 0):.2f}%")
-            c4.metric('Total CX', f"{totais_rc.get('caixas', 0):,.3f}",
+            c4.metric('Total CX', f"{_num_vc(totais_rc.get('caixas', 0), 3)}",
                       delta=comparativo.formatar_variacao(_c_rc('caixas')) if tot_ant_rc else None)
             c5.metric('Clientes', totais_rc.get('n_clientes', '-'),
                       delta=comparativo.formatar_variacao(_c_rc('n_clientes')) if tot_ant_rc else None)
@@ -2039,9 +3266,9 @@ def _render_recorrencia_resumo():
                 st.bar_chart(top30_rc, color='#2D6A4F')
                 with st.expander(f'Todos os clientes ({len(df_rc)})'):
                     styled_rc = df_rc.style.format({
-                        'Faturamento R$': 'R$ {:,.2f}',
-                        'Caixas': '{:,.3f}',
-                        'MC R$': 'R$ {:,.2f}',
+                        'Faturamento R$': lambda v: f"R$ {_num_vc(v, 2)}",
+                        'Caixas': lambda v: _num_vc(v, 3),
+                        'MC R$': lambda v: f"R$ {_num_vc(v, 2)}",
                         'MC %': '{:.2f}%',
                     })
                     st.dataframe(styled_rc, use_container_width=True, hide_index=True)
@@ -2054,7 +3281,7 @@ def _render_recorrencia_resumo():
                 _tot_lrc = _val_lrc.get('totais', {})
                 st.caption(
                     f"{_val_lrc.get('periodo','-')} — emissão {_val_lrc.get('emissao','-')} "
-                    f"— Faturamento R$ {_tot_lrc.get('faturamento', 0):,.2f}"
+                    f"— Faturamento R$ {_num_vc(_tot_lrc.get('faturamento', 0), 2)}"
                 )
 
 
@@ -2074,62 +3301,149 @@ if st.button('🔒 Sair', key='_gerencia_logout'):
 st.divider()
 
 # ── Grupos de abas ───────────────────────────────────────────────────────────
-(grp_vendas, grp_metas, grp_metas_gerais, grp_rentabilidade, grp_produtos,
- grp_clientes, grp_recorrencia, grp_quebras, grp_prevperdas) = st.tabs([
+# As mesmas 10 seções de sempre, agora agrupadas por assunto em 5 abas-pai com
+# st.tabs aninhado (mesma técnica de pages/7_Relatorios_Produtos_OTHIL.py) --
+# 10 abas lado a lado no topo já não cabiam na tela sem rolagem horizontal.
+# Nenhuma seção foi removida, renomeada ou teve conteúdo alterado: cada bloco
+# `with ...:` abaixo é exatamente o que já existia, só reposicionado sob a aba
+# de grupo correspondente.
+grp_top_metas, grp_top_dashboards, grp_top_resultados, grp_top_operacao, grp_top_clientes = st.tabs([
+    '🎯 Metas',
     '📊 Dashboards',
-    '🎯 Metas Semanais',
-    '🌐 Metas Gerais',
-    '💰 Rentabilidade',
-    '📦 Produtos',
+    '💰 Resultados',
+    '📦 Operação',
     '👥 Clientes',
-    '🔄 Recorrência',
-    '📦 Quebras',
-    '🚨 Prevenção de Perdas',
 ])
 
-# ── VENDAS ────────────────────────────────────────────────────────────────────
-with grp_vendas:
-    tab_d, tab_s, tab_m = st.tabs([
-        '📅 Diário',
-        '📆 Semanal',
-        '🗓️ Mensal',
+# ══ GRUPO: METAS ══════════════════════════════════════════════════════════════
+with grp_top_metas:
+    grp_metas, grp_metas_gerais = st.tabs([
+        '🎯 Metas Semanais',
+        '🌐 Metas Gerais',
     ])
-    with tab_d:
-        _render_secao_dash('diario', 'Dashboards Diários', '📅')
-    with tab_s:
-        _render_secao_dash('semanal', 'Dashboards Semanais', '📆')
-    with tab_m:
-        _render_secao_dash('mensal', 'Dashboards Mensais', '🗓️')
 
-# ── METAS ─────────────────────────────────────────────────────────────────────
-with grp_metas:
-    tab_ot, tab_fech = st.tabs([
-        '📊 On Track',
-        '🏁 Fechamentos Semanais',
+    # ── METAS SEMANAIS ────────────────────────────────────────────────────────
+    with grp_metas:
+        tab_ot, tab_fech = st.tabs([
+            '📊 On Track',
+            '🏁 Fechamentos Semanais',
+        ])
+        with tab_ot:
+            _render_ontrack_publicado()
+        with tab_fech:
+            _render_fechamentos_semanais()
+
+    # ── METAS GERAIS ──────────────────────────────────────────────────────────
+    with grp_metas_gerais:
+        _render_metas_gerais()
+
+# ══ GRUPO: DASHBOARDS ═════════════════════════════════════════════════════════
+with grp_top_dashboards:
+    grp_vendas, grp_margem_real = st.tabs([
+        '📊 Dashboards',
+        '💵 Margem Real',
     ])
-    with tab_ot:
-        _render_ontrack_publicado()
-    with tab_fech:
-        _render_fechamentos_semanais()
 
-# ── METAS GERAIS ──────────────────────────────────────────────────────────────
-with grp_metas_gerais:
-    _render_metas_gerais()
+    # ── VENDAS ────────────────────────────────────────────────────────────────
+    with grp_vendas:
+        tab_d, tab_s, tab_m = st.tabs([
+            '📅 Diário',
+            '📆 Semanal',
+            '🗓️ Mensal',
+        ])
+        with tab_d:
+            _render_secao_dash('diario', 'Dashboards Diários', '📅')
+        with tab_s:
+            _render_secao_dash('semanal', 'Dashboards Semanais', '📆')
+        with tab_m:
+            _render_secao_dash('mensal', 'Dashboards Mensais', '🗓️')
 
-# ── RENTABILIDADE ─────────────────────────────────────────────────────────────
-with grp_rentabilidade:
-    _render_rentabilidade_resumo()
+    # ── MARGEM REAL ───────────────────────────────────────────────────────────
+    with grp_margem_real:
+        st.caption(
+            'Custo real = Custo do relatório ÷ (1 + % administrativo do produto) — retira do Custo '
+            'a despesa administrativa que já vem embutida nele (variável por produto, cadastrada em '
+            '**Cadastro de Marcas**). MC % real = MC R$ real ÷ Custo real × 100, sem o +15pp '
+            'operacional usado nos outros indicadores. Sempre recalculada com o percentual mais atual '
+            'do cadastro, mesmo para períodos antigos.'
+        )
+        tab_mr_d, tab_mr_s, tab_mr_m = st.tabs([
+            '📅 Diário',
+            '📆 Semanal',
+            '🗓️ Mensal',
+        ])
+        with tab_mr_d:
+            _render_secao_margem_real('diario', 'Margem Real — Diário', '📅')
+        with tab_mr_s:
+            _render_secao_margem_real('semanal', 'Margem Real — Semanal', '📆')
+        with tab_mr_m:
+            _render_secao_margem_real('mensal', 'Margem Real — Mensal', '🗓️')
 
-# ── PRODUTOS ──────────────────────────────────────────────────────────────────
-with grp_produtos:
-    _render_produtos_resumo()
+# ══ GRUPO: RESULTADOS ═════════════════════════════════════════════════════════
+with grp_top_resultados:
+    grp_rentabilidade, grp_marca_fornecedor, grp_recorrencia = st.tabs([
+        '💰 Rentabilidade',
+        '📦 Resultado de Produtos',
+        '🔄 Recorrência',
+    ])
 
-# ── RECORRÊNCIA ───────────────────────────────────────────────────────────────
-with grp_recorrencia:
-    _render_recorrencia_resumo()
+    # ── RENTABILIDADE ─────────────────────────────────────────────────────────
+    with grp_rentabilidade:
+        _render_rentabilidade_resumo()
 
-# ── CLIENTES ──────────────────────────────────────────────────────────────────
-with grp_clientes:
+    # ── RESULTADO DE PRODUTOS (Marca/Fornecedor) ────────────────────────────
+    # A antiga aba "📦 Produtos" (_render_produtos_resumo(), base consolidada
+    # de Relatório Diário/Semanal/Mensal) foi removida em 03/09/2026 -- pedido
+    # da Ingrid ("apague a aba de Produtos, deixe somente a de Marca/
+    # Fornecedor, porém mude a nomenclatura para Resultado de Produtos"). A
+    # base por trás dela (produtos.carregar_base_consolidada() e o resto de
+    # produtos.py) não foi apagada -- só deixou de ser chamada aqui.
+    with grp_marca_fornecedor:
+        _render_marca_fornecedor()
+
+    # ── RECORRÊNCIA ───────────────────────────────────────────────────────────
+    with grp_recorrencia:
+        _render_recorrencia_resumo()
+
+# ══ GRUPO: OPERAÇÃO ═══════════════════════════════════════════════════════════
+with grp_top_operacao:
+    grp_quebras, grp_prevperdas = st.tabs([
+        '📦 Quebras',
+        '🚨 Prevenção de Perdas',
+    ])
+
+    # ── QUEBRAS ───────────────────────────────────────────────────────────────
+    with grp_quebras:
+        tab_qbr_s, tab_qbr_m, tab_qbr_comp = st.tabs([
+            '📦 Semanal',
+            '📦 Mensal',
+            '🔀 Comparativo',
+        ])
+        with tab_qbr_s:
+            _render_quebra_secao('semanal', 'Quebras Semanais', '📦')
+        with tab_qbr_m:
+            _render_quebra_secao('mensal', 'Quebras Mensais', '📦')
+        with tab_qbr_comp:
+            _render_quebra_comparativo()
+
+    # ── PREVENÇÃO DE PERDAS ───────────────────────────────────────────────────
+    with grp_prevperdas:
+        tab_pp_sv, tab_pp_me, tab_pp_cruz = st.tabs([
+            '🕐 1 Semana Sem Venda',
+            '📦 1 Mês em Estoque',
+            '🔗 Cruzamento com Quebra',
+        ])
+        with tab_pp_sv:
+            _render_prevperdas_secao('sem_venda', '1 Semana Sem Venda')
+        with tab_pp_me:
+            _render_prevperdas_secao('mes_estoque', '1 Mês em Estoque')
+        with tab_pp_cruz:
+            _render_cruzamento_quebra()
+
+# ══ GRUPO: CLIENTES ═══════════════════════════════════════════════════════════
+# Único grupo com uma seção só -- as 3 sub-abas de Clientes ficam direto sob a
+# aba-pai, sem um nível intermediário que não separaria nada.
+with grp_top_clientes:
     tab_cli_ot, tab_cli_top50, tab_cli_pv = st.tabs([
         '📊 On Track por Cliente', '🏆 Top 50 Clientes', '👤 Clientes por Vendedor',
     ])
@@ -2141,31 +3455,3 @@ with grp_clientes:
         _render_clientes_por_vendedor_ger()
     # Ranking de Recorrência mudou para a aba própria '🔄 Recorrência' (mais fácil de
     # achar, e junto ali agora tem os 5 tipos de período + histórico versionado).
-
-# ── QUEBRAS ───────────────────────────────────────────────────────────────────
-with grp_quebras:
-    tab_qbr_s, tab_qbr_m, tab_qbr_comp = st.tabs([
-        '📦 Semanal',
-        '📦 Mensal',
-        '🔀 Comparativo',
-    ])
-    with tab_qbr_s:
-        _render_quebra_secao('semanal', 'Quebras Semanais', '📦')
-    with tab_qbr_m:
-        _render_quebra_secao('mensal', 'Quebras Mensais', '📦')
-    with tab_qbr_comp:
-        _render_quebra_comparativo()
-
-# ── PREVENÇÃO DE PERDAS ───────────────────────────────────────────────────────
-with grp_prevperdas:
-    tab_pp_sv, tab_pp_me, tab_pp_cruz = st.tabs([
-        '🕐 1 Semana Sem Venda',
-        '📦 1 Mês em Estoque',
-        '🔗 Cruzamento com Quebra',
-    ])
-    with tab_pp_sv:
-        _render_prevperdas_secao('sem_venda', '1 Semana Sem Venda')
-    with tab_pp_me:
-        _render_prevperdas_secao('mes_estoque', '1 Mês em Estoque')
-    with tab_pp_cruz:
-        _render_cruzamento_quebra()
