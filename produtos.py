@@ -32,6 +32,11 @@ por_vendedor = rt.por_vendedor
 por_cliente = rt.por_cliente
 evolucao = rt.evolucao
 
+def _fmt_moeda(v):
+    s = f"{abs(v):,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
+    return f"R$ {'-' if v < 0 else ''}{s}"
+
+
 UNIDADE_PADRAO = 'cx'
 
 # Fonte de dados do Resumo do Estoque (upload de PDF direto nesta página --
@@ -481,7 +486,7 @@ def alertas_produtos(itens_atual, itens_anterior=None,
     for p in produtos_sem_venda_no_periodo(itens_atual, itens_anterior):
         alertas.append({
             'tipo': 'Deixou de vender', 'produto': p['chave'],
-            'detalhe': f"{p['chave']} teve {p['faturamento']:,.2f} de faturamento no período anterior "
+            'detalhe': f"{p['chave']} teve {_fmt_moeda(p['faturamento'])} de faturamento no período anterior "
                        f"e nenhuma venda no período atual.",
             'severidade': 'critico',
         })
