@@ -88,23 +88,38 @@ def _now_iso() -> str:
 # ---------------------------------------------------------------------------
 
 def _github_get(rel_path: str):
+    """Retorna (obj, sha, erro).
+
+    erro é None quando a leitura foi conclusiva -- seja porque encontrou o
+    arquivo (obj preenchido), seja porque o GitHub confirmou (404) que ele
+    ainda não existe (obj=None, erro=None: "não existe" é uma resposta
+    válida, não uma falha).
+
+    erro é preenchido (string) quando a leitura foi AMBÍGUA -- falha de
+    rede, timeout, token sem permissão (401/403), rate limit (429), erro
+    do lado do GitHub (5xx) ou conteúdo que veio mas não pôde ser
+    decodificado. Nesses casos NÃO dá pra saber se o arquivo existe ou
+    não -- quem chama não deve tratar isso como "não existe ainda".
+    """
     headers = _headers()
     if not headers:
-        return None, None
+        return None, None, None
     repo, branch = _repo_branch()
     url = f"https://api.github.com/repos/{repo}/contents/{DATA_ROOT}/{rel_path}"
     try:
         resp = requests.get(url, headers=headers, params={"ref": branch}, timeout=10)
-    except requests.RequestException:
-        return None, None
+    except requests.RequestException as e:
+        return None, None, f"falha de rede ao consultar o GitHub: {e}"
+    if resp.status_code == 404:
+        return None, None, None
     if resp.status_code != 200:
-        return None, None
+        return None, None, f"GitHub respondeu {resp.status_code} ao consultar {rel_path}"
     data = resp.json()
     try:
         content = base64.b64decode(data["content"]).decode("utf-8")
-        return json.loads(content), data.get("sha")
-    except Exception:
-        return None, data.get("sha")
+        return json.loads(content), data.get("sha"), None
+    except Exception as e:
+        return None, data.get("sha"), f"conteúdo remoto ilegível em {rel_path}: {e}"
 
 
 def _github_put(rel_path: str, obj: dict, sha, mensagem: str):
@@ -126,6 +141,22 @@ def _github_put(rel_path: str, obj: dict, sha, mensagem: str):
     except requests.RequestException as e:
         return False, f"Falha ao salvar no GitHub: {e}"
     if resp.status_code in (200, 201):
+        return True, None
+    return False, f"GitHub respondeu {resp.status_code}: {resp.text[:200]}"
+
+
+def _github_delete(rel_path: str, sha: str, mensagem: str):
+    headers = _headers()
+    if not headers:
+        return False, "GITHUB_TOKEN não configurado nos Secrets."
+    repo, branch = _repo_branch()
+    url = f"https://api.github.com/repos/{repo}/contents/{DATA_ROOT}/{rel_path}"
+    payload = {"message": mensagem, "sha": sha, "branch": branch}
+    try:
+        resp = requests.delete(url, headers=headers, json=payload, timeout=15)
+    except requests.RequestException as e:
+        return False, f"Falha ao apagar no GitHub: {e}"
+    if resp.status_code in (200, 204):
         return True, None
     return False, f"GitHub respondeu {resp.status_code}: {resp.text[:200]}"
 
@@ -188,21 +219,43 @@ def _local_list_dir(rel_dir: str):
 # ---------------------------------------------------------------------------
 
 def _read_file(rel_path: str):
+    """Retorna (obj, erro) -- ver docstring de _github_get para o
+    significado de erro (None = leitura conclusiva; string = ambígua)."""
     if is_remoto():
-        obj, sha = _github_get(rel_path)
+        obj, sha, erro = _github_get(rel_path)
         if obj is not None:
             _local_put(rel_path, obj)  # mantém cache local em dia
-            return obj
-        # não existe remotamente ainda (ou falha de rede) -> tenta cache local
-        return _local_get(rel_path)
-    return _local_get(rel_path)
+            return obj, None
+        if erro is not None:
+            # Leitura ambígua: não sabemos se existe ou não. Devolvemos o
+            # cache local (se houver) só para exibição, mas propagamos o
+            # erro -- quem grava não pode tratar isso como "arquivo novo".
+            return _local_get(rel_path), erro
+        # Confirmado (404): não existe remotamente ainda.
+        return _local_get(rel_path), None
+    return _local_get(rel_path), None
 
 
 def _write_file(rel_path: str, obj: dict, mensagem: str):
     _local_put(rel_path, obj)  # grava local sempre (cache/dev)
     if is_remoto():
-        _, sha = _github_get(rel_path)
-        return _github_put(rel_path, obj, sha, mensagem)
+        _, sha, _erro = _github_get(rel_path)
+        ok, err = _github_put(rel_path, obj, sha, mensagem)
+        if not ok and err and err.startswith('GitHub respondeu 409'):
+            # 409 = o sha que mandamos ficou desatualizado entre o GET e o
+            # PUT acima -- outra gravação no MESMO arquivo aconteceu bem
+            # no meio (ex.: duplo clique num botão de salvar, duas abas
+            # abertas, dois cliques em sequência rápida enquanto a pessoa
+            # não tinha certeza se o primeiro tinha funcionado -- caso
+            # real da Ingrid em 31/08/2026, usando "Corrigir a semana"
+            # duas vezes seguidas). Busca o sha ATUAL de novo e tenta
+            # gravar mais uma vez antes de desistir -- sem isso, a
+            # gravação ficava só no cache local (efêmero no Streamlit
+            # Cloud), sem persistir de verdade, até a pessoa notar o aviso
+            # e clicar de novo manualmente.
+            _, sha2, _erro2 = _github_get(rel_path)
+            ok, err = _github_put(rel_path, obj, sha2, mensagem)
+        return ok, err
     return True, None
 
 
@@ -214,9 +267,12 @@ def _write_file(rel_path: str, obj: dict, mensagem: str):
 
 @st.cache_data(ttl=30, show_spinner=False)
 def _load_current_cached(modulo: str, tipo_periodo: str, periodo_ref: str):
+    """Devolve (registro, erro) -- ver load_current_com_erro() abaixo pro
+    significado de cada um. Guardado como tupla numa cache só (em vez de
+    duas caches separadas) pra não duplicar a chamada à API do GitHub."""
     rel_path = _path_for(modulo, tipo_periodo, periodo_ref)
-    obj = _read_file(rel_path)
-    return obj.get('current') if obj else None
+    obj, erro = _read_file(rel_path)
+    return (obj.get('current') if obj else None), erro
 
 
 def _invalidate_cache():
@@ -239,7 +295,7 @@ def save_record(modulo: str, tipo_periodo: str, periodo_ref: str, valores: dict,
     Retorna o registro recém-salvo (com id, versao, criado_em, atualizado_em).
     """
     rel_path = _path_for(modulo, tipo_periodo, periodo_ref)
-    existing = _read_file(rel_path)
+    existing, erro_leitura = _read_file(rel_path)
 
     agora = _now_iso()
     if existing and existing.get('current'):
@@ -270,6 +326,29 @@ def save_record(modulo: str, tipo_periodo: str, periodo_ref: str, valores: dict,
 
     obj = {'current': novo, 'history': history}
     mensagem = f"{modulo}: atualiza {tipo_periodo} {periodo_ref} (v{versao})"
+
+    if erro_leitura is not None:
+        # Não conseguimos confirmar com certeza, antes de gravar, se já
+        # existe um registro remoto para este período (leitura ambígua:
+        # rede, GitHub fora do ar, token sem permissão, etc. -- ver
+        # _github_get). 'existing' acima pode ter vindo do cache local
+        # (possivelmente desatualizado ou vazio), então 'history'/'versao'
+        # calculados a partir dele NÃO são confiáveis. Gravar no GitHub
+        # nessa condição arriscaria apagar histórico real que não
+        # conseguimos ler. Por segurança, guardamos apenas no cache local
+        # (não perde o dado desta gravação) e NÃO tocamos no GitHub --
+        # sinalizamos o erro para o chamador avisar a usuária e permitir
+        # tentar de novo.
+        _local_put(rel_path, obj)
+        _invalidate_cache()
+        novo = dict(novo)
+        novo['_erro_persistencia_remota'] = (
+            f"Não foi possível confirmar o histórico já salvo antes de gravar "
+            f"({erro_leitura}). Para não arriscar apagar dados antigos, esta "
+            f"gravação ficou só no cache local -- tente novamente em instantes."
+        )
+        return novo
+
     ok, err = _write_file(rel_path, obj, mensagem)
     _invalidate_cache()
 
@@ -282,9 +361,59 @@ def save_record(modulo: str, tipo_periodo: str, periodo_ref: str, valores: dict,
     return novo
 
 
+def delete_record(modulo: str, tipo_periodo: str, periodo_ref: str) -> tuple:
+    """Apaga PERMANENTEMENTE o registro (modulo, tipo_periodo, periodo_ref)
+    -- do GitHub (se configurado) e do cache local, junto com todo o
+    histórico de versões dele. AÇÃO IRREVERSÍVEL -- diferente de
+    save_record() (que nunca apaga, só versiona), esta função existe
+    especificamente pra remover registros órfãos/duplicados (ex.: um
+    fechamento salvo sob o periodo_ref errado por causa da ambiguidade da
+    semana comercial -- ver "🔧 Corrigir a semana" em pages/gerencia.py).
+    Só deve ser chamada com confirmação explícita da pessoa usuária na UI,
+    nunca automaticamente. Devolve (ok: bool, erro: str|None)."""
+    rel_path = _path_for(modulo, tipo_periodo, periodo_ref)
+    full = _local_full_path(rel_path)
+    if os.path.exists(full):
+        try:
+            os.remove(full)
+        except Exception:
+            pass  # segue tentando apagar do GitHub mesmo se o local falhar
+    if not is_remoto():
+        _invalidate_cache()
+        return True, None
+    _, sha, erro_leitura = _github_get(rel_path)
+    if sha is None:
+        _invalidate_cache()
+        if erro_leitura:
+            return False, f"Não foi possível confirmar o registro no GitHub antes de apagar: {erro_leitura}"
+        return True, None  # já não existe remotamente -- nada a fazer
+    ok, err = _github_delete(rel_path, sha, f"{modulo}: apaga {tipo_periodo} {periodo_ref}")
+    _invalidate_cache()
+    return ok, err
+
+
 def load_current(modulo: str, tipo_periodo: str, periodo_ref: str):
     """Retorna o registro (versão) mais recente, ou None se não houver dado
-    salvo para esse módulo/período."""
+    salvo para esse módulo/período. Não distingue "nunca foi publicado" de
+    "falha ao consultar o GitHub agora" -- quem precisa dessa distinção
+    (pra não mostrar "sem dado" quando na real é uma falha de leitura) usa
+    load_current_com_erro() abaixo."""
+    reg, _erro = _load_current_cached(modulo, tipo_periodo, periodo_ref)
+    return reg
+
+
+def load_current_com_erro(modulo: str, tipo_periodo: str, periodo_ref: str):
+    """Como load_current(), mas devolve (registro, erro).
+
+    erro vem preenchido (string) quando a consulta ao GitHub falhou de
+    forma AMBÍGUA (rede, token inválido/sem permissão, rate limit, erro
+    5xx do lado do GitHub) -- nesse caso NÃO dá pra saber se o dado existe
+    ou não, e quem chama não deve tratar isso como "nunca foi publicado"
+    (mesma distinção que _github_get já faz internamente, só que até aqui
+    ela se perdia -- load_current descartava o erro em silêncio e todo
+    "sem dado" na tela podia na real ser uma falha de leitura escondida).
+    erro é None quando a consulta foi conclusiva (achou o registro, ou
+    confirmou -- 404 -- que ele realmente não existe)."""
     return _load_current_cached(modulo, tipo_periodo, periodo_ref)
 
 
@@ -292,7 +421,7 @@ def load_history(modulo: str, tipo_periodo: str, periodo_ref: str) -> list:
     """Retorna as versões anteriores (mais antiga -> mais recente), sem
     incluir a versão atual."""
     rel_path = _path_for(modulo, tipo_periodo, periodo_ref)
-    obj = _read_file(rel_path)
+    obj, _erro = _read_file(rel_path)
     return obj.get('history', []) if obj else []
 
 
