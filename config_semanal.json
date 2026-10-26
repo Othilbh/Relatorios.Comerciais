@@ -151,6 +151,14 @@
       "prioridade": "📅 Itens Diários",
       "metas_fixas_ativo": false,
       "metas_fixas": {}
+    },
+    {
+      "nome": "William Bouquet",
+      "codigos_texto": "0201046*",
+      "estoque": 336,
+      "prioridade": "🔥 Alta Prioridade",
+      "metas_fixas_ativo": false,
+      "metas_fixas": {}
     }
   ],
   "vendedor_pcts": {
