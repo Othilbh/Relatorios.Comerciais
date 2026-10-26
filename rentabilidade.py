@@ -43,6 +43,16 @@ from categorias import map_categoria
 MOD_RELATORIO_DIARIO = 'relatorio_diario'
 MOD_RENTABILIDADE = 'rentabilidade'
 
+
+def _fmt_moeda(v):
+    s = f"{abs(v):,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
+    return f"R$ {'-' if v < 0 else ''}{s}"
+
+
+def _fmt_num(v, casas=2):
+    s = f"{abs(v):,.{casas}f}".replace(',', 'X').replace('.', ',').replace('X', '.')
+    return f"{'-' if v < 0 else ''}{s}"
+
 # Limiares padrão dos alertas gerenciais (secção 16 do briefing: não são
 # regra de negócio fixa -- são parâmetros ajustáveis, com um valor inicial
 # razoável, já que nenhuma regra de "margem mínima sobre faturamento"
@@ -405,7 +415,7 @@ def alertas_gerenciais(itens_atual, itens_anterior=None,
         if c['faturamento'] >= corte_fat_cli and c['margem_pct'] < limiar_atencao and c['faturamento'] > 0:
             alertas.append({
                 'tipo': 'Cliente: alto faturamento + baixa margem',
-                'detalhe': f"{c['chave']} — faturamento R$ {c['faturamento']:,.2f}, margem {c['margem_pct']:.2f}%.",
+                'detalhe': f"{c['chave']} — faturamento {_fmt_moeda(c['faturamento'])}, margem {c['margem_pct']:.2f}%.",
                 'severidade': 'critico' if c['margem_pct'] < limiar_critico else 'atencao',
             })
 
@@ -415,7 +425,7 @@ def alertas_gerenciais(itens_atual, itens_anterior=None,
         if p['volume'] >= corte_vol_prod and p['margem_pct'] < limiar_atencao and p['volume'] > 0:
             alertas.append({
                 'tipo': 'Produto: alto volume + baixa margem',
-                'detalhe': f"{p['chave']} — volume {p['volume']:,.3f}, margem {p['margem_pct']:.2f}%.",
+                'detalhe': f"{p['chave']} — volume {_fmt_num(p['volume'], 3)}, margem {p['margem_pct']:.2f}%.",
                 'severidade': 'critico' if p['margem_pct'] < limiar_critico else 'atencao',
             })
 
