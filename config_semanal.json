@@ -139,7 +139,7 @@
     },
     {
       "nome": "Mamao Havai",
-      "codigos_texto": "40601003*",
+      "codigos_texto": "40601003*\n406100305\n406100303",
       "estoque": 277,
       "prioridade": "📅 Itens Diários",
       "metas_fixas_ativo": false,
