@@ -12,6 +12,10 @@ import pdfplumber
 
 NUM_RE  = re.compile(r'^-?[\d.]+,\d+$')
 QTY3_RE = re.compile(r'^-?\d[\d.]*,\d{3}$')  # números com 3 casas decimais (quantidades)
+# Casa uma quantidade (3 casas decimais) colada no FINAL de um token maior,
+# ex.: "REGINALDO31,000" ou "CXREGINALDO1,000" — ver _extrair_qtde() abaixo.
+QTY3_TAIL_RE = re.compile(r'(-?\d[\d.]*,\d{3})$')
+MONEY2_RE = re.compile(r'^-?[\d.]+,\d{2}$')  # números com 2 casas decimais (dinheiro)
 DATE_RE = re.compile(r'^\d{2}/\d{2}/\d{4}$')
 VENDOR_LINE_RE = re.compile(r'^Vendedor:\s*(\d+)\s+(.+)$')
 
@@ -141,16 +145,76 @@ def parse_vendas(file) -> list[dict]:
                 if not codematch:
                     continue
                 codigo = codematch.group(1)
-                nums = [t for t in toks if NUM_RE.match(t)]
-                # Filtra só os tokens com 3 casas decimais (formato quantidade: 5,000)
-                # O último desses é sempre o Total das Saídas Qtd (Saídas por Vendas
-                # + Outras Saídas). Usando o último em vez do índice fixo 6 porque o
-                # pdfplumber funde colunas adjacentes em algumas linhas, deslocando os índices.
-                qty_nums = [n for n in nums if QTY3_RE.match(n)]
-                if not qty_nums:
+                # Às vezes a quantidade vendida sai colada sem espaço no nome do
+                # vendedor responsável (mesmo bug de caracteres embaralhados citado
+                # no docstring, ex.: "REGINALDO31,000" ou "CXREGINALDO1,000") — nesse
+                # caso o token inteiro não bate com QTY3_RE e a quantidade real
+                # desaparecia silenciosamente. Recuperamos ela procurando um número
+                # de 3 casas decimais colado no FINAL de qualquer token da linha.
+                glued_qty = None
+                qty_nums = []
+                for t in toks:
+                    if QTY3_RE.match(t):
+                        qty_nums.append(t)
+                        continue
+                    m = QTY3_TAIL_RE.search(t)
+                    if m and glued_qty is None:
+                        glued_qty = m.group(1)
+                # BUG REAL corrigido 04/09/2026, reportado pela Ingrid ("A dole, não
+                # está puxando toda a venda... Reginaldo vendeu 99 cx. Afanais vendeu
+                # 83", print do relatório mostrando bem menos). Cabeçalho REAL deste
+                # relatório (conferido linha a linha no PDF que ela enviou): "Código
+                # Descrição UN Qtd Vendida Devoluções Total Vendas Val.Unit. Custo
+                # Total Lucro Liq. Lucro Unit. Lucro %" -- ou seja, existem
+                # exatamente DUAS colunas com 3 casas decimais (formato quantidade:
+                # 5,000): Qtd Vendida (a PRIMEIRA) e Devoluções (a segunda, sempre
+                # 0,000 neste relatório) -- "Total Vendas" é uma coluna de DINHEIRO
+                # (2 casas decimais, R$), não uma 3ª coluna de quantidade. O código
+                # antigo assumia o contrário (comentário antigo dizia "o último
+                # desses é sempre o Total das Saídas Qtd") e pegava sempre o ÚLTIMO
+                # número de 3 casas -- que na prática é quase sempre Devoluções =
+                # 0,000, zerando silenciosamente a Qtd Vendida de quase toda linha
+                # "saudável" (sem o bug de colagem acima).
+                qtde_primaria = to_float(glued_qty) if glued_qty is not None else (
+                    to_float(qty_nums[0]) if qty_nums else None
+                )
+                # Verificação cruzada / recuperação via colunas de dinheiro:
+                # "Total Vendas" (2 casas) sempre vem logo após "Devoluções" (o
+                # último token que bate QTY3_RE), seguido de "Val.Unit." (2 casas).
+                # Nas linhas saudáveis deste relatório, Total Vendas ÷ Val.Unit. =
+                # Qtd Vendida EXATAMENTE (confirmado em 104 linhas limpas reais,
+                # nenhuma divergência) -- essa é uma identidade aritmética do
+                # próprio ERP (Total Vendas = Qtd Vendida × Val.Unit.), não um
+                # número inventado, então serve tanto pra RECUPERAR a Qtd Vendida
+                # quando ela está irrecuperável no texto (ex.: linhas com
+                # complemento "-RONISTONIS", onde as letras do nome do vendedor mais
+                # longo do sistema se intercalam DENTRO dos dígitos, sobrando só a
+                # Devolução "0,000" reconhecível) quanto pra CORRIGIR um valor colado
+                # truncado (ex.: "CRXEGINALD1O3,000" pro vendedor FARLEY/produto
+                # 8707112 -- o dígito "1" fica preso antes da letra "O" e o regex de
+                # cauda só recupera o "3,000" final, quando o valor real, confirmado
+                # por Total Vendas 780,00 ÷ Val.Unit. 60,00, é 13 -- mesmo padrão de
+                # embaralhamento do docstring, "PREMIUM"+"DORA"->"PREMIUDMORA",
+                # aplicado a um número em vez de uma palavra).
+                qtde_dinheiro = None
+                if qty_nums:
+                    idx_devol = toks.index(qty_nums[-1])
+                    if idx_devol + 2 < len(toks):
+                        tot_tok, val_tok = toks[idx_devol + 1], toks[idx_devol + 2]
+                        if MONEY2_RE.match(tot_tok) and MONEY2_RE.match(val_tok):
+                            val_unit = to_float(val_tok)
+                            if val_unit:
+                                derived = to_float(tot_tok) / val_unit
+                                if abs(derived - round(derived)) < 0.05:
+                                    qtde_dinheiro = round(derived)
+                if qtde_dinheiro is not None and (
+                    qtde_primaria is None or abs(qtde_primaria - qtde_dinheiro) > 0.5
+                ):
+                    qtde = float(qtde_dinheiro)
+                elif qtde_primaria is not None:
+                    qtde = qtde_primaria
+                else:
                     continue
-                # Preferência: 3º qty (Total das Saídas); fallback: último disponível
-                qtde = to_float(qty_nums[2] if len(qty_nums) >= 3 else qty_nums[-1])
                 rows_out.append({
                     'vendedor': current_vendor,
                     'codigo': codigo,
