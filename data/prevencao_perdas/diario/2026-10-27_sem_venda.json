@@ -1,0 +1,284 @@
+{
+  "current": {
+    "id": "a966cc37-16a1-4f9d-9b5c-ae6ff86320fe",
+    "modulo_origem": "prevencao_perdas",
+    "tipo_periodo": "diario",
+    "periodo_ref": "2026-10-27_sem_venda",
+    "data_referencia": "2026-10-27",
+    "criado_em": "2026-10-27T13:32:33+00:00",
+    "atualizado_em": "2026-10-27T13:32:33+00:00",
+    "usuario": "Ingrid",
+    "versao": 1,
+    "valores": {
+      "publicado_em": "2026-10-27T13:32:33.827230",
+      "emissao": "27/10/2026",
+      "periodo": "19/10/2026",
+      "tipo": "sem_venda",
+      "resumo": {
+        "total": 23,
+        "criticos": 3,
+        "alta_prioridade": 15,
+        "atencao": 5,
+        "valor_risco": 577078.87,
+        "sem_venda_7d": 23,
+        "estoque_30d": 3
+      },
+      "produtos": [
+        {
+          "prioridade": "🔴 Crítico",
+          "produto": "GALA 165 BRANCA FONTANELA",
+          "responsavel": "FARLEY",
+          "dias_estoque": 36,
+          "dias_sem_venda": 8,
+          "saldo_cx": 194.0,
+          "qtd_vendida": 0.0,
+          "valor_estoque": 22472.96,
+          "acao": "Promoção urgente / Vender urgente"
+        },
+        {
+          "prioridade": "🔴 Crítico",
+          "produto": "CAQUI HOTH 20X1",
+          "responsavel": "RONISTONIS",
+          "dias_estoque": 88,
+          "dias_sem_venda": 8,
+          "saldo_cx": 4.0,
+          "qtd_vendida": 0.0,
+          "valor_estoque": 375.12,
+          "acao": "Promoção urgente / Vender urgente"
+        },
+        {
+          "prioridade": "🔴 Crítico",
+          "produto": "LARANJA IMP BAHIA CITRUS CX",
+          "responsavel": "AZULRONISTONIS",
+          "dias_estoque": 89,
+          "dias_sem_venda": 8,
+          "saldo_cx": 1.0,
+          "qtd_vendida": 0.0,
+          "valor_estoque": 34.83,
+          "acao": "Promoção urgente / Vender urgente"
+        },
+        {
+          "prioridade": "🟠 Alta Prioridade",
+          "produto": "CUMB THOMPSON SANIFRUIT",
+          "responsavel": "RONISTONIS",
+          "dias_estoque": 6,
+          "dias_sem_venda": 8,
+          "saldo_cx": 3080.0,
+          "qtd_vendida": 0.0,
+          "valor_estoque": 201093.2,
+          "acao": "Priorizar venda / Contatar vendedor"
+        },
+        {
+          "prioridade": "🟠 Alta Prioridade",
+          "produto": "CUMB AMEIXA 20X1",
+          "responsavel": "HOTH",
+          "dias_estoque": 1,
+          "dias_sem_venda": 8,
+          "saldo_cx": 769.0,
+          "qtd_vendida": 0.0,
+          "valor_estoque": 101692.56,
+          "acao": "Priorizar venda / Contatar vendedor"
+        },
+        {
+          "prioridade": "🟠 Alta Prioridade",
+          "produto": "CUMB ISIS VITACE",
+          "responsavel": "AFANAIS",
+          "dias_estoque": 12,
+          "dias_sem_venda": 8,
+          "saldo_cx": 660.0,
+          "qtd_vendida": 0.0,
+          "valor_estoque": 32749.2,
+          "acao": "Priorizar venda / Contatar vendedor"
+        },
+        {
+          "prioridade": "🟠 Alta Prioridade",
+          "produto": "FUJI 100 LABELLE",
+          "responsavel": "RONI",
+          "dias_estoque": 1,
+          "dias_sem_venda": 8,
+          "saldo_cx": 224.0,
+          "qtd_vendida": 0.0,
+          "valor_estoque": 23649.92,
+          "acao": "Priorizar venda / Contatar vendedor"
+        },
+        {
+          "prioridade": "🟠 Alta Prioridade",
+          "produto": "PORTUGUESA 55/60 SABOR",
+          "responsavel": "LUCIANO",
+          "dias_estoque": 6,
+          "dias_sem_venda": 8,
+          "saldo_cx": 224.0,
+          "qtd_vendida": 0.0,
+          "valor_estoque": 21123.2,
+          "acao": "Priorizar venda / Contatar vendedor"
+        },
+        {
+          "prioridade": "🟠 Alta Prioridade",
+          "produto": "GALA IMP 113 ARMAMAR 18KG",
+          "responsavel": "REGINALDO",
+          "dias_estoque": 4,
+          "dias_sem_venda": 8,
+          "saldo_cx": 112.0,
+          "qtd_vendida": 0.0,
+          "valor_estoque": 19289.76,
+          "acao": "Priorizar venda / Contatar vendedor"
+        },
+        {
+          "prioridade": "🟠 Alta Prioridade",
+          "produto": "GALA 110 FRUTAS DE OURO",
+          "responsavel": "REGIS",
+          "dias_estoque": 1,
+          "dias_sem_venda": 8,
+          "saldo_cx": 112.0,
+          "qtd_vendida": 0.0,
+          "valor_estoque": 16778.72,
+          "acao": "Priorizar venda / Contatar vendedor"
+        },
+        {
+          "prioridade": "🟠 Alta Prioridade",
+          "produto": "PACKHAMS 110 BREVI CX VERDE",
+          "responsavel": "REGINALDO",
+          "dias_estoque": 6,
+          "dias_sem_venda": 8,
+          "saldo_cx": 112.0,
+          "qtd_vendida": 0.0,
+          "valor_estoque": 16550.24,
+          "acao": "Priorizar venda / Contatar vendedor"
+        },
+        {
+          "prioridade": "🟠 Alta Prioridade",
+          "produto": "KIWI 33 RIO BLANCO CX",
+          "responsavel": "PLASTICA",
+          "dias_estoque": 7,
+          "dias_sem_venda": 8,
+          "saldo_cx": 104.0,
+          "qtd_vendida": 0.0,
+          "valor_estoque": 16352.96,
+          "acao": "Priorizar venda / Contatar vendedor"
+        },
+        {
+          "prioridade": "🟠 Alta Prioridade",
+          "produto": "GALA IMP 150 ARMAMAR 18KG",
+          "responsavel": "DORA",
+          "dias_estoque": 4,
+          "dias_sem_venda": 8,
+          "saldo_cx": 112.0,
+          "qtd_vendida": 0.0,
+          "valor_estoque": 15731.52,
+          "acao": "Priorizar venda / Contatar vendedor"
+        },
+        {
+          "prioridade": "🟠 Alta Prioridade",
+          "produto": "GALA 120 FRUTAS DE OURO",
+          "responsavel": "REGIS",
+          "dias_estoque": 1,
+          "dias_sem_venda": 8,
+          "saldo_cx": 112.0,
+          "qtd_vendida": 0.0,
+          "valor_estoque": 15470.56,
+          "acao": "Priorizar venda / Contatar vendedor"
+        },
+        {
+          "prioridade": "🟠 Alta Prioridade",
+          "produto": "FUJI 135 FRUTAS DE",
+          "responsavel": "OURO",
+          "dias_estoque": 1,
+          "dias_sem_venda": 8,
+          "saldo_cx": 112.0,
+          "qtd_vendida": 0.0,
+          "valor_estoque": 15470.56,
+          "acao": "Priorizar venda / Contatar vendedor"
+        },
+        {
+          "prioridade": "🟠 Alta Prioridade",
+          "produto": "WILLIANS 1/2 BOUQUET",
+          "responsavel": "75/80",
+          "dias_estoque": 4,
+          "dias_sem_venda": 8,
+          "saldo_cx": 112.0,
+          "qtd_vendida": 0.0,
+          "valor_estoque": 12523.84,
+          "acao": "Priorizar venda / Contatar vendedor"
+        },
+        {
+          "prioridade": "🟠 Alta Prioridade",
+          "produto": "GALA IMP AURORA",
+          "responsavel": "180",
+          "dias_estoque": 26,
+          "dias_sem_venda": 8,
+          "saldo_cx": 56.0,
+          "qtd_vendida": 0.0,
+          "valor_estoque": 8276.24,
+          "acao": "Priorizar venda / Contatar vendedor"
+        },
+        {
+          "prioridade": "🟠 Alta Prioridade",
+          "produto": "PIMENTAO REI DUO",
+          "responsavel": "RONISTONIS",
+          "dias_estoque": 27,
+          "dias_sem_venda": 8,
+          "saldo_cx": 1.0,
+          "qtd_vendida": 0.0,
+          "valor_estoque": 129.56,
+          "acao": "Priorizar venda / Contatar vendedor"
+        },
+        {
+          "prioridade": "🟡 Atenção",
+          "produto": "GALA 135 PEROLA",
+          "responsavel": "NEGRA",
+          "dias_estoque": 1,
+          "dias_sem_venda": 8,
+          "saldo_cx": 112.0,
+          "qtd_vendida": 0.0,
+          "valor_estoque": 9189.6,
+          "acao": "Monitorar / Ação preventiva"
+        },
+        {
+          "prioridade": "🟡 Atenção",
+          "produto": "GALA SOLTA MORRO",
+          "responsavel": "AGUDO",
+          "dias_estoque": 1,
+          "dias_sem_venda": 8,
+          "saldo_cx": 112.0,
+          "qtd_vendida": 0.0,
+          "valor_estoque": 9189.6,
+          "acao": "Monitorar / Ação preventiva"
+        },
+        {
+          "prioridade": "🟡 Atenção",
+          "produto": "GALA 110 DADIVA",
+          "responsavel": "DORA",
+          "dias_estoque": 1,
+          "dias_sem_venda": 8,
+          "saldo_cx": 56.0,
+          "qtd_vendida": 0.0,
+          "valor_estoque": 8436.96,
+          "acao": "Monitorar / Ação preventiva"
+        },
+        {
+          "prioridade": "🟡 Atenção",
+          "produto": "FUJI 100 PEROLA",
+          "responsavel": "NEGRA",
+          "dias_estoque": 1,
+          "dias_sem_venda": 8,
+          "saldo_cx": 56.0,
+          "qtd_vendida": 0.0,
+          "valor_estoque": 5248.88,
+          "acao": "Monitorar / Ação preventiva"
+        },
+        {
+          "prioridade": "🟡 Atenção",
+          "produto": "FUJI 110 PEROLA",
+          "responsavel": "NEGRA",
+          "dias_estoque": 1,
+          "dias_sem_venda": 8,
+          "saldo_cx": 56.0,
+          "qtd_vendida": 0.0,
+          "valor_estoque": 5248.88,
+          "acao": "Monitorar / Ação preventiva"
+        }
+      ]
+    }
+  },
+  "history": []
+}
