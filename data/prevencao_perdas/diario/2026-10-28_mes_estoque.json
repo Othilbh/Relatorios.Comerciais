@@ -1,0 +1,240 @@
+{
+  "current": {
+    "id": "d08c6f1b-827c-4565-a0b8-efb76db4d756",
+    "modulo_origem": "prevencao_perdas",
+    "tipo_periodo": "diario",
+    "periodo_ref": "2026-10-28_mes_estoque",
+    "data_referencia": "2026-10-28",
+    "criado_em": "2026-10-28T14:22:41+00:00",
+    "atualizado_em": "2026-10-28T14:22:41+00:00",
+    "usuario": "Ingrid",
+    "versao": 1,
+    "valores": {
+      "publicado_em": "2026-10-28T14:22:40.873805",
+      "emissao": "28/10/2026",
+      "periodo": "28/10/2026",
+      "tipo": "mes_estoque",
+      "resumo": {
+        "total": 19,
+        "criticos": 14,
+        "alta_prioridade": 5,
+        "atencao": 0,
+        "valor_risco": 474992.33,
+        "sem_venda_7d": 0,
+        "estoque_30d": 19
+      },
+      "produtos": [
+        {
+          "prioridade": "🔴 Crítico",
+          "produto": "TAMARA KHOUET ALIG BDJ 200GR",
+          "responsavel": "REGINALDO",
+          "dias_estoque": 120,
+          "dias_sem_venda": 1,
+          "saldo_cx": 3216.0,
+          "qtd_vendida": 0.0,
+          "valor_estoque": 224412.48,
+          "acao": "Promoção urgente / Vender urgente"
+        },
+        {
+          "prioridade": "🔴 Crítico",
+          "produto": "TAMARA KHAJUR BDJ 200GR",
+          "responsavel": "AFANAIS",
+          "dias_estoque": 219,
+          "dias_sem_venda": 0,
+          "saldo_cx": 1394.0,
+          "qtd_vendida": 7.0,
+          "valor_estoque": 103016.6,
+          "acao": "Promoção urgente / Vender urgente"
+        },
+        {
+          "prioridade": "🔴 Crítico",
+          "produto": "GRAN SMITH DOLE 80",
+          "responsavel": "LUCIANO",
+          "dias_estoque": 33,
+          "dias_sem_venda": 1,
+          "saldo_cx": 112.0,
+          "qtd_vendida": 0.0,
+          "valor_estoque": 27034.56,
+          "acao": "Promoção urgente / Vender urgente"
+        },
+        {
+          "prioridade": "🔴 Crítico",
+          "produto": "GALA 165 BRANCA FONTANELA",
+          "responsavel": "FARLEY",
+          "dias_estoque": 37,
+          "dias_sem_venda": 1,
+          "saldo_cx": 194.0,
+          "qtd_vendida": 0.0,
+          "valor_estoque": 22472.96,
+          "acao": "Promoção urgente / Vender urgente"
+        },
+        {
+          "prioridade": "🔴 Crítico",
+          "produto": "ROMA IMP POMICA",
+          "responsavel": "REGINALDO",
+          "dias_estoque": 89,
+          "dias_sem_venda": 0,
+          "saldo_cx": 175.0,
+          "qtd_vendida": 21.0,
+          "valor_estoque": 15319.5,
+          "acao": "Promoção urgente / Vender urgente"
+        },
+        {
+          "prioridade": "🔴 Crítico",
+          "produto": "MACA GALA HOSHI",
+          "responsavel": "120",
+          "dias_estoque": 30,
+          "dias_sem_venda": 1,
+          "saldo_cx": 135.0,
+          "qtd_vendida": 0.0,
+          "valor_estoque": 10291.05,
+          "acao": "Promoção urgente / Vender urgente"
+        },
+        {
+          "prioridade": "🔴 Crítico",
+          "produto": "MELAO GAIA TP 05",
+          "responsavel": "DORA",
+          "dias_estoque": 44,
+          "dias_sem_venda": 1,
+          "saldo_cx": 132.0,
+          "qtd_vendida": 0.0,
+          "valor_estoque": 8500.8,
+          "acao": "Promoção urgente / Vender urgente"
+        },
+        {
+          "prioridade": "🔴 Crítico",
+          "produto": "GALA 135 PORTUGAL",
+          "responsavel": "JULIANA",
+          "dias_estoque": 40,
+          "dias_sem_venda": 1,
+          "saldo_cx": 21.0,
+          "qtd_vendida": 0.0,
+          "valor_estoque": 3603.18,
+          "acao": "Promoção urgente / Vender urgente"
+        },
+        {
+          "prioridade": "🔴 Crítico",
+          "produto": "ROMA IMP INIKANTO",
+          "responsavel": "REGINALDO",
+          "dias_estoque": 34,
+          "dias_sem_venda": 1,
+          "saldo_cx": 11.0,
+          "qtd_vendida": 0.0,
+          "valor_estoque": 1046.43,
+          "acao": "Promoção urgente / Vender urgente"
+        },
+        {
+          "prioridade": "🔴 Crítico",
+          "produto": "LARANJA BAHIA NEDEL 14KG",
+          "responsavel": "DORA",
+          "dias_estoque": 65,
+          "dias_sem_venda": 1,
+          "saldo_cx": 9.0,
+          "qtd_vendida": 0.0,
+          "valor_estoque": 542.61,
+          "acao": "Promoção urgente / Vender urgente"
+        },
+        {
+          "prioridade": "🔴 Crítico",
+          "produto": "CAQUI HOTH 20X1",
+          "responsavel": "RONISTONIS",
+          "dias_estoque": 89,
+          "dias_sem_venda": 1,
+          "saldo_cx": 4.0,
+          "qtd_vendida": 0.0,
+          "valor_estoque": 375.12,
+          "acao": "Promoção urgente / Vender urgente"
+        },
+        {
+          "prioridade": "🔴 Crítico",
+          "produto": "FORELLE 1/2 ALESSANDRINI",
+          "responsavel": "FARLEY",
+          "dias_estoque": 33,
+          "dias_sem_venda": 1,
+          "saldo_cx": 2.0,
+          "qtd_vendida": 0.0,
+          "valor_estoque": 239.76,
+          "acao": "Promoção urgente / Vender urgente"
+        },
+        {
+          "prioridade": "🔴 Crítico",
+          "produto": "FUJI 180 BRANCA POMERANA",
+          "responsavel": "LUCIANO",
+          "dias_estoque": 79,
+          "dias_sem_venda": 1,
+          "saldo_cx": 1.0,
+          "qtd_vendida": 0.0,
+          "valor_estoque": 60.74,
+          "acao": "Promoção urgente / Vender urgente"
+        },
+        {
+          "prioridade": "🔴 Crítico",
+          "produto": "LARANJA IMP BAHIA CITRUS CX",
+          "responsavel": "AZULRONISTONIS",
+          "dias_estoque": 90,
+          "dias_sem_venda": 1,
+          "saldo_cx": 1.0,
+          "qtd_vendida": 0.0,
+          "valor_estoque": 34.83,
+          "acao": "Promoção urgente / Vender urgente"
+        },
+        {
+          "prioridade": "🟠 Alta Prioridade",
+          "produto": "PACKHAMS 1/2 BREVI CX",
+          "responsavel": "VERDE",
+          "dias_estoque": 37,
+          "dias_sem_venda": 0,
+          "saldo_cx": 228.0,
+          "qtd_vendida": 4.0,
+          "valor_estoque": 22806.84,
+          "acao": "Priorizar venda / Contatar vendedor"
+        },
+        {
+          "prioridade": "🟠 Alta Prioridade",
+          "produto": "CUMB KIWI 20X 600GR DOM FRUTO",
+          "responsavel": "AFANAIS",
+          "dias_estoque": 40,
+          "dias_sem_venda": 0,
+          "saldo_cx": 80.0,
+          "qtd_vendida": 17.0,
+          "valor_estoque": 17684.0,
+          "acao": "Priorizar venda / Contatar vendedor"
+        },
+        {
+          "prioridade": "🟠 Alta Prioridade",
+          "produto": "GRAN SMITH DOLE 100",
+          "responsavel": "REGINALDO",
+          "dias_estoque": 33,
+          "dias_sem_venda": 0,
+          "saldo_cx": 43.0,
+          "qtd_vendida": 1.0,
+          "valor_estoque": 10359.99,
+          "acao": "Priorizar venda / Contatar vendedor"
+        },
+        {
+          "prioridade": "🟠 Alta Prioridade",
+          "produto": "ASIATICA 1/2 ASIAN PEARS BRANCA",
+          "responsavel": "REGINALDO",
+          "dias_estoque": 51,
+          "dias_sem_venda": 0,
+          "saldo_cx": 32.0,
+          "qtd_vendida": 1.0,
+          "valor_estoque": 4204.8,
+          "acao": "Priorizar venda / Contatar vendedor"
+        },
+        {
+          "prioridade": "🟠 Alta Prioridade",
+          "produto": "GRAN SMITH DOLE 113",
+          "responsavel": "LUCIANO",
+          "dias_estoque": 50,
+          "dias_sem_venda": 0,
+          "saldo_cx": 12.0,
+          "qtd_vendida": 3.0,
+          "valor_estoque": 2986.08,
+          "acao": "Priorizar venda / Contatar vendedor"
+        }
+      ]
+    }
+  },
+  "history": []
+}
