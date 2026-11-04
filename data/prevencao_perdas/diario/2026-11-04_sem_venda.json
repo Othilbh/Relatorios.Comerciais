@@ -1,0 +1,350 @@
+{
+  "current": {
+    "id": "be5fad3b-9201-494b-bc4a-b6c18923f9b3",
+    "modulo_origem": "prevencao_perdas",
+    "tipo_periodo": "diario",
+    "periodo_ref": "2026-11-04_sem_venda",
+    "data_referencia": "2026-11-04",
+    "criado_em": "2026-11-04T12:14:44+00:00",
+    "atualizado_em": "2026-11-04T12:14:44+00:00",
+    "usuario": "Ingrid",
+    "versao": 1,
+    "valores": {
+      "publicado_em": "2026-11-04T12:14:44.814998",
+      "emissao": "04/11/2026",
+      "periodo": "28/10/2026",
+      "tipo": "sem_venda",
+      "resumo": {
+        "total": 29,
+        "criticos": 12,
+        "alta_prioridade": 13,
+        "atencao": 4,
+        "valor_risco": 629346.99,
+        "sem_venda_7d": 29,
+        "estoque_30d": 12
+      },
+      "produtos": [
+        {
+          "prioridade": "🔴 Crítico",
+          "produto": "TAMARA KHOUET ALIG BDJ 200GR",
+          "responsavel": "REGINALDO",
+          "dias_estoque": 127,
+          "dias_sem_venda": 7,
+          "saldo_cx": 3216.0,
+          "qtd_vendida": 0.0,
+          "valor_estoque": 224412.48,
+          "acao": "Promoção urgente / Vender urgente"
+        },
+        {
+          "prioridade": "🔴 Crítico",
+          "produto": "GALA 165 BRANCA FONTANELA",
+          "responsavel": "FARLEY",
+          "dias_estoque": 44,
+          "dias_sem_venda": 7,
+          "saldo_cx": 194.0,
+          "qtd_vendida": 0.0,
+          "valor_estoque": 22472.96,
+          "acao": "Promoção urgente / Vender urgente"
+        },
+        {
+          "prioridade": "🔴 Crítico",
+          "produto": "FUJI 100 HIRAGAMIS CX PARDA",
+          "responsavel": "DORA",
+          "dias_estoque": 16,
+          "dias_sem_venda": 7,
+          "saldo_cx": 112.0,
+          "qtd_vendida": 0.0,
+          "valor_estoque": 18369.12,
+          "acao": "Promoção urgente / Vender urgente"
+        },
+        {
+          "prioridade": "🔴 Crítico",
+          "produto": "PACKHAMS MORE",
+          "responsavel": "80",
+          "dias_estoque": 30,
+          "dias_sem_venda": 7,
+          "saldo_cx": 117.0,
+          "qtd_vendida": 0.0,
+          "valor_estoque": 18365.49,
+          "acao": "Promoção urgente / Vender urgente"
+        },
+        {
+          "prioridade": "🔴 Crítico",
+          "produto": "MELAO GAIA TP 05",
+          "responsavel": "DORA",
+          "dias_estoque": 51,
+          "dias_sem_venda": 7,
+          "saldo_cx": 133.0,
+          "qtd_vendida": 0.0,
+          "valor_estoque": 8561.21,
+          "acao": "Promoção urgente / Vender urgente"
+        },
+        {
+          "prioridade": "🔴 Crítico",
+          "produto": "GALA IMP AURORA",
+          "responsavel": "180",
+          "dias_estoque": 34,
+          "dias_sem_venda": 7,
+          "saldo_cx": 56.0,
+          "qtd_vendida": 0.0,
+          "valor_estoque": 8276.24,
+          "acao": "Promoção urgente / Vender urgente"
+        },
+        {
+          "prioridade": "🔴 Crítico",
+          "produto": "GALA 135 PORTUGAL",
+          "responsavel": "JULIANA",
+          "dias_estoque": 47,
+          "dias_sem_venda": 7,
+          "saldo_cx": 21.0,
+          "qtd_vendida": 0.0,
+          "valor_estoque": 3603.18,
+          "acao": "Promoção urgente / Vender urgente"
+        },
+        {
+          "prioridade": "🔴 Crítico",
+          "produto": "ARGENTINA RM",
+          "responsavel": "88",
+          "dias_estoque": 42,
+          "dias_sem_venda": 7,
+          "saldo_cx": 4.0,
+          "qtd_vendida": 0.0,
+          "valor_estoque": 838.12,
+          "acao": "Promoção urgente / Vender urgente"
+        },
+        {
+          "prioridade": "🔴 Crítico",
+          "produto": "LARANJA BAHIA NEDEL 14KG",
+          "responsavel": "DORA",
+          "dias_estoque": 72,
+          "dias_sem_venda": 7,
+          "saldo_cx": 9.0,
+          "qtd_vendida": 0.0,
+          "valor_estoque": 542.61,
+          "acao": "Promoção urgente / Vender urgente"
+        },
+        {
+          "prioridade": "🔴 Crítico",
+          "produto": "CAQUI HOTH 20X1",
+          "responsavel": "RONISTONIS",
+          "dias_estoque": 96,
+          "dias_sem_venda": 7,
+          "saldo_cx": 4.0,
+          "qtd_vendida": 0.0,
+          "valor_estoque": 375.12,
+          "acao": "Promoção urgente / Vender urgente"
+        },
+        {
+          "prioridade": "🔴 Crítico",
+          "produto": "FORELLE 1/2 ALESSANDRINI",
+          "responsavel": "FARLEY",
+          "dias_estoque": 40,
+          "dias_sem_venda": 7,
+          "saldo_cx": 2.0,
+          "qtd_vendida": 0.0,
+          "valor_estoque": 239.76,
+          "acao": "Promoção urgente / Vender urgente"
+        },
+        {
+          "prioridade": "🔴 Crítico",
+          "produto": "PIMENTAO REI DUO",
+          "responsavel": "RONISTONIS",
+          "dias_estoque": 35,
+          "dias_sem_venda": 7,
+          "saldo_cx": 1.0,
+          "qtd_vendida": 0.0,
+          "valor_estoque": 129.56,
+          "acao": "Promoção urgente / Vender urgente"
+        },
+        {
+          "prioridade": "🟠 Alta Prioridade",
+          "produto": "CRINSON CHERRY CX VERDE",
+          "responsavel": "GURUVARONISTONIS",
+          "dias_estoque": 1,
+          "dias_sem_venda": 7,
+          "saldo_cx": 1775.0,
+          "qtd_vendida": 0.0,
+          "valor_estoque": 99471.0,
+          "acao": "Priorizar venda / Contatar vendedor"
+        },
+        {
+          "prioridade": "🟠 Alta Prioridade",
+          "produto": "PACKHAMS DOLE 100",
+          "responsavel": "AZUL",
+          "dias_estoque": 13,
+          "dias_sem_venda": 7,
+          "saldo_cx": 273.0,
+          "qtd_vendida": 0.0,
+          "valor_estoque": 41897.31,
+          "acao": "Priorizar venda / Contatar vendedor"
+        },
+        {
+          "prioridade": "🟠 Alta Prioridade",
+          "produto": "PACKHAMS DOLE 110",
+          "responsavel": "AZUL",
+          "dias_estoque": 13,
+          "dias_sem_venda": 7,
+          "saldo_cx": 268.0,
+          "qtd_vendida": 0.0,
+          "valor_estoque": 40567.16,
+          "acao": "Priorizar venda / Contatar vendedor"
+        },
+        {
+          "prioridade": "🟠 Alta Prioridade",
+          "produto": "GALA 135 SANJO",
+          "responsavel": "AFANAIS",
+          "dias_estoque": 2,
+          "dias_sem_venda": 7,
+          "saldo_cx": 168.0,
+          "qtd_vendida": 0.0,
+          "valor_estoque": 24756.48,
+          "acao": "Priorizar venda / Contatar vendedor"
+        },
+        {
+          "prioridade": "🟠 Alta Prioridade",
+          "produto": "CRINSON CHERRY CX PRETA",
+          "responsavel": "GURUVALUCIANO",
+          "dias_estoque": 1,
+          "dias_sem_venda": 7,
+          "saldo_cx": 420.0,
+          "qtd_vendida": 0.0,
+          "valor_estoque": 23536.8,
+          "acao": "Priorizar venda / Contatar vendedor"
+        },
+        {
+          "prioridade": "🟠 Alta Prioridade",
+          "produto": "GALA 135 LABELLE",
+          "responsavel": "FARLEY",
+          "dias_estoque": 2,
+          "dias_sem_venda": 7,
+          "saldo_cx": 224.0,
+          "qtd_vendida": 0.0,
+          "valor_estoque": 21698.88,
+          "acao": "Priorizar venda / Contatar vendedor"
+        },
+        {
+          "prioridade": "🟠 Alta Prioridade",
+          "produto": "GRAN SMITH 90 BREVI AZUL",
+          "responsavel": "RONISTONIS",
+          "dias_estoque": 12,
+          "dias_sem_venda": 7,
+          "saldo_cx": 98.0,
+          "qtd_vendida": 0.0,
+          "valor_estoque": 16796.22,
+          "acao": "Priorizar venda / Contatar vendedor"
+        },
+        {
+          "prioridade": "🟠 Alta Prioridade",
+          "produto": "GALA 110",
+          "responsavel": "LABELLE",
+          "dias_estoque": 7,
+          "dias_sem_venda": 7,
+          "saldo_cx": 114.0,
+          "qtd_vendida": 0.0,
+          "valor_estoque": 12864.9,
+          "acao": "Priorizar venda / Contatar vendedor"
+        },
+        {
+          "prioridade": "🟠 Alta Prioridade",
+          "produto": "PACKHAMS MORE",
+          "responsavel": "100",
+          "dias_estoque": 30,
+          "dias_sem_venda": 7,
+          "saldo_cx": 55.0,
+          "qtd_vendida": 0.0,
+          "valor_estoque": 8633.35,
+          "acao": "Priorizar venda / Contatar vendedor"
+        },
+        {
+          "prioridade": "🟠 Alta Prioridade",
+          "produto": "FUJI 1/2 HIRAGAMIS CX BRANCA",
+          "responsavel": "DORA",
+          "dias_estoque": 16,
+          "dias_sem_venda": 7,
+          "saldo_cx": 59.0,
+          "qtd_vendida": 0.0,
+          "valor_estoque": 7265.85,
+          "acao": "Priorizar venda / Contatar vendedor"
+        },
+        {
+          "prioridade": "🟠 Alta Prioridade",
+          "produto": "MELAO DINO CEPI T4 10KG",
+          "responsavel": "FARLEY",
+          "dias_estoque": 27,
+          "dias_sem_venda": 7,
+          "saldo_cx": 78.0,
+          "qtd_vendida": 0.0,
+          "valor_estoque": 3767.4,
+          "acao": "Priorizar venda / Contatar vendedor"
+        },
+        {
+          "prioridade": "🟠 Alta Prioridade",
+          "produto": "",
+          "responsavel": "MORANGO",
+          "dias_estoque": 16,
+          "dias_sem_venda": 7,
+          "saldo_cx": 6.0,
+          "qtd_vendida": 0.0,
+          "valor_estoque": 310.5,
+          "acao": "Priorizar venda / Contatar vendedor"
+        },
+        {
+          "prioridade": "🟠 Alta Prioridade",
+          "produto": "GALA 120 FISCHER",
+          "responsavel": "JULIANA",
+          "dias_estoque": 16,
+          "dias_sem_venda": 7,
+          "saldo_cx": 1.0,
+          "qtd_vendida": 0.0,
+          "valor_estoque": 127.93,
+          "acao": "Priorizar venda / Contatar vendedor"
+        },
+        {
+          "prioridade": "🟡 Atenção",
+          "produto": "PACKMANS 135 GAMA",
+          "responsavel": "REGINALDO",
+          "dias_estoque": 14,
+          "dias_sem_venda": 7,
+          "saldo_cx": 56.0,
+          "qtd_vendida": 0.0,
+          "valor_estoque": 6998.88,
+          "acao": "Monitorar / Ação preventiva"
+        },
+        {
+          "prioridade": "🟡 Atenção",
+          "produto": "FUJI 100 PEROLA",
+          "responsavel": "NEGRA",
+          "dias_estoque": 9,
+          "dias_sem_venda": 7,
+          "saldo_cx": 56.0,
+          "qtd_vendida": 0.0,
+          "valor_estoque": 5248.88,
+          "acao": "Monitorar / Ação preventiva"
+        },
+        {
+          "prioridade": "🟡 Atenção",
+          "produto": "FUJI 110 PEROLA",
+          "responsavel": "NEGRA",
+          "dias_estoque": 9,
+          "dias_sem_venda": 7,
+          "saldo_cx": 56.0,
+          "qtd_vendida": 0.0,
+          "valor_estoque": 5248.88,
+          "acao": "Monitorar / Ação preventiva"
+        },
+        {
+          "prioridade": "🟡 Atenção",
+          "produto": "PACKMANS 110 MENIS",
+          "responsavel": "REGINALDO",
+          "dias_estoque": 14,
+          "dias_sem_venda": 7,
+          "saldo_cx": 26.0,
+          "qtd_vendida": 0.0,
+          "valor_estoque": 3970.72,
+          "acao": "Monitorar / Ação preventiva"
+        }
+      ]
+    }
+  },
+  "history": []
+}
