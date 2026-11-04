@@ -1,0 +1,339 @@
+{
+  "current": {
+    "id": "01156f0f-e44a-41ca-87c4-eb3141243733",
+    "modulo_origem": "prevencao_perdas",
+    "tipo_periodo": "diario",
+    "periodo_ref": "2026-11-04_mes_estoque",
+    "data_referencia": "2026-11-04",
+    "criado_em": "2026-11-04T12:15:35+00:00",
+    "atualizado_em": "2026-11-04T12:15:35+00:00",
+    "usuario": "Ingrid",
+    "versao": 1,
+    "valores": {
+      "publicado_em": "2026-11-04T12:15:35.078674",
+      "emissao": "04/11/2026",
+      "periodo": "04/11/2026",
+      "tipo": "mes_estoque",
+      "resumo": {
+        "total": 28,
+        "criticos": 15,
+        "alta_prioridade": 4,
+        "atencao": 7,
+        "valor_risco": 551264.43,
+        "sem_venda_7d": 0,
+        "estoque_30d": 28
+      },
+      "produtos": [
+        {
+          "prioridade": "🔴 Crítico",
+          "produto": "TAMARA KHOUET ALIG BDJ 200GR",
+          "responsavel": "REGINALDO",
+          "dias_estoque": 127,
+          "dias_sem_venda": 1,
+          "saldo_cx": 3216.0,
+          "qtd_vendida": 0.0,
+          "valor_estoque": 224412.48,
+          "acao": "Promoção urgente / Vender urgente"
+        },
+        {
+          "prioridade": "🔴 Crítico",
+          "produto": "TAMARA KHAJUR BDJ 200GR",
+          "responsavel": "AFANAIS",
+          "dias_estoque": 226,
+          "dias_sem_venda": 1,
+          "saldo_cx": 1361.0,
+          "qtd_vendida": 0.0,
+          "valor_estoque": 100577.9,
+          "acao": "Promoção urgente / Vender urgente"
+        },
+        {
+          "prioridade": "🔴 Crítico",
+          "produto": "GALA 165 BRANCA FONTANELA",
+          "responsavel": "FARLEY",
+          "dias_estoque": 44,
+          "dias_sem_venda": 1,
+          "saldo_cx": 194.0,
+          "qtd_vendida": 0.0,
+          "valor_estoque": 22472.96,
+          "acao": "Promoção urgente / Vender urgente"
+        },
+        {
+          "prioridade": "🔴 Crítico",
+          "produto": "PACKHAMS MORE",
+          "responsavel": "80",
+          "dias_estoque": 30,
+          "dias_sem_venda": 1,
+          "saldo_cx": 117.0,
+          "qtd_vendida": 0.0,
+          "valor_estoque": 18365.49,
+          "acao": "Promoção urgente / Vender urgente"
+        },
+        {
+          "prioridade": "🔴 Crítico",
+          "produto": "MELAO GAIA TP 05",
+          "responsavel": "DORA",
+          "dias_estoque": 51,
+          "dias_sem_venda": 1,
+          "saldo_cx": 133.0,
+          "qtd_vendida": 0.0,
+          "valor_estoque": 8561.21,
+          "acao": "Promoção urgente / Vender urgente"
+        },
+        {
+          "prioridade": "🔴 Crítico",
+          "produto": "GALA IMP AURORA",
+          "responsavel": "180",
+          "dias_estoque": 34,
+          "dias_sem_venda": 1,
+          "saldo_cx": 56.0,
+          "qtd_vendida": 0.0,
+          "valor_estoque": 8276.24,
+          "acao": "Promoção urgente / Vender urgente"
+        },
+        {
+          "prioridade": "🔴 Crítico",
+          "produto": "ROMA IMP POMICA",
+          "responsavel": "REGINALDO",
+          "dias_estoque": 96,
+          "dias_sem_venda": 0,
+          "saldo_cx": 92.0,
+          "qtd_vendida": 6.0,
+          "valor_estoque": 8053.68,
+          "acao": "Promoção urgente / Vender urgente"
+        },
+        {
+          "prioridade": "🔴 Crítico",
+          "produto": "ASIATICA 1/2 ASIAN PEARS BRANCA",
+          "responsavel": "REGINALDO",
+          "dias_estoque": 58,
+          "dias_sem_venda": 1,
+          "saldo_cx": 34.0,
+          "qtd_vendida": 0.0,
+          "valor_estoque": 4467.6,
+          "acao": "Promoção urgente / Vender urgente"
+        },
+        {
+          "prioridade": "🔴 Crítico",
+          "produto": "GALA 135 PORTUGAL",
+          "responsavel": "JULIANA",
+          "dias_estoque": 47,
+          "dias_sem_venda": 1,
+          "saldo_cx": 21.0,
+          "qtd_vendida": 0.0,
+          "valor_estoque": 3603.18,
+          "acao": "Promoção urgente / Vender urgente"
+        },
+        {
+          "prioridade": "🔴 Crítico",
+          "produto": "GRAN SMITH DOLE 113",
+          "responsavel": "LUCIANO",
+          "dias_estoque": 57,
+          "dias_sem_venda": 1,
+          "saldo_cx": 11.0,
+          "qtd_vendida": 0.0,
+          "valor_estoque": 2737.24,
+          "acao": "Promoção urgente / Vender urgente"
+        },
+        {
+          "prioridade": "🔴 Crítico",
+          "produto": "ARGENTINA RM",
+          "responsavel": "88",
+          "dias_estoque": 42,
+          "dias_sem_venda": 1,
+          "saldo_cx": 4.0,
+          "qtd_vendida": 0.0,
+          "valor_estoque": 838.12,
+          "acao": "Promoção urgente / Vender urgente"
+        },
+        {
+          "prioridade": "🔴 Crítico",
+          "produto": "LARANJA BAHIA NEDEL 14KG",
+          "responsavel": "DORA",
+          "dias_estoque": 72,
+          "dias_sem_venda": 1,
+          "saldo_cx": 9.0,
+          "qtd_vendida": 0.0,
+          "valor_estoque": 542.61,
+          "acao": "Promoção urgente / Vender urgente"
+        },
+        {
+          "prioridade": "🔴 Crítico",
+          "produto": "CAQUI HOTH 20X1",
+          "responsavel": "RONISTONIS",
+          "dias_estoque": 96,
+          "dias_sem_venda": 1,
+          "saldo_cx": 4.0,
+          "qtd_vendida": 0.0,
+          "valor_estoque": 375.12,
+          "acao": "Promoção urgente / Vender urgente"
+        },
+        {
+          "prioridade": "🔴 Crítico",
+          "produto": "FORELLE 1/2 ALESSANDRINI",
+          "responsavel": "FARLEY",
+          "dias_estoque": 40,
+          "dias_sem_venda": 1,
+          "saldo_cx": 2.0,
+          "qtd_vendida": 0.0,
+          "valor_estoque": 239.76,
+          "acao": "Promoção urgente / Vender urgente"
+        },
+        {
+          "prioridade": "🔴 Crítico",
+          "produto": "PIMENTAO REI DUO",
+          "responsavel": "RONISTONIS",
+          "dias_estoque": 35,
+          "dias_sem_venda": 1,
+          "saldo_cx": 1.0,
+          "qtd_vendida": 0.0,
+          "valor_estoque": 129.56,
+          "acao": "Promoção urgente / Vender urgente"
+        },
+        {
+          "prioridade": "🟠 Alta Prioridade",
+          "produto": "GRAN SMITH DOLE 80",
+          "responsavel": "LUCIANO",
+          "dias_estoque": 40,
+          "dias_sem_venda": 0,
+          "saldo_cx": 103.0,
+          "qtd_vendida": 3.0,
+          "valor_estoque": 24862.14,
+          "acao": "Priorizar venda / Contatar vendedor"
+        },
+        {
+          "prioridade": "🟠 Alta Prioridade",
+          "produto": "PACKHAMS 1/2 BREVI CX",
+          "responsavel": "VERDE",
+          "dias_estoque": 44,
+          "dias_sem_venda": 0,
+          "saldo_cx": 211.0,
+          "qtd_vendida": 9.0,
+          "valor_estoque": 21106.33,
+          "acao": "Priorizar venda / Contatar vendedor"
+        },
+        {
+          "prioridade": "🟠 Alta Prioridade",
+          "produto": "PACKHAMS MORE",
+          "responsavel": "100",
+          "dias_estoque": 30,
+          "dias_sem_venda": 1,
+          "saldo_cx": 55.0,
+          "qtd_vendida": 0.0,
+          "valor_estoque": 8633.35,
+          "acao": "Priorizar venda / Contatar vendedor"
+        },
+        {
+          "prioridade": "🟠 Alta Prioridade",
+          "produto": "PACKHAMS MORE",
+          "responsavel": "70",
+          "dias_estoque": 30,
+          "dias_sem_venda": 1,
+          "saldo_cx": 56.0,
+          "qtd_vendida": 0.0,
+          "valor_estoque": 8468.32,
+          "acao": "Priorizar venda / Contatar vendedor"
+        },
+        {
+          "prioridade": "🟡 Atenção",
+          "produto": "PACKHAMS MORE",
+          "responsavel": "90",
+          "dias_estoque": 30,
+          "dias_sem_venda": 0,
+          "saldo_cx": 230.0,
+          "qtd_vendida": 11.0,
+          "valor_estoque": 36103.1,
+          "acao": "Monitorar / Ação preventiva"
+        },
+        {
+          "prioridade": "🟡 Atenção",
+          "produto": "PACKHAMS MORE",
+          "responsavel": "110",
+          "dias_estoque": 30,
+          "dias_sem_venda": 0,
+          "saldo_cx": 99.0,
+          "qtd_vendida": 1.0,
+          "valor_estoque": 15018.3,
+          "acao": "Monitorar / Ação preventiva"
+        },
+        {
+          "prioridade": "🟡 Atenção",
+          "produto": "AMEIXA 65/70 TANY",
+          "responsavel": "RONISTONIS",
+          "dias_estoque": 30,
+          "dias_sem_venda": 0,
+          "saldo_cx": 99.0,
+          "qtd_vendida": 6.0,
+          "valor_estoque": 13880.79,
+          "acao": "Monitorar / Ação preventiva"
+        },
+        {
+          "prioridade": "🟡 Atenção",
+          "produto": "MACA GALA HOSHI",
+          "responsavel": "120",
+          "dias_estoque": 37,
+          "dias_sem_venda": 0,
+          "saldo_cx": 87.0,
+          "qtd_vendida": 3.0,
+          "valor_estoque": 6632.01,
+          "acao": "Monitorar / Ação preventiva"
+        },
+        {
+          "prioridade": "🟡 Atenção",
+          "produto": "GRAN SMITH DOLE 100",
+          "responsavel": "REGINALDO",
+          "dias_estoque": 40,
+          "dias_sem_venda": 0,
+          "saldo_cx": 21.0,
+          "qtd_vendida": 1.0,
+          "valor_estoque": 5059.53,
+          "acao": "Monitorar / Ação preventiva"
+        },
+        {
+          "prioridade": "🟡 Atenção",
+          "produto": "FUJI 90",
+          "responsavel": "FISCHER",
+          "dias_estoque": 36,
+          "dias_sem_venda": 0,
+          "saldo_cx": 36.0,
+          "qtd_vendida": 1.0,
+          "valor_estoque": 4525.56,
+          "acao": "Monitorar / Ação preventiva"
+        },
+        {
+          "prioridade": "🟡 Atenção",
+          "produto": "ROMA IMP INIKANTO",
+          "responsavel": "REGINALDO",
+          "dias_estoque": 41,
+          "dias_sem_venda": 0,
+          "saldo_cx": 9.0,
+          "qtd_vendida": 1.0,
+          "valor_estoque": 856.17,
+          "acao": "Monitorar / Ação preventiva"
+        },
+        {
+          "prioridade": "🟢 Controlado",
+          "produto": "CUMB THOMPSON ALGODAO",
+          "responsavel": "DOCE",
+          "dias_estoque": 30,
+          "dias_sem_venda": 0,
+          "saldo_cx": 27.0,
+          "qtd_vendida": 79.0,
+          "valor_estoque": 2163.24,
+          "acao": "Manter monitoramento"
+        },
+        {
+          "prioridade": "🟢 Controlado",
+          "produto": "PACKHAMS MORE",
+          "responsavel": "120",
+          "dias_estoque": 30,
+          "dias_sem_venda": 0,
+          "saldo_cx": 2.0,
+          "qtd_vendida": 1.0,
+          "valor_estoque": 302.44,
+          "acao": "Manter monitoramento"
+        }
+      ]
+    }
+  },
+  "history": []
+}
