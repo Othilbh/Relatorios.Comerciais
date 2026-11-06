@@ -1,0 +1,2685 @@
+{
+  "current": {
+    "id": "13d50840-f17a-4f86-93bd-f4bd0533dd7a",
+    "modulo_origem": "vendedor_cliente",
+    "tipo_periodo": "mensal",
+    "periodo_ref": "2026-11",
+    "data_referencia": "2026-11-06",
+    "criado_em": "2026-11-06T14:09:04+00:00",
+    "atualizado_em": "2026-11-06T14:09:04+00:00",
+    "usuario": "Ingrid",
+    "versao": 1,
+    "valores": {
+      "clientes_data": {
+        "Roni": {
+          "ABC SAPAO": {
+            "vol": 640,
+            "fat": 23075.0,
+            "custo": 33270.61,
+            "mc_rs": -10195.61,
+            "mc_pct": -30.64,
+            "resultado_real": -15.64
+          },
+          "BH SUPERMERCADO": {
+            "vol": 1313,
+            "fat": 71484.0,
+            "custo": 72825.15,
+            "mc_rs": -1341.15,
+            "mc_pct": -1.84,
+            "resultado_real": 13.16
+          },
+          "BIG MAIS SUPERMERCADO / WHATSAPP": {
+            "vol": 1186,
+            "fat": 85654.0,
+            "custo": 84912.41,
+            "mc_rs": 741.59,
+            "mc_pct": 0.87,
+            "resultado_real": 15.87
+          },
+          "BRIXX": {
+            "vol": 2494,
+            "fat": 155118.0,
+            "custo": 159324.83,
+            "mc_rs": -4206.83,
+            "mc_pct": -2.64,
+            "resultado_real": 12.36
+          },
+          "ENESIO": {
+            "vol": 213,
+            "fat": 10605.0,
+            "custo": 11224.85,
+            "mc_rs": -619.85,
+            "mc_pct": -5.52,
+            "resultado_real": 9.48
+          },
+          "EXPERFRUT": {
+            "vol": 2286,
+            "fat": 114546.0,
+            "custo": 137957.52,
+            "mc_rs": -23411.52,
+            "mc_pct": -16.97,
+            "resultado_real": -1.97
+          },
+          "FRUTAS BARBACENA- JUIZ DE FORA": {
+            "vol": 654,
+            "fat": 35958.0,
+            "custo": 37976.54,
+            "mc_rs": -2018.54,
+            "mc_pct": -5.32,
+            "resultado_real": 9.68
+          },
+          "HERBERT / WHATSAPP": {
+            "vol": 65,
+            "fat": 8675.0,
+            "custo": 8337.37,
+            "mc_rs": 337.63,
+            "mc_pct": 4.05,
+            "resultado_real": 19.05
+          },
+          "HORTIFARIA": {
+            "vol": 1483,
+            "fat": 67020.0,
+            "custo": 70812.18,
+            "mc_rs": -3792.18,
+            "mc_pct": -5.36,
+            "resultado_real": 9.64
+          },
+          "JOSE ONOFRE": {
+            "vol": 641,
+            "fat": 38100.0,
+            "custo": 39478.58,
+            "mc_rs": -1378.58,
+            "mc_pct": -3.49,
+            "resultado_real": 11.51
+          },
+          "NL CD": {
+            "vol": 740,
+            "fat": 37186.4,
+            "custo": 39337.98,
+            "mc_rs": -2151.58,
+            "mc_pct": -5.47,
+            "resultado_real": 9.53
+          },
+          "RAFAEL SOARES MATRIZ": {
+            "vol": 192,
+            "fat": 14260.0,
+            "custo": 17012.64,
+            "mc_rs": -2752.64,
+            "mc_pct": -16.18,
+            "resultado_real": -1.18
+          },
+          "SUPERMERCADOS REX LTDA": {
+            "vol": 329,
+            "fat": 34973.0,
+            "custo": 34663.88,
+            "mc_rs": 309.12,
+            "mc_pct": 0.89,
+            "resultado_real": 15.89
+          },
+          "VAREJAO OBA": {
+            "vol": 66,
+            "fat": 9640.0,
+            "custo": 9971.15,
+            "mc_rs": -331.15,
+            "mc_pct": -3.32,
+            "resultado_real": 11.68
+          }
+        },
+        "Reginaldo": {
+          "BONFIM": {
+            "vol": 783,
+            "fat": 87431.0,
+            "custo": 88200.41,
+            "mc_rs": -769.41,
+            "mc_pct": -0.87,
+            "resultado_real": 14.13
+          },
+          "BRIXX": {
+            "vol": 448,
+            "fat": 45920.0,
+            "custo": 45522.39,
+            "mc_rs": 397.61,
+            "mc_pct": 0.87,
+            "resultado_real": 15.87
+          },
+          "CAMPONES": {
+            "vol": 10,
+            "fat": 950.0,
+            "custo": 862.5,
+            "mc_rs": 87.5,
+            "mc_pct": 10.14,
+            "resultado_real": 25.14
+          },
+          "ENESIO": {
+            "vol": 285,
+            "fat": 25660.0,
+            "custo": 26200.95,
+            "mc_rs": -540.95,
+            "mc_pct": -2.06,
+            "resultado_real": 12.94
+          },
+          "LEGOMES": {
+            "vol": 247,
+            "fat": 20780.0,
+            "custo": 21018.26,
+            "mc_rs": -238.26,
+            "mc_pct": -1.13,
+            "resultado_real": 13.87
+          },
+          "PATRICIA HORTSUL": {
+            "vol": 707,
+            "fat": 79986.2,
+            "custo": 79431.76,
+            "mc_rs": 554.44,
+            "mc_pct": 0.7,
+            "resultado_real": 15.7
+          },
+          "RR LEGUMES": {
+            "vol": 56,
+            "fat": 2800.0,
+            "custo": 2846.34,
+            "mc_rs": -46.34,
+            "mc_pct": -1.63,
+            "resultado_real": 13.37
+          },
+          "SACOLAO CASTELO": {
+            "vol": 5,
+            "fat": 250.0,
+            "custo": 258.75,
+            "mc_rs": -8.75,
+            "mc_pct": -3.38,
+            "resultado_real": 11.62
+          },
+          "SACOLAO CASTELO- CABRAL": {
+            "vol": 15,
+            "fat": 1595.0,
+            "custo": 1578.84,
+            "mc_rs": 16.16,
+            "mc_pct": 1.02,
+            "resultado_real": 16.02
+          },
+          "SACOLAO CASTELO- FILIAL": {
+            "vol": 58,
+            "fat": 5475.0,
+            "custo": 5599.39,
+            "mc_rs": -124.39,
+            "mc_pct": -2.22,
+            "resultado_real": 12.78
+          },
+          "SACOLAO CASTELO- FILIAL II": {
+            "vol": 32,
+            "fat": 3015.0,
+            "custo": 3006.26,
+            "mc_rs": 8.74,
+            "mc_pct": 0.29,
+            "resultado_real": 15.29
+          },
+          "SACOLAO CASTELO- MATRIZ": {
+            "vol": 79,
+            "fat": 7225.0,
+            "custo": 7231.92,
+            "mc_rs": -6.92,
+            "mc_pct": -0.1,
+            "resultado_real": 14.9
+          },
+          "VILMA": {
+            "vol": 37,
+            "fat": 3645.0,
+            "custo": 4005.66,
+            "mc_rs": -360.66,
+            "mc_pct": -9.0,
+            "resultado_real": 6.0
+          }
+        },
+        "Luca": {
+          "APOIO MINEIRO / MANUAL E WHATSAPP": {
+            "vol": 2067,
+            "fat": 149364.0,
+            "custo": 141261.97,
+            "mc_rs": 8102.03,
+            "mc_pct": 5.74,
+            "resultado_real": 20.74
+          },
+          "ECONOMART": {
+            "vol": 197,
+            "fat": 19141.21,
+            "custo": 19066.68,
+            "mc_rs": 74.53,
+            "mc_pct": 0.39,
+            "resultado_real": 15.39
+          },
+          "SUPER LUNA/ WHATSAPP": {
+            "vol": 832,
+            "fat": 83000.0,
+            "custo": 83339.14,
+            "mc_rs": -339.14,
+            "mc_pct": -0.41,
+            "resultado_real": 14.59
+          }
+        },
+        "Juliana": {
+          "DHF": {
+            "vol": 367,
+            "fat": 17650.0,
+            "custo": 20989.07,
+            "mc_rs": -3339.07,
+            "mc_pct": -15.91,
+            "resultado_real": -0.91
+          },
+          "ENTRE RIOS": {
+            "vol": 698,
+            "fat": 57343.0,
+            "custo": 57127.0,
+            "mc_rs": 216.0,
+            "mc_pct": 0.38,
+            "resultado_real": 15.38
+          },
+          "POUPY DISTRIBUIDORA": {
+            "vol": 438,
+            "fat": 23845.0,
+            "custo": 27922.68,
+            "mc_rs": -4077.68,
+            "mc_pct": -14.6,
+            "resultado_real": 0.4
+          },
+          "SITIO NATURA": {
+            "vol": 295,
+            "fat": 16635.0,
+            "custo": 18906.84,
+            "mc_rs": -2271.84,
+            "mc_pct": -12.02,
+            "resultado_real": 2.98
+          }
+        },
+        "Farley": {
+          "ABC CAMPEAO": {
+            "vol": 584,
+            "fat": 17180.0,
+            "custo": 29752.52,
+            "mc_rs": -12572.52,
+            "mc_pct": -42.26,
+            "resultado_real": -27.26
+          },
+          "OLS ANDRADAS": {
+            "vol": 1322,
+            "fat": 59150.0,
+            "custo": 78019.02,
+            "mc_rs": -18869.02,
+            "mc_pct": -24.19,
+            "resultado_real": -9.19
+          },
+          "PAULO JUIZ DE FORA": {
+            "vol": 64,
+            "fat": 2940.0,
+            "custo": 3348.31,
+            "mc_rs": -408.31,
+            "mc_pct": -12.19,
+            "resultado_real": 2.81
+          },
+          "SACOLAO MAXIMO": {
+            "vol": 128,
+            "fat": 15585.0,
+            "custo": 16675.87,
+            "mc_rs": -1090.87,
+            "mc_pct": -6.54,
+            "resultado_real": 8.46
+          },
+          "SUPER SO": {
+            "vol": 11,
+            "fat": 930.0,
+            "custo": 902.3,
+            "mc_rs": 27.7,
+            "mc_pct": 3.07,
+            "resultado_real": 18.07
+          },
+          "VILLEFORT ATACADISTA": {
+            "vol": 3285,
+            "fat": 215787.0,
+            "custo": 198174.56,
+            "mc_rs": 17612.44,
+            "mc_pct": 8.89,
+            "resultado_real": 23.89
+          }
+        },
+        "Afanais": {
+          "ADICAO": {
+            "vol": 2592,
+            "fat": 181123.0,
+            "custo": 178411.06,
+            "mc_rs": 2711.94,
+            "mc_pct": 1.52,
+            "resultado_real": 16.52
+          },
+          "ALISSON CARATINGA": {
+            "vol": 296,
+            "fat": 22460.0,
+            "custo": 23938.64,
+            "mc_rs": -1478.64,
+            "mc_pct": -6.18,
+            "resultado_real": 8.82
+          },
+          "CATALAO": {
+            "vol": 202,
+            "fat": 12635.0,
+            "custo": 14719.98,
+            "mc_rs": -2084.98,
+            "mc_pct": -14.16,
+            "resultado_real": 0.84
+          },
+          "DARIO": {
+            "vol": 294,
+            "fat": 28702.0,
+            "custo": 26822.97,
+            "mc_rs": 1879.03,
+            "mc_pct": 7.01,
+            "resultado_real": 22.01
+          },
+          "HERCULANO": {
+            "vol": 207,
+            "fat": 14940.0,
+            "custo": 16356.75,
+            "mc_rs": -1416.75,
+            "mc_pct": -8.66,
+            "resultado_real": 6.34
+          },
+          "JOSE PEREIRA DE SOUZA": {
+            "vol": 1114,
+            "fat": 77899.0,
+            "custo": 81912.4,
+            "mc_rs": -4013.4,
+            "mc_pct": -4.9,
+            "resultado_real": 10.1
+          },
+          "MART MINAS": {
+            "vol": 18536,
+            "fat": 1406092.0,
+            "custo": 1425064.43,
+            "mc_rs": -18972.43,
+            "mc_pct": -1.33,
+            "resultado_real": 13.67
+          },
+          "NOVO HORIZONTE": {
+            "vol": 331,
+            "fat": 22530.0,
+            "custo": 23798.91,
+            "mc_rs": -1268.91,
+            "mc_pct": -5.33,
+            "resultado_real": 9.67
+          },
+          "SO BANANAS": {
+            "vol": 404,
+            "fat": 32785.0,
+            "custo": 32840.65,
+            "mc_rs": -55.65,
+            "mc_pct": -0.17,
+            "resultado_real": 14.83
+          },
+          "TONINHO BOY": {
+            "vol": 266,
+            "fat": 22120.0,
+            "custo": 22121.49,
+            "mc_rs": -1.49,
+            "mc_pct": -0.01,
+            "resultado_real": 14.99
+          },
+          "VERA CRUZ": {
+            "vol": 142,
+            "fat": 15258.0,
+            "custo": 17113.5,
+            "mc_rs": -1855.5,
+            "mc_pct": -10.84,
+            "resultado_real": 4.16
+          }
+        }
+      },
+      "totais_dict": {
+        "Reginaldo": {
+          "vol": 3863,
+          "fat": 398740.45,
+          "custo": 403805.85,
+          "mc_rs": -5065.4,
+          "mc_pct": -1.25,
+          "resultado_real": 13.75
+        },
+        "Roni": {
+          "vol": 15732,
+          "fat": 952575.95,
+          "custo": 1045032.32,
+          "mc_rs": -92456.37,
+          "mc_pct": -8.85,
+          "resultado_real": 6.15
+        },
+        "Afanais": {
+          "vol": 26395,
+          "fat": 1937048.06,
+          "custo": 2035793.07,
+          "mc_rs": -98745.01,
+          "mc_pct": -4.85,
+          "resultado_real": 10.15
+        },
+        "Dora": {
+          "vol": 1844,
+          "fat": 149491.7,
+          "custo": 146399.15,
+          "mc_rs": 3092.55,
+          "mc_pct": 2.11,
+          "resultado_real": 17.11
+        },
+        "Farley": {
+          "vol": 5918,
+          "fat": 336411.47,
+          "custo": 367016.22,
+          "mc_rs": -30604.75,
+          "mc_pct": -8.34,
+          "resultado_real": 6.66
+        },
+        "Luca": {
+          "vol": 3193,
+          "fat": 243079.96,
+          "custo": 253992.57,
+          "mc_rs": -10912.61,
+          "mc_pct": -4.3,
+          "resultado_real": 10.7
+        },
+        "Juliana": {
+          "vol": 3211,
+          "fat": 235076.05,
+          "custo": 244205.9,
+          "mc_rs": -9129.85,
+          "mc_pct": -3.74,
+          "resultado_real": 11.26
+        }
+      },
+      "historico": {
+        "produtos": [
+          {
+            "nome": "PESSEGO FRUITS PONENT ",
+            "codigos_texto": "24010540152",
+            "estoque": 112,
+            "prioridade": "🚨 Grande Urgência"
+          },
+          {
+            "nome": "NECTARINA",
+            "codigos_texto": "260100101\n260104801\n26010492\n",
+            "estoque": 264,
+            "prioridade": "🚨 Grande Urgência"
+          },
+          {
+            "nome": "CUMB RED GLOBE MANAIRA",
+            "codigos_texto": "830100530",
+            "estoque": 48,
+            "prioridade": "🚨 Grande Urgência"
+          },
+          {
+            "nome": "CUMB CRINSON CHERRY BELLA",
+            "codigos_texto": "830100696",
+            "estoque": 61,
+            "prioridade": "🚨 Grande Urgência"
+          },
+          {
+            "nome": "PACKHAMS 80 FAENZA",
+            "codigos_texto": "010207280",
+            "estoque": 28,
+            "prioridade": "🚨 Grande Urgência"
+          },
+          {
+            "nome": "PACKMANS 1/2 MONO AZUL",
+            "codigos_texto": "020200501",
+            "estoque": 115,
+            "prioridade": "🚨 Grande Urgência"
+          },
+          {
+            "nome": "CUMB THOMPSON BELLA",
+            "codigos_texto": "830100811",
+            "estoque": 2634,
+            "prioridade": "🚨 Grande Urgência"
+          },
+          {
+            "nome": "TANGERINA CAMPOSOL",
+            "codigos_texto": "390600180",
+            "estoque": 60,
+            "prioridade": "🚨 Grande Urgência"
+          },
+          {
+            "nome": "ROMA IMP POMICA",
+            "codigos_texto": "8704714",
+            "estoque": 300,
+            "prioridade": "🔥 Alta Prioridade"
+          },
+          {
+            "nome": "CUMB THOMPSON GURUVA",
+            "codigos_texto": "830100824",
+            "estoque": 628,
+            "prioridade": "🔥 Alta Prioridade"
+          },
+          {
+            "nome": "AMEIXA 50-55 TANY",
+            "codigos_texto": "250100102",
+            "estoque": 345,
+            "prioridade": "🔥 Alta Prioridade"
+          },
+          {
+            "nome": "AMEIXA 65/70 TANY",
+            "codigos_texto": "250100105",
+            "estoque": 538,
+            "prioridade": "🔥 Alta Prioridade"
+          },
+          {
+            "nome": "PINK LADY 1/2",
+            "codigos_texto": "050201332",
+            "estoque": 150,
+            "prioridade": "🔥 Alta Prioridade"
+          },
+          {
+            "nome": "ARGENTINA 125 DOLE",
+            "codigos_texto": "0501019125.2",
+            "estoque": 336,
+            "prioridade": "🔥 Alta Prioridade"
+          },
+          {
+            "nome": "8KG ITALIA",
+            "codigos_texto": "830200113\n830200107\n",
+            "estoque": 25,
+            "prioridade": "🔥 Alta Prioridade"
+          },
+          {
+            "nome": "WILLIANS DOLE",
+            "codigos_texto": "0101100*",
+            "estoque": 317,
+            "prioridade": "Normal"
+          },
+          {
+            "nome": "8KG THOMPSON AUTUM ",
+            "codigos_texto": "830200705",
+            "estoque": 120,
+            "prioridade": "Normal"
+          },
+          {
+            "nome": "MELAO CEPI",
+            "codigos_texto": "3102005*",
+            "estoque": 1200,
+            "prioridade": "Normal"
+          },
+          {
+            "nome": "MELAO REI",
+            "codigos_texto": "3102009*",
+            "estoque": 1400,
+            "prioridade": "Normal"
+          }
+        ],
+        "vendedor_pcts": {
+          "Farley": 17,
+          "Dora": 17,
+          "Afanais": 25,
+          "Roni": 25,
+          "Reginaldo": 22,
+          "Luciano": 7,
+          "Juliana": 7,
+          "Luca": 7
+        },
+        "periodo": "17/08 a 21/08"
+      },
+      "produtos_por_cliente": {
+        "Roni": {
+          "ABC SAPAO": {
+            "KG JUBILEE VERDE VALE": {
+              "vol": 9,
+              "fat": 900.0
+            },
+            "CUMB VITORIA ARGO": {
+              "vol": 230,
+              "fat": 6900.0
+            },
+            "CUMB VITORIA IBACEM/GOOD": {
+              "vol": 382,
+              "fat": 11940.0
+            },
+            "MELAO REI TP 4": {
+              "vol": 1,
+              "fat": 95.0
+            },
+            "PORTUGUESA 65/70 AURORA PREMIUM": {
+              "vol": 18,
+              "fat": 3240.0
+            }
+          },
+          "BH SUPERMERCADO": {
+            "CUMB ISIS GRAND VALLE": {
+              "vol": 220,
+              "fat": 11440.0
+            },
+            "CUMB RED GLOBE BELLA": {
+              "vol": 103,
+              "fat": 7004.0
+            },
+            "CUMB VITORIA FRUTA HIT": {
+              "vol": 220,
+              "fat": 10560.0
+            },
+            "CUMB VITORIA FRUTIBRAS": {
+              "vol": 110,
+              "fat": 5280.0
+            },
+            "LIMAO SICILIANO CITRUS": {
+              "vol": 60,
+              "fat": 7200.0
+            },
+            "PESSEGO COOPRADO 28": {
+              "vol": 531,
+              "fat": 26550.0
+            },
+            "PESSEGO COOPRADO 33": {
+              "vol": 64,
+              "fat": 3200.0
+            },
+            "PESSEGO COOPRADO 36": {
+              "vol": 5,
+              "fat": 250.0
+            }
+          },
+          "BIG MAIS SUPERMERCADO / WHATSAPP": {
+            "CRINSON CHERRY CX VERDE GURUVA": {
+              "vol": 220,
+              "fat": 11880.0
+            },
+            "CUMB CRINSON CHERRY MUSA": {
+              "vol": 190,
+              "fat": 10070.0
+            },
+            "CUMB THOMPSON SUEMI PURO NECTA": {
+              "vol": 630,
+              "fat": 51660.0
+            },
+            "FUJI 110 FRUTAS DE OURO": {
+              "vol": 56,
+              "fat": 7784.0
+            },
+            "PESSEGO COOPRADO 28": {
+              "vol": 60,
+              "fat": 3000.0
+            },
+            "ROSADA BAND GI": {
+              "vol": 30,
+              "fat": 1260.0
+            }
+          },
+          "BRIXX": {
+            "AMEIXA 55/60 TANY": {
+              "vol": 40,
+              "fat": 5000.0
+            },
+            "ARGENTINA 100 BREVI VERDE": {
+              "vol": 20,
+              "fat": 4000.0
+            },
+            "CUMB THOMPSON GRAND GRAPE": {
+              "vol": 155,
+              "fat": 8525.0
+            },
+            "CUMB THOMPSON GURUVA": {
+              "vol": 330,
+              "fat": 18810.0
+            },
+            "CUMB THOMPSON SUEMI PURO NECTA": {
+              "vol": 105,
+              "fat": 8400.0
+            },
+            "CUMB THOMPSON WHITE LINA": {
+              "vol": 550,
+              "fat": 31350.0
+            },
+            "CUMB VITORIA FRUTA HIT": {
+              "vol": 770,
+              "fat": 36960.0
+            },
+            "GRAN SMITH DOLE 80": {
+              "vol": 15,
+              "fat": 3000.0
+            },
+            "LIMAO SICILIANO CITRUS": {
+              "vol": 8,
+              "fat": 960.0
+            },
+            "MELANCIA MAGALI T5 14KG": {
+              "vol": 66,
+              "fat": 3960.0
+            },
+            "MELAO REI TP 4": {
+              "vol": 77,
+              "fat": 6545.0
+            },
+            "MIRTILO CX PARDA": {
+              "vol": 12,
+              "fat": 960.0
+            },
+            "MIRTILO PRIZÓ GOLD": {
+              "vol": 2,
+              "fat": 160.0
+            },
+            "PACKMANS 100 GAMA": {
+              "vol": 97,
+              "fat": 14065.0
+            },
+            "PACKMANS 90 GAMA": {
+              "vol": 15,
+              "fat": 2175.0
+            },
+            "PESSEGO COOPRADO 28": {
+              "vol": 22,
+              "fat": 1100.0
+            },
+            "PESSEGO COOPRADO 33": {
+              "vol": 208,
+              "fat": 8968.0
+            },
+            "ROMA IMP POMICA": {
+              "vol": 2,
+              "fat": 180.0
+            }
+          },
+          "ENESIO": {
+            "CUMB VITORIA DELICAT": {
+              "vol": 201,
+              "fat": 9849.0
+            },
+            "Z ROSADA 1CAM BL ISOPOR Z": {
+              "vol": 12,
+              "fat": 756.0
+            }
+          },
+          "EXPERFRUT": {
+            "AMEIXA 60/65 TANY": {
+              "vol": 10,
+              "fat": 1300.0
+            },
+            "XL CEREJA IMP XL TUNICHE": {
+              "vol": 6,
+              "fat": 2220.0
+            },
+            "CUMB RED GLOBE BELLA": {
+              "vol": 20,
+              "fat": 1300.0
+            },
+            "GALA 135 MOINHO AZUL": {
+              "vol": 122,
+              "fat": 7320.0
+            },
+            "GALA 135 PEROLA NEGRA": {
+              "vol": 109,
+              "fat": 8066.0
+            },
+            "GALA 150 MOINHO AZUL": {
+              "vol": 59,
+              "fat": 3540.0
+            },
+            "LARANJA IMP BAHIA FRUTTO MARKET": {
+              "vol": 64,
+              "fat": 4800.0
+            },
+            "X MAMAO FORMOSO NORTE T10/11 X": {
+              "vol": 98,
+              "fat": 7840.0
+            },
+            "MELAO CEPI TP 5": {
+              "vol": 83,
+              "fat": 5395.0
+            },
+            "MELAO GAIA TP 07": {
+              "vol": 920,
+              "fat": 35880.0
+            },
+            "MELAO REI TP 4": {
+              "vol": 142,
+              "fat": 12070.0
+            },
+            "PESSEGO COOPRADO 33": {
+              "vol": 270,
+              "fat": 10680.0
+            },
+            "PESSEGO COOPRADO 36": {
+              "vol": 280,
+              "fat": 9520.0
+            },
+            "PIMENTAO REI GRANEL AMARELO": {
+              "vol": 1,
+              "fat": 160.0
+            },
+            "PIMENTAO REI GRANEL VERMELHO": {
+              "vol": 1,
+              "fat": 170.0
+            },
+            "ROSADA BAND GI": {
+              "vol": 100,
+              "fat": 4200.0
+            },
+            "ROMA IMP BOUQUET": {
+              "vol": 1,
+              "fat": 85.0
+            }
+          },
+          "FRUTAS BARBACENA- JUIZ DE FORA": {
+            "CUMB THOMPSON BELLA": {
+              "vol": 210,
+              "fat": 11550.0
+            },
+            "CUMB THOMPSON WHITE LINA": {
+              "vol": 324,
+              "fat": 18468.0
+            },
+            "CUMB VITORIA MUSA": {
+              "vol": 110,
+              "fat": 5390.0
+            },
+            "X ROSADA 1CAM SL ISOPOR X": {
+              "vol": 10,
+              "fat": 550.0
+            }
+          },
+          "HERBERT / WHATSAPP": {
+            "KG CRINSON CHERRY CRUSH SUEMI": {
+              "vol": 5,
+              "fat": 675.0
+            },
+            "KG RED GLOBE DELICIA BELLA": {
+              "vol": 10,
+              "fat": 1200.0
+            },
+            "KG THOMPSON SUEMI PURO NECTA": {
+              "vol": 10,
+              "fat": 1350.0
+            },
+            "CEREJA L      IMP L TUNICHE": {
+              "vol": 5,
+              "fat": 1550.0
+            },
+            "GRAN SMITH 100 BREVI AZUL": {
+              "vol": 5,
+              "fat": 900.0
+            },
+            "X MAMAO FORMOSO NORTE T10/11 X": {
+              "vol": 10,
+              "fat": 850.0
+            },
+            "MIRTILO FAMILYTREE TUBO": {
+              "vol": 10,
+              "fat": 1150.0
+            },
+            "PORT 1/2 CUMB GRANFER": {
+              "vol": 10,
+              "fat": 1000.0
+            }
+          },
+          "HORTIFARIA": {
+            "KG BENITAKA SPECIALE": {
+              "vol": 14,
+              "fat": 1120.0
+            },
+            "8KG RED GLOBE DELICAT": {
+              "vol": 10,
+              "fat": 1200.0
+            },
+            "CEREJA L      IMP L TUNICHE": {
+              "vol": 4,
+              "fat": 1360.0
+            },
+            "CUMB VITORIA CX ROXA": {
+              "vol": 615,
+              "fat": 26445.0
+            },
+            "CUMB VITORIA FRUTIBRAS": {
+              "vol": 40,
+              "fat": 1720.0
+            },
+            "CUMB VITORIA GRAPE CX AMARELA": {
+              "vol": 660,
+              "fat": 28380.0
+            },
+            "CUMB VITORIA IBACEM/GOOD": {
+              "vol": 115,
+              "fat": 4945.0
+            },
+            "MELAO CEPI TP 5": {
+              "vol": 15,
+              "fat": 1050.0
+            },
+            "TAMARA KHAJUR BDJ 200GR": {
+              "vol": 10,
+              "fat": 800.0
+            }
+          },
+          "JOSE ONOFRE": {
+            "AMEIXA 50-55 TANY": {
+              "vol": 8,
+              "fat": 960.0
+            },
+            "AMEIXA CUMB GRANFER": {
+              "vol": 7,
+              "fat": 840.0
+            },
+            "CEREJA L      IMP L TUNICHE": {
+              "vol": 1,
+              "fat": 320.0
+            },
+            "CUMB THOMPSON BELLA": {
+              "vol": 240,
+              "fat": 13350.0
+            },
+            "CUMB THOMPSON SUEMI PURO NECTA": {
+              "vol": 55,
+              "fat": 4450.0
+            },
+            "CUMB VITORIA FRUTA HIT": {
+              "vol": 110,
+              "fat": 4950.0
+            },
+            "CUMB VITORIA NATURAL           LUCIANO/CLAUDIA/": {
+              "vol": 110,
+              "fat": 5060.0
+            },
+            "GALA 135 MOINHO AZUL": {
+              "vol": 56,
+              "fat": 3080.0
+            },
+            "KIWI 33 RIO BLANCO": {
+              "vol": 5,
+              "fat": 850.0
+            },
+            "KIWI CUMB 10X1 CX PRETA": {
+              "vol": 15,
+              "fat": 1650.0
+            },
+            "KIWI ZESPRI SUN GOLD": {
+              "vol": 1,
+              "fat": 200.0
+            },
+            "MELAO CEPI TP 5": {
+              "vol": 20,
+              "fat": 1400.0
+            },
+            "MELAO PELE SAPO CEPI TP 9 14KG": {
+              "vol": 5,
+              "fat": 225.0
+            },
+            "MELAO REI TP 4": {
+              "vol": 4,
+              "fat": 360.0
+            },
+            "MIRTILO FAMILYTREE BAND": {
+              "vol": 1,
+              "fat": 120.0
+            },
+            "MIRTILO PRIZÓ GOLD": {
+              "vol": 1,
+              "fat": 115.0
+            },
+            "ROMA IMP BOUQUET": {
+              "vol": 1,
+              "fat": 85.0
+            },
+            "ROMA IMP POMICA": {
+              "vol": 1,
+              "fat": 85.0
+            }
+          },
+          "NL CD": {
+            "CUMB VITORIA GRAPE CX AMARELA": {
+              "vol": 660,
+              "fat": 28538.4
+            },
+            "MIRTILO PRIZÓ GOLD": {
+              "vol": 80,
+              "fat": 8648.0
+            }
+          },
+          "RAFAEL SOARES MATRIZ": {
+            "AMEIXA 55/60 TANY": {
+              "vol": 10,
+              "fat": 1200.0
+            },
+            "GALA 150 MOINHO AZUL": {
+              "vol": 56,
+              "fat": 3080.0
+            },
+            "KIWI 33 RIO BLANCO": {
+              "vol": 6,
+              "fat": 1020.0
+            },
+            "KIWI ZESPRI SUN GOLD": {
+              "vol": 10,
+              "fat": 1750.0
+            },
+            "MELAO REI TP 4": {
+              "vol": 77,
+              "fat": 3850.0
+            },
+            "MIRTILO FAMILYTREE BAND": {
+              "vol": 3,
+              "fat": 360.0
+            },
+            "TANGERINA BERGAMOTA PVC 15KG": {
+              "vol": 30,
+              "fat": 3000.0
+            }
+          },
+          "SUPERMERCADOS REX LTDA": {
+            "AMEIXA 60/65 TANY": {
+              "vol": 5,
+              "fat": 700.0
+            },
+            "ARGENTINA 80 BREVI VERDE": {
+              "vol": 10,
+              "fat": 2100.0
+            },
+            "ASIATICA 1/2 JFC MARRON": {
+              "vol": 3,
+              "fat": 390.0
+            },
+            "CUMB THOMPSON SUEMI PURO NECTA": {
+              "vol": 105,
+              "fat": 8925.0
+            },
+            "GALA 150 BRANCA POMERANA": {
+              "vol": 56,
+              "fat": 5208.0
+            },
+            "KIWI 20 FRUSAN": {
+              "vol": 10,
+              "fat": 2200.0
+            },
+            "KIWI 23 FRUSAN": {
+              "vol": 10,
+              "fat": 2200.0
+            },
+            "KIWI CUMB 10X1 CX PRETA": {
+              "vol": 50,
+              "fat": 5600.0
+            },
+            "MELAO CEPI TP 5": {
+              "vol": 20,
+              "fat": 1400.0
+            },
+            "MELAO REI TP 4": {
+              "vol": 20,
+              "fat": 1800.0
+            },
+            "MIRTILO FAMILYTREE BAND": {
+              "vol": 40,
+              "fat": 4450.0
+            }
+          },
+          "VAREJAO OBA": {
+            "GALA 110 FRUTAS DE OURO          REGIS": {
+              "vol": 56,
+              "fat": 7840.0
+            },
+            "PORTUGUESA 65/70 AURORA PREMIUM": {
+              "vol": 10,
+              "fat": 1800.0
+            }
+          }
+        },
+        "Reginaldo": {
+          "BONFIM": {
+            "AMEIXA 60/65 TANY": {
+              "vol": 20,
+              "fat": 2500.0
+            },
+            "ASIATICA 1/2 JFC BRANCA": {
+              "vol": 1,
+              "fat": 130.0
+            },
+            "ASIATICA 1/2 JFC MARRON": {
+              "vol": 1,
+              "fat": 130.0
+            },
+            "CEREJA L      IMP L TUNICHE": {
+              "vol": 3,
+              "fat": 1050.0
+            },
+            "FUJI 120 FISCHER": {
+              "vol": 109,
+              "fat": 12535.0
+            },
+            "SPPFUJI SOLTA HOSHI PP": {
+              "vol": 6,
+              "fat": 360.0
+            },
+            "GALA 120 PRETA VALENTINO": {
+              "vol": 231,
+              "fat": 27720.0
+            },
+            "KIWI ZESPRI SUN GOLD": {
+              "vol": 24,
+              "fat": 4800.0
+            },
+            "MELAO REI TP 4": {
+              "vol": 14,
+              "fat": 1260.0
+            },
+            "MIRTILO PRIZÓ GOLD": {
+              "vol": 19,
+              "fat": 2280.0
+            },
+            "PESSEGO COOPRADO 28": {
+              "vol": 52,
+              "fat": 2496.0
+            },
+            "ROMA IMP POMICA": {
+              "vol": 16,
+              "fat": 1440.0
+            },
+            "TAMARA MEDJOUL": {
+              "vol": 1,
+              "fat": 230.0
+            },
+            "WILLIANS 1/2 ESP 65/70 VILLA": {
+              "vol": 97,
+              "fat": 10670.0
+            },
+            "WILLIANS 1/2 ESP 70/75 VILLA": {
+              "vol": 93,
+              "fat": 10230.0
+            },
+            "WILLIANS 1/2 ESP 75/80 VILLA": {
+              "vol": 96,
+              "fat": 9600.0
+            }
+          },
+          "BRIXX": {
+            "FUJI 110 BRANCA POMERANA": {
+              "vol": 56,
+              "fat": 6160.0
+            },
+            "FUJI 135 BRANCA POMERANA": {
+              "vol": 112,
+              "fat": 11760.0
+            },
+            "FUJI 150 BRANCA POMERANA": {
+              "vol": 56,
+              "fat": 5600.0
+            },
+            "GALA 135 ASTRO CX VERMELHA             AFANAS": {
+              "vol": 50,
+              "fat": 5250.0
+            },
+            "GALA 135 PRETA VALENTINO": {
+              "vol": 62,
+              "fat": 6510.0
+            },
+            "GALA 150 ASTRO CX VERMELHA             AFANAS": {
+              "vol": 112,
+              "fat": 10640.0
+            }
+          },
+          "CAMPONES": {
+            "MELAO REI TP 4": {
+              "vol": 10,
+              "fat": 950.0
+            }
+          },
+          "ENESIO": {
+            "GALA 120 DADIVA": {
+              "vol": 12,
+              "fat": 1560.0
+            },
+            "GALA 135 DADIVA": {
+              "vol": 42,
+              "fat": 5460.0
+            },
+            "LARANJA IMP BAHIA FRUTTO MARKET": {
+              "vol": 76,
+              "fat": 6460.0
+            },
+            "MELAO CEPI TP 5": {
+              "vol": 83,
+              "fat": 4980.0
+            },
+            "WILLIANS 1/2 ESP 65/70 VILLA": {
+              "vol": 72,
+              "fat": 7200.0
+            }
+          },
+          "LEGOMES": {
+            "KG THOMPSON SUEMI PURO NECTA": {
+              "vol": 11,
+              "fat": 1430.0
+            },
+            "ERCOLINE 1/2 GRANFER": {
+              "vol": 4,
+              "fat": 520.0
+            },
+            "FUJI 135 FISCHER": {
+              "vol": 22,
+              "fat": 2530.0
+            },
+            "GALA 135 PRETA VALENTINO": {
+              "vol": 26,
+              "fat": 2860.0
+            },
+            "KIWI 23 FRUSAN": {
+              "vol": 1,
+              "fat": 230.0
+            },
+            "KIWI ZESPRI SUN GOLD": {
+              "vol": 4,
+              "fat": 800.0
+            },
+            "MELAO GAIA TP 08": {
+              "vol": 65,
+              "fat": 2795.0
+            },
+            "MIRTILO PRIZÓ GOLD": {
+              "vol": 1,
+              "fat": 120.0
+            },
+            "PACKMANS 100 MENIS": {
+              "vol": 14,
+              "fat": 2240.0
+            },
+            "PACKMANS 90 MENIS": {
+              "vol": 12,
+              "fat": 2040.0
+            },
+            "PESSEGO COOPRADO 28": {
+              "vol": 44,
+              "fat": 2420.0
+            },
+            "X ROSADA 1CAM BL ISOPOR X": {
+              "vol": 24,
+              "fat": 1560.0
+            },
+            "Z ROSADA 1CAM BL ISOPOR Z": {
+              "vol": 17,
+              "fat": 1105.0
+            },
+            "X ROSADA 1CAM SL ISOPOR X": {
+              "vol": 2,
+              "fat": 130.0
+            }
+          },
+          "PATRICIA HORTSUL": {
+            "ARGENTINA 100 BREVI VERDE": {
+              "vol": 5,
+              "fat": 1045.0
+            },
+            "ASIATICA 1/2 JFC MARRON": {
+              "vol": 3,
+              "fat": 370.5
+            },
+            "XL CEREJA IMP XL TUNICHE": {
+              "vol": 10,
+              "fat": 3610.0
+            },
+            "ERCOLINE 1/2 GRANFER": {
+              "vol": 9,
+              "fat": 855.0
+            },
+            "ERCOLINE FRUITS PONENT": {
+              "vol": 27,
+              "fat": 2565.0
+            },
+            "FUJI 120 DADIVA": {
+              "vol": 66,
+              "fat": 8652.6
+            },
+            "FUJI 120 FISCHER": {
+              "vol": 35,
+              "fat": 4588.5
+            },
+            "GALA 110 DADIVA": {
+              "vol": 8,
+              "fat": 1048.8
+            },
+            "GALA 120 DADIVA": {
+              "vol": 82,
+              "fat": 10408.2
+            },
+            "KIWI 20 FRUSAN": {
+              "vol": 22,
+              "fat": 4807.0
+            },
+            "KIWI ZESPRI SUN GOLD": {
+              "vol": 41,
+              "fat": 7790.0
+            },
+            "LARANJA IMP BAHIA FRUTTO MARKET": {
+              "vol": 84,
+              "fat": 6384.0
+            },
+            "MELANCIA MAGALI T5 14KG": {
+              "vol": 66,
+              "fat": 3009.6
+            },
+            "MELAO REI TP 4": {
+              "vol": 120,
+              "fat": 10260.0
+            },
+            "MIRTILO PRIZÓ GOLD": {
+              "vol": 42,
+              "fat": 4389.0
+            },
+            "PACKMANS 90 MENIS": {
+              "vol": 28,
+              "fat": 4522.0
+            },
+            "PIMENTAO REI GRANEL VERMELHO": {
+              "vol": 2,
+              "fat": 266.0
+            },
+            "PORTUGUESA 70/75 AURORA PREMIUM": {
+              "vol": 10,
+              "fat": 1805.0
+            },
+            "Y ROSADA 1CAM BL ISOPOR Y": {
+              "vol": 23,
+              "fat": 1420.25
+            },
+            "TANGERINA MURCOTE FRUTTO MARKET": {
+              "vol": 19,
+              "fat": 1714.75
+            },
+            "TANGERINA URUGOLD CX ABERTA": {
+              "vol": 5,
+              "fat": 475.0
+            }
+          },
+          "RR LEGUMES": {
+            "GALA 165 VALENTINO CX PARDA": {
+              "vol": 56,
+              "fat": 2800.0
+            }
+          },
+          "SACOLAO CASTELO": {
+            "Y MAMAO HAVAI NORTE T20Y": {
+              "vol": 5,
+              "fat": 250.0
+            }
+          },
+          "SACOLAO CASTELO- CABRAL": {
+            "ARGENTINA 80 BREVI VERDE": {
+              "vol": 1,
+              "fat": 210.0
+            },
+            "FUJI 110 DADIVA": {
+              "vol": 5,
+              "fat": 725.0
+            },
+            "Y MAMAO HAVAI NORTE T20Y": {
+              "vol": 4,
+              "fat": 200.0
+            },
+            "MELAO REI TP 4": {
+              "vol": 5,
+              "fat": 460.0
+            }
+          },
+          "SACOLAO CASTELO- FILIAL": {
+            "FUJI 110 DADIVA": {
+              "vol": 20,
+              "fat": 2900.0
+            },
+            "Y MAMAO FORMOSO NORTE T10/11Y": {
+              "vol": 5,
+              "fat": 275.0
+            },
+            "Y MAMAO HAVAI NORTE T18 Y": {
+              "vol": 12,
+              "fat": 600.0
+            },
+            "Y MAMAO HAVAI NORTE T20Y": {
+              "vol": 8,
+              "fat": 400.0
+            },
+            "MELAO REI TP 4": {
+              "vol": 10,
+              "fat": 920.0
+            },
+            "PORTUGUESA 65/70 AURORA PREMIUM": {
+              "vol": 1,
+              "fat": 190.0
+            },
+            "TANGERINA URUGOLD CX ABERTA": {
+              "vol": 2,
+              "fat": 190.0
+            }
+          },
+          "SACOLAO CASTELO- FILIAL II": {
+            "ERCOLINE 1/2 GRANFER": {
+              "vol": 1,
+              "fat": 120.0
+            },
+            "FUJI 110 DADIVA": {
+              "vol": 5,
+              "fat": 725.0
+            },
+            "GALA 110 DADIVA": {
+              "vol": 5,
+              "fat": 725.0
+            },
+            "GRAN SMITH 1/2 DOLE": {
+              "vol": 2,
+              "fat": 240.0
+            },
+            "Y MAMAO HAVAI NORTE T20Y": {
+              "vol": 13,
+              "fat": 650.0
+            },
+            "MELAO REI TP 4": {
+              "vol": 5,
+              "fat": 460.0
+            },
+            "TANGERINA URUGOLD CX ABERTA": {
+              "vol": 1,
+              "fat": 95.0
+            }
+          },
+          "SACOLAO CASTELO- MATRIZ": {
+            "FUJI 110 DADIVA": {
+              "vol": 10,
+              "fat": 1450.0
+            },
+            "GALA 110 DADIVA": {
+              "vol": 5,
+              "fat": 725.0
+            },
+            "Y MAMAO FORMOSO NORTE T10/11Y": {
+              "vol": 5,
+              "fat": 275.0
+            },
+            "Y MAMAO HAVAI NORTE T20Y": {
+              "vol": 17,
+              "fat": 850.0
+            },
+            "MELAO REI TP 4": {
+              "vol": 40,
+              "fat": 3680.0
+            },
+            "PIMENTAO REI GRANEL AMARELO": {
+              "vol": 1,
+              "fat": 150.0
+            },
+            "TANGERINA URUGOLD CX ABERTA": {
+              "vol": 1,
+              "fat": 95.0
+            }
+          },
+          "VILMA": {
+            "AMEIXA 55/60 TANY": {
+              "vol": 9,
+              "fat": 980.0
+            },
+            "KIWI CUMB 10X1 CX PRETA": {
+              "vol": 8,
+              "fat": 960.0
+            },
+            "PACKHAMS MORE 110": {
+              "vol": 3,
+              "fat": 375.0
+            },
+            "PESSEGO COOPRADO 28": {
+              "vol": 5,
+              "fat": 250.0
+            },
+            "PORTUGUESA 55/60 SABOR": {
+              "vol": 12,
+              "fat": 1080.0
+            }
+          }
+        },
+        "Luca": {
+          "APOIO MINEIRO / MANUAL E WHATSAPP": {
+            "CUMB THOMPSON GURUVA": {
+              "vol": 220,
+              "fat": 14520.0
+            },
+            "CUMB THOMPSON SANIFRUIT": {
+              "vol": 220,
+              "fat": 14520.0
+            },
+            "GALA 135 PEROLA NEGRA": {
+              "vol": 1,
+              "fat": 96.0
+            },
+            "KIWI ZESPRI SUN GOLD": {
+              "vol": 2,
+              "fat": 360.0
+            },
+            "LARANJA IMP BAHIA FRUTTO MARKET": {
+              "vol": 72,
+              "fat": 5400.0
+            },
+            "X MAMAO FORMOSO NORTE T10/11 X": {
+              "vol": 195,
+              "fat": 18525.0
+            },
+            "Y MAMAO FORMOSO NORTE T10/11Y": {
+              "vol": 195,
+              "fat": 17875.0
+            },
+            "X MAMAO HAVAI NORTE T20X": {
+              "vol": 70,
+              "fat": 3850.0
+            },
+            "X MAMAO HAVAI NORTE T24 X": {
+              "vol": 280,
+              "fat": 15400.0
+            },
+            "Y MAMAO HAVAI NORTE T24Y": {
+              "vol": 260,
+              "fat": 14300.0
+            },
+            "MELAO DINO REI T6": {
+              "vol": 4,
+              "fat": 240.0
+            },
+            "MELAO REI TP 4": {
+              "vol": 252,
+              "fat": 21924.0
+            },
+            "PESSEGO COOPRADO 33": {
+              "vol": 180,
+              "fat": 8334.0
+            },
+            "PORTUGUESA 60-65 CLUBE DA PERA": {
+              "vol": 20,
+              "fat": 2200.0
+            },
+            "PORTUGUESA 65/70 AURORA PREMIUM": {
+              "vol": 17,
+              "fat": 3230.0
+            },
+            "PORTUGUESA 70/75 AURORA PREMIUM": {
+              "vol": 9,
+              "fat": 1710.0
+            },
+            "ROMA IMP BOUQUET": {
+              "vol": 3,
+              "fat": 330.0
+            },
+            "ROMA IMP POMICA": {
+              "vol": 12,
+              "fat": 1270.0
+            },
+            "TANGERINA MURCOTE FRUTTO MARKET": {
+              "vol": 55,
+              "fat": 5280.0
+            }
+          },
+          "ECONOMART": {
+            "GRAN SMITH DOLE 100": {
+              "vol": 10,
+              "fat": 1900.0
+            },
+            "LARANJA IMP BAHIA FRUTTO MARKET": {
+              "vol": 68,
+              "fat": 4760.0
+            },
+            "PORT 1/2 CUMB GRANFER": {
+              "vol": 55,
+              "fat": 6050.0
+            },
+            "PIMENTAO REI GRANEL VERMELHO": {
+              "vol": 14,
+              "fat": 2281.21
+            },
+            "ROMA IMP BOUQUET": {
+              "vol": 50,
+              "fat": 4150.0
+            }
+          },
+          "SUPER LUNA/ WHATSAPP": {
+            "AMEIXA 60/65 TANY": {
+              "vol": 112,
+              "fat": 14000.0
+            },
+            "CUMB THOMPSON SUEMI PURO NECTA": {
+              "vol": 220,
+              "fat": 17600.0
+            },
+            "KIWI 20 FRUSAN": {
+              "vol": 30,
+              "fat": 6300.0
+            },
+            "KIWI ZESPRI SUN GOLD": {
+              "vol": 30,
+              "fat": 5700.0
+            },
+            "LARANJA IMP BAHIA FRUTTO MARKET": {
+              "vol": 144,
+              "fat": 10800.0
+            },
+            "MELAO REI TP 4": {
+              "vol": 84,
+              "fat": 6720.0
+            },
+            "PORTUGUESA 60/65 SABOR": {
+              "vol": 112,
+              "fat": 12880.0
+            },
+            "ROMA IMP BOUQUET": {
+              "vol": 100,
+              "fat": 9000.0
+            }
+          }
+        },
+        "Juliana": {
+          "DHF": {
+            "CUMB THOMPSON ALGODAO DOCE": {
+              "vol": 25,
+              "fat": 1200.0
+            },
+            "CUMB VITORIA ARGO": {
+              "vol": 235,
+              "fat": 10105.0
+            },
+            "MELANCIA CEPI T5 14KG": {
+              "vol": 35,
+              "fat": 1575.0
+            },
+            "MELAO GAIA TP 06": {
+              "vol": 10,
+              "fat": 400.0
+            },
+            "MELAO GAIA TP 07": {
+              "vol": 10,
+              "fat": 400.0
+            },
+            "MELAO GAIA TP 08": {
+              "vol": 15,
+              "fat": 600.0
+            },
+            "MELAO GAIA TP 09": {
+              "vol": 10,
+              "fat": 400.0
+            },
+            "PACKHAMS 90 EL CHICHE": {
+              "vol": 27,
+              "fat": 2970.0
+            }
+          },
+          "ENTRE RIOS": {
+            "AMEIXA 60/65 TANY": {
+              "vol": 5,
+              "fat": 700.0
+            },
+            "CUMB CRINSON CHERRY MUSA": {
+              "vol": 50,
+              "fat": 2750.0
+            },
+            "CUMB THOMPSON SUEMI PURO NECTA": {
+              "vol": 138,
+              "fat": 11316.0
+            },
+            "CUMB VITORIA MUSA": {
+              "vol": 141,
+              "fat": 7332.0
+            },
+            "GALA IMP 150 ARMAMAR 18KG": {
+              "vol": 102,
+              "fat": 14790.0
+            },
+            "X MAMAO FORMOSO NORTE T10/11 X": {
+              "vol": 17,
+              "fat": 1445.0
+            },
+            "Y MAMAO FORMOSO NORTE T10/11Y": {
+              "vol": 9,
+              "fat": 765.0
+            },
+            "Y MAMAO HAVAI NORTE T20Y": {
+              "vol": 4,
+              "fat": 200.0
+            },
+            "Y MAMAO HAVAI NORTE T24Y": {
+              "vol": 26,
+              "fat": 1300.0
+            },
+            "MELAO GAIA TP 07": {
+              "vol": 1,
+              "fat": 60.0
+            },
+            "MELAO GAIA TP 08": {
+              "vol": 31,
+              "fat": 1860.0
+            },
+            "PACKMANS 120 GAMA": {
+              "vol": 3,
+              "fat": 405.0
+            },
+            "PACKMANS 80 MENIS": {
+              "vol": 22,
+              "fat": 2970.0
+            },
+            "PESSEGO COOPRADO 33": {
+              "vol": 57,
+              "fat": 2585.0
+            },
+            "AMEIXA 65/70 TANY": {
+              "vol": 1,
+              "fat": 140.0
+            },
+            "GALA IMP 138 ARMAMAR 18KG          LUCIANO/": {
+              "vol": 15,
+              "fat": 2175.0
+            },
+            "KIWI ZESPRI SUN GOLD": {
+              "vol": 8,
+              "fat": 1520.0
+            },
+            "PORTUGUESA 60-65 CLUBE DA PERA": {
+              "vol": 2,
+              "fat": 180.0
+            },
+            "ROSADA BAND GI": {
+              "vol": 2,
+              "fat": 70.0
+            },
+            "ARGENTINA 100 BREVI VERDE": {
+              "vol": 2,
+              "fat": 390.0
+            },
+            "GALA IMP 138 ARMAMAR 18KG      LUCIANO/": {
+              "vol": 8,
+              "fat": 1160.0
+            },
+            "GRAN SMITH 100 BREVI AZUL": {
+              "vol": 2,
+              "fat": 360.0
+            },
+            "MELAO PELE SAPO CEPI TP12 14KG": {
+              "vol": 1,
+              "fat": 60.0
+            },
+            "LIMAO SICILIANO CITRUS": {
+              "vol": 2,
+              "fat": 240.0
+            },
+            "X MAMAO HAVAI NORTE T20X": {
+              "vol": 46,
+              "fat": 2300.0
+            },
+            "MELAO REI TP 4": {
+              "vol": 2,
+              "fat": 160.0
+            },
+            "PORTUGUESA 60/65 SABOR": {
+              "vol": 1,
+              "fat": 110.0
+            }
+          },
+          "POUPY DISTRIBUIDORA": {
+            "AMEIXA CUMB APPC 20X1": {
+              "vol": 5,
+              "fat": 350.0
+            },
+            "CUMB THOMPSON BELLA": {
+              "vol": 312,
+              "fat": 15760.0
+            },
+            "CUMB THOMPSON GURUVA": {
+              "vol": 18,
+              "fat": 990.0
+            },
+            "CUMB VITORIA DELICAT": {
+              "vol": 80,
+              "fat": 4200.0
+            },
+            "MIRTILO FAMILYTREE BAND": {
+              "vol": 1,
+              "fat": 120.0
+            },
+            "PACKMANS 110 GAMA": {
+              "vol": 5,
+              "fat": 675.0
+            },
+            "PACKMANS 135 GAMA": {
+              "vol": 5,
+              "fat": 600.0
+            },
+            "PIMENTAO REI GRANEL VERMELHO": {
+              "vol": 2,
+              "fat": 200.0
+            },
+            "PORT 1/2 CUMB GRANFER": {
+              "vol": 5,
+              "fat": 475.0
+            },
+            "TANGERINA BERGAMOTA PVC 15KG": {
+              "vol": 5,
+              "fat": 475.0
+            }
+          },
+          "SITIO NATURA": {
+            "CUMB THOMPSON ALGODAO DOCE": {
+              "vol": 10,
+              "fat": 480.0
+            },
+            "CUMB VITORIA ARGO": {
+              "vol": 65,
+              "fat": 2795.0
+            },
+            "FUJI 165 BRANCA POMERANA": {
+              "vol": 55,
+              "fat": 4840.0
+            },
+            "FUJI 165 MOINHO AZUL": {
+              "vol": 75,
+              "fat": 3525.0
+            },
+            "GALA 165 ASTRO CX VERMELHA": {
+              "vol": 25,
+              "fat": 2200.0
+            },
+            "MELANCIA CEPI T5 14KG": {
+              "vol": 21,
+              "fat": 945.0
+            },
+            "MELAO GAIA TP 07": {
+              "vol": 30,
+              "fat": 1200.0
+            },
+            "MELAO GAIA TP 08": {
+              "vol": 10,
+              "fat": 400.0
+            },
+            "MELAO GAIA TP 09": {
+              "vol": 3,
+              "fat": 135.0
+            },
+            "MIRTILO FAMILYTREE BAND": {
+              "vol": 1,
+              "fat": 115.0
+            }
+          }
+        },
+        "Farley": {
+          "ABC CAMPEAO": {
+            "CUMB ISIS VITACE": {
+              "vol": 220,
+              "fat": 6600.0
+            },
+            "CUMB VITORIA IBACEM/GOOD": {
+              "vol": 220,
+              "fat": 7700.0
+            },
+            "MELAO DINO CEPI T4 10KG": {
+              "vol": 78,
+              "fat": 1560.0
+            },
+            "MELAO DINO REI T5 14KG": {
+              "vol": 66,
+              "fat": 1320.0
+            }
+          },
+          "OLS ANDRADAS": {
+            "CUMB VITORIA IBACEM/GOOD": {
+              "vol": 1210,
+              "fat": 42350.0
+            },
+            "KIWI 33 RIO BLANCO": {
+              "vol": 112,
+              "fat": 16800.0
+            }
+          },
+          "PAULO JUIZ DE FORA": {
+            "Y MAMAO HAVAI NORTE T24Y": {
+              "vol": 60,
+              "fat": 2700.0
+            },
+            "X ROSADA 1CAM BL ISOPOR X": {
+              "vol": 4,
+              "fat": 240.0
+            }
+          },
+          "SACOLAO MAXIMO": {
+            "FUJI 110 DADIVA": {
+              "vol": 20,
+              "fat": 2800.0
+            },
+            "FUJI 120 DADIVA": {
+              "vol": 25,
+              "fat": 3500.0
+            },
+            "GALA 135 BRANCA POMERANA": {
+              "vol": 23,
+              "fat": 2185.0
+            },
+            "GRAN SMITH 100 BREVI AZUL": {
+              "vol": 6,
+              "fat": 1140.0
+            },
+            "PORTUGUESA 60-65 CLUBE DA PERA": {
+              "vol": 10,
+              "fat": 900.0
+            },
+            "WILLIANS 1/2 ESP 75/80 VILLA": {
+              "vol": 44,
+              "fat": 5060.0
+            }
+          },
+          "SUPER SO": {
+            "MELANCIA MAGALI T5 14KG": {
+              "vol": 2,
+              "fat": 120.0
+            },
+            "MELAO REI TP 4": {
+              "vol": 9,
+              "fat": 810.0
+            }
+          },
+          "VILLEFORT ATACADISTA": {
+            "AMEIXA CUMB APPC 20X1": {
+              "vol": 19,
+              "fat": 2755.0
+            },
+            "AMEIXA CUMB GRANFER": {
+              "vol": 38,
+              "fat": 5510.0
+            },
+            "CUMB NUBIA/JUBILLE SPECIALE": {
+              "vol": 479,
+              "fat": 28740.0
+            },
+            "CUMB THOMPSON BELLA": {
+              "vol": 330,
+              "fat": 17160.0
+            },
+            "CUMB THOMPSON GRAND GRAPE": {
+              "vol": 285,
+              "fat": 15105.0
+            },
+            "FUJI 135 MOINHO AZUL": {
+              "vol": 784,
+              "fat": 47040.0
+            },
+            "FUJI 165 MOINHO AZUL": {
+              "vol": 784,
+              "fat": 47040.0
+            },
+            "KIWI CUMB CX PRETA 20X1": {
+              "vol": 95,
+              "fat": 19400.0
+            },
+            "LARANJA IMP BAHIA FRUTTO MARKET": {
+              "vol": 38,
+              "fat": 3040.0
+            },
+            "MELAO GAIA TP 07": {
+              "vol": 130,
+              "fat": 5200.0
+            },
+            "MELAO REI TP 4": {
+              "vol": 77,
+              "fat": 6160.0
+            },
+            "PESSEGO COOPRADO 28": {
+              "vol": 53,
+              "fat": 2915.0
+            },
+            "PORTUGUESA 60-65 CLUBE DA PERA": {
+              "vol": 112,
+              "fat": 9744.0
+            },
+            "TANGERINA MURCOTE FRUTTO MARKET": {
+              "vol": 61,
+              "fat": 5978.0
+            }
+          }
+        },
+        "Afanais": {
+          "ADICAO": {
+            "AMEIXA 55/60 TANY": {
+              "vol": 30,
+              "fat": 4200.0
+            },
+            "ARGENTINA 100 DOLE": {
+              "vol": 5,
+              "fat": 1000.0
+            },
+            "CUMB ISIS GRAND VALLE": {
+              "vol": 298,
+              "fat": 14900.0
+            },
+            "CUMB RED GLOBE BELLA": {
+              "vol": 10,
+              "fat": 510.0
+            },
+            "CUMB THOMPSON BELLA": {
+              "vol": 390,
+              "fat": 25360.0
+            },
+            "CUMB VITORIA ARGO": {
+              "vol": 330,
+              "fat": 16500.0
+            },
+            "CUMB VITORIA FRUTA HIT": {
+              "vol": 330,
+              "fat": 16500.0
+            },
+            "CUMB VITORIA NATURAL          LUCIANO/CLAUDIA/": {
+              "vol": 330,
+              "fat": 16500.0
+            },
+            "FUJI 150 BRANCA POMERANA": {
+              "vol": 56,
+              "fat": 5152.0
+            },
+            "FUJI 165 BRANCA POMERANA": {
+              "vol": 168,
+              "fat": 15456.0
+            },
+            "GALA 135 LABELLE": {
+              "vol": 56,
+              "fat": 5880.0
+            },
+            "GALA 165 ASTRO CX VERMELHA": {
+              "vol": 280,
+              "fat": 25200.0
+            },
+            "GALA 165 LABELLE": {
+              "vol": 56,
+              "fat": 5040.0
+            },
+            "GRAN SMITH DOLE 80": {
+              "vol": 5,
+              "fat": 1050.0
+            },
+            "KIWI 23 FRUSAN": {
+              "vol": 58,
+              "fat": 12760.0
+            },
+            "KIWI CUMB 22X1 RIO BLANCO": {
+              "vol": 4,
+              "fat": 840.0
+            },
+            "LARANJA IMP BAHIA FRUTTO MARKET": {
+              "vol": 1,
+              "fat": 85.0
+            },
+            "LIMAO SICILIANO CITRUS": {
+              "vol": 1,
+              "fat": 105.0
+            },
+            "MELAO REI TP 4": {
+              "vol": 3,
+              "fat": 300.0
+            },
+            "PACKHAMS DOLE 90 AZUL": {
+              "vol": 35,
+              "fat": 5250.0
+            },
+            "PESSEGO COOPRADO 28": {
+              "vol": 138,
+              "fat": 7590.0
+            },
+            "PORTUGUESA 60-65 CLUBE DA PERA": {
+              "vol": 5,
+              "fat": 675.0
+            },
+            "ROMA IMP POMICA": {
+              "vol": 3,
+              "fat": 270.0
+            }
+          },
+          "ALISSON CARATINGA": {
+            "CUMB THOMPSON SUEMI PURO NECTA": {
+              "vol": 30,
+              "fat": 2400.0
+            },
+            "CUMB VITORIA FRUTA HIT": {
+              "vol": 110,
+              "fat": 4950.0
+            },
+            "PP.1 GALA SOLTA HOSHI PP": {
+              "vol": 70,
+              "fat": 5600.0
+            },
+            "MELANCIA MAGALI T5 14KG": {
+              "vol": 10,
+              "fat": 700.0
+            },
+            "MELAO CEPI TP 5": {
+              "vol": 10,
+              "fat": 650.0
+            },
+            "MELAO REI TP 4": {
+              "vol": 10,
+              "fat": 880.0
+            },
+            "PACKHAMS DOLE 80 AZUL": {
+              "vol": 56,
+              "fat": 7280.0
+            }
+          },
+          "CATALAO": {
+            "MELANCIA MAGALI T5 14KG": {
+              "vol": 5,
+              "fat": 275.0
+            },
+            "MELAO GAIA TP 08": {
+              "vol": 140,
+              "fat": 7000.0
+            },
+            "MELAO REI TP 4": {
+              "vol": 30,
+              "fat": 2700.0
+            },
+            "Z ROSADA 1CAM BL ISOPOR Z": {
+              "vol": 1,
+              "fat": 60.0
+            },
+            "TANGERINA BERGAMOTA PVC 15KG": {
+              "vol": 26,
+              "fat": 2600.0
+            }
+          },
+          "DARIO": {
+            "CUMB THOMPSON SUEMI PURO NECTA": {
+              "vol": 66,
+              "fat": 5940.0
+            },
+            "CUMB VITORIA ARGO": {
+              "vol": 7,
+              "fat": 336.0
+            },
+            "CUMB VITORIA SPECIALE": {
+              "vol": 34,
+              "fat": 1632.0
+            },
+            "FUJI 120 FISCHER": {
+              "vol": 35,
+              "fat": 3675.0
+            },
+            "KIWI 20 FRUSAN": {
+              "vol": 2,
+              "fat": 400.0
+            },
+            "KIWI CUMB 22X1 RIO BLANCO": {
+              "vol": 5,
+              "fat": 1010.0
+            },
+            "X MAMAO FORMOSO NORTE T10/11 X": {
+              "vol": 17,
+              "fat": 1530.0
+            },
+            "Y MAMAO FORMOSO NORTE T10/11Y": {
+              "vol": 21,
+              "fat": 1890.0
+            },
+            "MELAO REI TP 4": {
+              "vol": 32,
+              "fat": 3520.0
+            },
+            "X ROSADA 1 CAM ISOPOR SERIE OURO": {
+              "vol": 24,
+              "fat": 1680.0
+            },
+            "XL CEREJA IMP XL TUNICHE": {
+              "vol": 10,
+              "fat": 3700.0
+            },
+            "CUMB VITORIA FRUTIBRAS": {
+              "vol": 13,
+              "fat": 624.0
+            },
+            "KIWI 23 FRUSAN": {
+              "vol": 2,
+              "fat": 400.0
+            },
+            "MIRTILO FAMILYTREE TUBO": {
+              "vol": 11,
+              "fat": 1320.0
+            },
+            "CUMB VITORIA RCA": {
+              "vol": 5,
+              "fat": 240.0
+            },
+            "KIWI ZESPRI SUN GOLD": {
+              "vol": 1,
+              "fat": 220.0
+            },
+            "Z ROSADA 1CAM BL ISOPOR Z": {
+              "vol": 9,
+              "fat": 585.0
+            }
+          },
+          "HERCULANO": {
+            "CEREJA L      IMP L TUNICHE": {
+              "vol": 2,
+              "fat": 690.0
+            },
+            "CUMB NUBIA/JUBILLE SPECIALE": {
+              "vol": 20,
+              "fat": 1000.0
+            },
+            "FUJI 120 BRANCA POMERANA": {
+              "vol": 56,
+              "fat": 5880.0
+            },
+            "SPPFUJI SOLTA HOSHI PP": {
+              "vol": 20,
+              "fat": 1200.0
+            },
+            "Y MAMAO FORMOSO NORTE T10/11Y": {
+              "vol": 34,
+              "fat": 2550.0
+            },
+            "MELAO GAIA TP 08": {
+              "vol": 65,
+              "fat": 3120.0
+            },
+            "MELAO PELE SAPO CEPI TP 9 14KG": {
+              "vol": 10,
+              "fat": 500.0
+            }
+          },
+          "JOSE PEREIRA DE SOUZA": {
+            "KG THOMPSON SUEMI PURO NECTA": {
+              "vol": 20,
+              "fat": 2600.0
+            },
+            "CUMB CRINSON CHERRY ARGO": {
+              "vol": 6,
+              "fat": 300.0
+            },
+            "CUMB NUBIA/JUBILLE SPECIALE": {
+              "vol": 2,
+              "fat": 100.0
+            },
+            "CUMB THOMPSON SUEMI PURO NECTA": {
+              "vol": 220,
+              "fat": 17160.0
+            },
+            "CUMB VITORIA GRAND VALLE": {
+              "vol": 220,
+              "fat": 11000.0
+            },
+            "CUMB VITORIA LINA": {
+              "vol": 220,
+              "fat": 9900.0
+            },
+            "GALA 135 AZALEIA": {
+              "vol": 9,
+              "fat": 450.0
+            },
+            "GALA 135 PRETA VALENTINO": {
+              "vol": 20,
+              "fat": 2000.0
+            },
+            "GALA 150 MOINHO AZUL": {
+              "vol": 41,
+              "fat": 2050.0
+            },
+            "PP.1 GALA SOLTA HOSHI PP": {
+              "vol": 112,
+              "fat": 8960.0
+            },
+            "KIWI CUMB 22X1 RIO BLANCO": {
+              "vol": 7,
+              "fat": 1400.0
+            },
+            "KIWI ZESPRI SUN GOLD": {
+              "vol": 10,
+              "fat": 1800.0
+            },
+            "MELANCIA MAGALI T5 14KG": {
+              "vol": 10,
+              "fat": 700.0
+            },
+            "MELAO PELE SAPO CEPI TP5 14KG": {
+              "vol": 2,
+              "fat": 120.0
+            },
+            "MELAO REI TP 4": {
+              "vol": 13,
+              "fat": 1230.0
+            },
+            "PACKHAMS MORE 70": {
+              "vol": 112,
+              "fat": 14560.0
+            },
+            "PESSEGO COOPRADO 28": {
+              "vol": 1,
+              "fat": 55.0
+            },
+            "PESSEGO COOPRADO 33": {
+              "vol": 51,
+              "fat": 1734.0
+            },
+            "PORTUGUESA 60-65 CLUBE DA PERA": {
+              "vol": 1,
+              "fat": 120.0
+            },
+            "ROSADA BAND GI": {
+              "vol": 34,
+              "fat": 1375.0
+            },
+            "TANGERINA MURCOTE FRUTTO MARKET": {
+              "vol": 3,
+              "fat": 285.0
+            }
+          },
+          "MART MINAS": {
+            "AMEIXA 55/60 TANY": {
+              "vol": 104,
+              "fat": 14040.0
+            },
+            "AMEIXA 60/65 TANY": {
+              "vol": 104,
+              "fat": 14040.0
+            },
+            "ASIATICA 1/2 JFC MARRON": {
+              "vol": 30,
+              "fat": 4200.0
+            },
+            "CUMB THOMPSON GURUVA": {
+              "vol": 2992,
+              "fat": 203456.0
+            },
+            "CUMB THOMPSON JOIA DO VALE": {
+              "vol": 1100,
+              "fat": 74800.0
+            },
+            "CUMB THOMPSON SANIFRUIT": {
+              "vol": 88,
+              "fat": 5984.0
+            },
+            "CUMB VITORIA CONE": {
+              "vol": 3081,
+              "fat": 160212.0
+            },
+            "CUMB VITORIA CX ROXA": {
+              "vol": 330,
+              "fat": 17160.0
+            },
+            "CUMB VITORIA SPECIALE": {
+              "vol": 3300,
+              "fat": 171600.0
+            },
+            "FUJI 110 LABELLE": {
+              "vol": 461,
+              "fat": 43795.0
+            },
+            "FUJI 120 LABELLE": {
+              "vol": 692,
+              "fat": 65740.0
+            },
+            "FUJI 135 BRANCA POMERANA": {
+              "vol": 2067,
+              "fat": 196365.0
+            },
+            "FUJI 135 LABELLE": {
+              "vol": 56,
+              "fat": 5320.0
+            },
+            "FUJI 150 BRANCA POMERANA": {
+              "vol": 980,
+              "fat": 93100.0
+            },
+            "KIWI 25 LE CERASARE": {
+              "vol": 112,
+              "fat": 19040.0
+            },
+            "KIWI 33 RIO BLANCO": {
+              "vol": 112,
+              "fat": 19040.0
+            },
+            "KIWI CUMB 22X1 MONO AZUL": {
+              "vol": 440,
+              "fat": 88000.0
+            },
+            "KIWI CUMB 22X1 RIO BLANCO": {
+              "vol": 187,
+              "fat": 41140.0
+            },
+            "LARANJA IMP BAHIA FRUTTO MARKET": {
+              "vol": 396,
+              "fat": 29700.0
+            },
+            "LIMAO SICILIANO CITRUS": {
+              "vol": 90,
+              "fat": 11700.0
+            },
+            "MELAO GAIA TP 06": {
+              "vol": 720,
+              "fat": 28800.0
+            },
+            "PESSEGO COOPRADO 28": {
+              "vol": 450,
+              "fat": 24300.0
+            },
+            "PINK LADY 120": {
+              "vol": 223,
+              "fat": 34565.0
+            },
+            "TANGERINA MURCOTE FRUTTO MARKET": {
+              "vol": 421,
+              "fat": 39995.0
+            }
+          },
+          "NOVO HORIZONTE": {
+            "AMEIXA 55/60 TANY": {
+              "vol": 6,
+              "fat": 840.0
+            },
+            "CUMB THOMPSON SUEMI PURO NECTA": {
+              "vol": 35,
+              "fat": 3150.0
+            },
+            "CUMB VITORIA DELICAT": {
+              "vol": 86,
+              "fat": 4300.0
+            },
+            "CUMB VITORIA MUSA": {
+              "vol": 62,
+              "fat": 3180.0
+            },
+            "GALA 165 ASTRO CX VERMELHA": {
+              "vol": 53,
+              "fat": 4770.0
+            },
+            "GALA 165 PRETA VALENTINO": {
+              "vol": 30,
+              "fat": 2810.0
+            },
+            "KIWI 33 RIO BLANCO": {
+              "vol": 3,
+              "fat": 600.0
+            },
+            "MELAO GAIA TP 07": {
+              "vol": 32,
+              "fat": 1280.0
+            },
+            "MELAO GAIA TP 08": {
+              "vol": 19,
+              "fat": 800.0
+            },
+            "PACKMANS 110 MENIS": {
+              "vol": 4,
+              "fat": 640.0
+            },
+            "PACKMANS 90 GAMA": {
+              "vol": 1,
+              "fat": 160.0
+            }
+          },
+          "SO BANANAS": {
+            "KG JUBILEE VERDE VALE": {
+              "vol": 15,
+              "fat": 1500.0
+            },
+            "KG RED GLOBE DELICIA BELLA": {
+              "vol": 10,
+              "fat": 1250.0
+            },
+            "AMEIXA CUMB APPC 20X1": {
+              "vol": 15,
+              "fat": 1275.0
+            },
+            "CUMB THOMPSON SUEMI PURO NECTA": {
+              "vol": 60,
+              "fat": 5100.0
+            },
+            "CUMB VITORIA DELICAT": {
+              "vol": 50,
+              "fat": 2600.0
+            },
+            "FUJI 110 DADIVA": {
+              "vol": 40,
+              "fat": 5400.0
+            },
+            "FUJI 165 BRANCA POMERANA": {
+              "vol": 30,
+              "fat": 2700.0
+            },
+            "FUJI 165 MOINHO AZUL": {
+              "vol": 116,
+              "fat": 6100.0
+            },
+            "KIWI CUMB 22X1 RIO BLANCO": {
+              "vol": 3,
+              "fat": 600.0
+            },
+            "LARANJA IMP BAHIA FRUTTO MARKET": {
+              "vol": 1,
+              "fat": 60.0
+            },
+            "MELAO PELE SAPO CEPI TP 9 14KG": {
+              "vol": 6,
+              "fat": 300.0
+            },
+            "PACKMANS 135 GAMA": {
+              "vol": 15,
+              "fat": 1845.0
+            },
+            "PACKMANS 80 GAMA": {
+              "vol": 21,
+              "fat": 2835.0
+            },
+            "PESSEGO COOPRADO 33": {
+              "vol": 6,
+              "fat": 300.0
+            },
+            "ROMA IMP BOUQUET": {
+              "vol": 2,
+              "fat": 170.0
+            },
+            "ROSADA BAND GI": {
+              "vol": 10,
+              "fat": 450.0
+            },
+            "TAMARA KHAJUR BDJ 200GR": {
+              "vol": 4,
+              "fat": 300.0
+            }
+          },
+          "TONINHO BOY": {
+            "KG BENITAKA SPECIALE": {
+              "vol": 5,
+              "fat": 425.0
+            },
+            "AMEIXA 50-55 TANY": {
+              "vol": 2,
+              "fat": 220.0
+            },
+            "FUJI 135 MOINHO AZUL": {
+              "vol": 30,
+              "fat": 1950.0
+            },
+            "SPPFUJI SOLTA HOSHI PP": {
+              "vol": 60,
+              "fat": 4200.0
+            },
+            "PP.1 GALA SOLTA HOSHI PP": {
+              "vol": 40,
+              "fat": 3200.0
+            },
+            "KIWI 33 RIO BLANCO": {
+              "vol": 4,
+              "fat": 680.0
+            },
+            "MACA GALA HOSHI 120": {
+              "vol": 30,
+              "fat": 1950.0
+            },
+            "MELANCIA CEPI T5 14KG": {
+              "vol": 1,
+              "fat": 55.0
+            },
+            "PACKHAMS MORE 110": {
+              "vol": 18,
+              "fat": 2340.0
+            },
+            "PACKHAMS MORE 90": {
+              "vol": 9,
+              "fat": 1170.0
+            },
+            "PORTUGUESA 60-65 CLUBE DA PERA": {
+              "vol": 2,
+              "fat": 240.0
+            },
+            "X ROSADA 1CAM BL ISOPOR X": {
+              "vol": 9,
+              "fat": 810.0
+            },
+            "Z ROSADA 1CAM BL ISOPOR Z": {
+              "vol": 9,
+              "fat": 540.0
+            },
+            "X ROSADA 1CAM SL ISOPOR X": {
+              "vol": 7,
+              "fat": 420.0
+            },
+            "TANGERINA BERGAMOTA PVC 15KG": {
+              "vol": 40,
+              "fat": 3920.0
+            }
+          },
+          "VERA CRUZ": {
+            "KG JUBILEE VERDE VALE": {
+              "vol": 14,
+              "fat": 1400.0
+            },
+            "KG NUBIA/JUBILLE SPECIALE": {
+              "vol": 10,
+              "fat": 800.0
+            },
+            "8KG RED GLOBE DELICAT": {
+              "vol": 8,
+              "fat": 880.0
+            },
+            "KG RED GLOBE DELICIA BELLA": {
+              "vol": 8,
+              "fat": 880.0
+            },
+            "KG THOMPSON SUEMI PURO NECTA": {
+              "vol": 13,
+              "fat": 1755.0
+            },
+            "ARGENTINA 1/2 BREVI AZUL": {
+              "vol": 6,
+              "fat": 660.0
+            },
+            "FUJI 90 FISCHER": {
+              "vol": 26,
+              "fat": 2548.0
+            },
+            "KIWI 33 RIO BLANCO": {
+              "vol": 13,
+              "fat": 2080.0
+            },
+            "PORTUGUESA 60-65 CLUBE DA PERA": {
+              "vol": 15,
+              "fat": 1500.0
+            },
+            "WILLIANS 1/2 BOUQUET 65/70": {
+              "vol": 29,
+              "fat": 2755.0
+            }
+          }
+        }
+      }
+    }
+  },
+  "history": []
+}
